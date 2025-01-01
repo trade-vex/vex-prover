@@ -1,17 +1,13 @@
 //! # Attribution
 //! This code is based on the implementation from the StarksWare's STWO repository.
 //! The original code can be found [here](https://github.com/starkware-libs/stwo/blob/dev/crates/prover/src/examples/poseidon/mod.rs)
-//! todo: add original round constants
 
 use std::array;
 
+use crate::constants::{EXTERNAL_ROUND_CONSTS, INTERNAL_ROUND_CONSTS, MAT_DIAG16_M_1};
 use num_traits::identities::*;
 use stwo_prover::core::fields::m31::BaseField;
 
-pub const EXTERNAL_ROUND_CONSTS: [[BaseField; N_STATE]; 2 * N_HALF_FULL_ROUNDS] =
-    [[BaseField::from_u32_unchecked(1234); N_STATE]; 2 * N_HALF_FULL_ROUNDS];
-pub const INTERNAL_ROUND_CONSTS: [BaseField; N_PARTIAL_ROUNDS] =
-    [BaseField::from_u32_unchecked(1234); N_PARTIAL_ROUNDS];
 pub const N_PARTIAL_ROUNDS: usize = 14;
 pub const N_HALF_FULL_ROUNDS: usize = 4;
 pub const N_STATE: usize = 16;
@@ -52,7 +48,7 @@ pub fn hash_leaf(input: [BaseField; 16]) -> [BaseField; 8] {
 }
 
 pub fn compress(input: &[&[BaseField; 8]; 2]) -> [BaseField; 8] {
-    // Combine the two slices into a single array of length 16
+    // Combine the two slices into a single array of length 16(initial state)
     let mut combined = [BaseField::zero(); 16];
     combined[..8].copy_from_slice(&input[0][..]);
     combined[8..].copy_from_slice(&input[1][..]);
@@ -60,7 +56,7 @@ pub fn compress(input: &[&[BaseField; 8]; 2]) -> [BaseField; 8] {
     // Apply the permutation function to the combined array
     let permuted = permutation(combined);
 
-    // Return the first 8 elements of the permuted array as the result
+    // The first 8 elements as hash of the permuted array are returned as the result
     let mut output = [BaseField::zero(); 8];
     output.copy_from_slice(&permuted[..8]);
     output
@@ -92,7 +88,7 @@ pub fn apply_external_round_matrix(state: &mut [BaseField; 16]) {
 pub fn apply_internal_round_matrix(state: &mut [BaseField; 16]) {
     let sum = state[1..].iter().fold(state[0], |acc, s| acc + *s);
     state.iter_mut().enumerate().for_each(|(i, s)| {
-        *s = *s * BaseField::from_u32_unchecked(1 << (i + 1)) + sum;
+        (*s) = (*s) * MAT_DIAG16_M_1[i] + sum;
     });
 }
 
