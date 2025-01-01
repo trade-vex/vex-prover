@@ -1,3 +1,8 @@
+//! # Attribution
+//! This code is based on the implementation from the StarksWare's STWO repository.
+//! The original code can be found [here](https://github.com/starkware-libs/stwo/blob/dev/crates/prover/src/examples/poseidon/mod.rs)
+//! todo: add original round constants
+
 use std::array;
 
 use num_traits::identities::*;
@@ -61,8 +66,6 @@ pub fn compress(input: &[&[BaseField; 8]; 2]) -> [BaseField; 8] {
     output
 }
 
-/// Applies the external round matrix.
-/// See <https://eprint.iacr.org/2023/323.pdf> 5.1 and Appendix B.
 pub fn apply_external_round_matrix(state: &mut [BaseField; 16]) {
     // Applies circ(2M4, M4, M4, M4).
     for i in 0..4 {
@@ -86,15 +89,9 @@ pub fn apply_external_round_matrix(state: &mut [BaseField; 16]) {
     }
 }
 
-// Applies the internal round matrix.
-//   mu_i = 2^{i+1} + 1.
-// See <https://eprint.iacr.org/2023/323.pdf> 5.2.
 pub fn apply_internal_round_matrix(state: &mut [BaseField; 16]) {
-    // TODO(shahars): Check that these coefficients are good according to section  5.3 of Poseidon2
-    // paper.
     let sum = state[1..].iter().fold(state[0], |acc, s| acc + *s);
     state.iter_mut().enumerate().for_each(|(i, s)| {
-        // TODO(andrew): Change to rotations.
         *s = *s * BaseField::from_u32_unchecked(1 << (i + 1)) + sum;
     });
 }
@@ -106,7 +103,6 @@ pub fn pow5(x: BaseField) -> BaseField {
 }
 
 #[inline(always)]
-/// Applies the M4 MDS matrix described in <https://eprint.iacr.org/2023/323.pdf> 5.1.
 fn apply_m4(x: [BaseField; 4]) -> [BaseField; 4] {
     let t0 = x[0] + x[1];
     let t02 = t0 + t0;

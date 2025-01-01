@@ -1,5 +1,10 @@
 use stwo_prover::core::fields::m31::{BaseField, M31};
 
+/// Empty hashes are the hashes of empty leaves at each level of the tree.
+/// The hash at the leaves is the hash of the empty leaf.
+/// The hash at the next level is the hash of the concatenation of the hash of the empty leaf with itself.
+/// This is repeated until the root hash is reached.
+/// It is assumed that the maximum height of the tree is 30.
 pub const EMPTY_HASHES: [[BaseField; 8]; 30] = [
     [
         M31(2113849685),

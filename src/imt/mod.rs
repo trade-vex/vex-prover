@@ -546,6 +546,7 @@ mod tests {
 
     #[test]
     fn test_empty_hashes() {
+        // tests that the constant EMPTY_HASHES is correct
         let mut empty_hashes: [[BaseField; 8]; 30] =
             array::from_fn(|_| array::from_fn(|_| BaseField::zero()));
         let mut current = Leaf::empty().hash();
