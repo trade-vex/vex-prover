@@ -42,6 +42,12 @@ macro_rules! implement_field_array_type {
             }
         }
 
+        impl<F: Copy + Default> Default for $type_name<F> {
+            fn default() -> Self {
+                Self([F::default(); 8])
+            }
+        }
+
         impl<F: Copy + Default + Add<Output = F>> Add for $type_name<F> {
             type Output = Self;
             fn add(self, rhs: Self) -> Self {
