@@ -7,7 +7,7 @@ use stwo_prover::core::fields::m31::BaseField;
 #[derive(Default, Clone, Copy)]
 pub struct Leaf {
     /// Determines if the leaf is active
-    /// active leaf referes the node contains an order eligible to be executed
+    /// active leaf indicate whether the node contains an order eligible to be executed
     pub active: BaseField,
     /// Unfilled Volume
     pub volume: BaseField,
