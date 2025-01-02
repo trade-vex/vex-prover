@@ -1,4 +1,7 @@
-use crate::imt::BaseField;
+use crate::{
+    imt::BaseField,
+    types::{Price, Time, Volume},
+};
 use num_traits::One;
 
 use super::leaf::{Leaf, PriceTime};
@@ -7,14 +10,14 @@ use super::leaf::{Leaf, PriceTime};
 #[derive(Debug, Clone, Copy)]
 pub struct Order {
     /// volume of the order
-    pub volume: BaseField,
+    pub volume: Volume<BaseField>,
     /// price of the order
     pub price_time: PriceTime,
 }
 
 impl Order {
     /// Creates a new Order.
-    pub fn new(volume: BaseField, price: BaseField, time: BaseField) -> Self {
+    pub fn new(volume: Volume<BaseField>, price: Price<BaseField>, time: Time<BaseField>) -> Self {
         Self {
             volume,
             price_time: PriceTime::new(price, time),

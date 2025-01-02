@@ -1,6 +1,10 @@
 use std::array;
 
-use crate::{hash::hash_leaf, imt::Hash};
+use crate::{
+    hash::hash_leaf,
+    imt::Hash,
+    types::{Price, Time, Volume},
+};
 use num_traits::{One, Zero};
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -10,7 +14,7 @@ pub struct Leaf {
     /// active leaf indicate whether the node contains an order eligible to be executed
     pub active: BaseField,
     /// Unfilled Volume
-    pub volume: BaseField,
+    pub volume: Volume<BaseField>,
     /// label determines the ordering in the IMT: Price Time Priority
     pub label: PriceTime,
     /// next refers to the next leaf in the order book
@@ -22,7 +26,7 @@ impl Leaf {
     pub fn first() -> Self {
         Self {
             active: BaseField::one(),
-            volume: BaseField::zero(),
+            volume: Volume::default(),
             label: PriceTime::default(),
             next: PriceTime::default(),
         }
@@ -32,34 +36,29 @@ impl Leaf {
     pub fn empty() -> Self {
         Self {
             active: BaseField::zero(),
-            volume: BaseField::zero(),
+            volume: Volume::default(),
             label: PriceTime::default(),
             next: PriceTime::default(),
         }
     }
 
-    /// return true if the leaf is empty
-    pub fn is_empty(&self) -> bool {
-        self.active.is_zero() && self.volume.is_zero() && self.label.is_zero()
-    }
-
     /// construct felts from leaf
-    pub fn to_felts(&self) -> [BaseField; 6] {
+    pub fn to_felts(&self) -> [BaseField; N_LEAF_FELTS] {
         let mut felts = array::from_fn(|_| BaseField::zero());
         felts[0] = self.active;
-        felts[1] = self.volume;
-        [felts[2], felts[3]] = self.label.to_felts();
-        [felts[4], felts[5]] = self.next.to_felts();
+        felts[1..9].copy_from_slice(&self.volume.to_felts());
+        felts[9..25].copy_from_slice(&self.label.to_felts());
+        felts[25..41].copy_from_slice(&self.next.to_felts());
         felts
     }
 
     /// construct leaf from felts
-    pub fn from_felts(felts: [BaseField; 6]) -> Self {
+    pub fn from_felts(felts: [BaseField; N_LEAF_FELTS]) -> Self {
         Self {
             active: felts[0],
-            volume: felts[1],
-            label: PriceTime::from_felts([felts[2], felts[3]]),
-            next: PriceTime::from_felts([felts[4], felts[5]]),
+            volume: Volume::try_from(&felts[1..9]).unwrap(),
+            label: PriceTime::try_from(&felts[9..25]).unwrap(),
+            next: PriceTime::try_from(&felts[25..41]).unwrap(),
         }
     }
 
@@ -74,20 +73,13 @@ impl Leaf {
 
 use std::cmp::Ordering;
 
-// Holds a price and a time, used as a key in the BTreeMap
-#[derive(Debug, Eq, Clone, Copy)]
-pub struct PriceTime {
-    price: BaseField,
-    time: BaseField,
-}
+use super::{N_LEAF_FELTS, N_U64_FELTS};
 
-impl Default for PriceTime {
-    fn default() -> Self {
-        Self {
-            price: BaseField::zero(),
-            time: BaseField::zero(),
-        }
-    }
+// Holds a price and a time, used as a key in the BTreeMap
+#[derive(Debug, Default, Eq, Clone, Copy)]
+pub struct PriceTime {
+    price: Price<BaseField>,
+    time: Time<BaseField>,
 }
 
 impl PartialEq for PriceTime {
@@ -115,43 +107,53 @@ impl Ord for PriceTime {
     }
 }
 
+impl TryFrom<&[BaseField]> for PriceTime {
+    type Error = &'static str;
+
+    fn try_from(slice: &[BaseField]) -> Result<Self, Self::Error> {
+        let price = Price::try_from(&slice[0..9])?;
+        let time = Time::try_from(&slice[9..16])?;
+        let price_time = PriceTime::new(price, time);
+        Ok(price_time)
+    }
+}
+
 impl PriceTime {
-    pub fn new(price: BaseField, time: BaseField) -> Self {
+    pub fn new(price: Price<BaseField>, time: Time<BaseField>) -> Self {
         Self { price, time }
     }
 
-    pub fn price(&self) -> &BaseField {
+    pub fn price(&self) -> &Price<BaseField> {
         &self.price
     }
 
-    pub fn time(&self) -> &BaseField {
+    pub fn time(&self) -> &Time<BaseField> {
         &self.time
     }
 
-    pub fn into_inner(&self) -> (BaseField, BaseField) {
+    pub fn into_inner(&self) -> (Price<BaseField>, Time<BaseField>) {
         (self.price, self.time)
     }
 
-    pub fn from_inner((price, time): &(BaseField, BaseField)) -> Self {
+    pub fn from_inner((price, time): &(Price<BaseField>, Time<BaseField>)) -> Self {
         Self {
             price: *price,
             time: *time,
         }
     }
 
-    pub fn from_felts(felts: [BaseField; 2]) -> Self {
+    pub fn from_felts(felts: [BaseField; 2 * N_U64_FELTS]) -> Self {
         Self {
-            price: felts[0],
-            time: felts[1],
+            price: Price::try_from(&felts[0..8]).unwrap(),
+            time: Time::try_from(&felts[8..16]).unwrap(),
         }
     }
 
-    pub fn to_felts(&self) -> [BaseField; 2] {
-        [self.price, self.time]
-    }
-
-    pub fn is_zero(&self) -> bool {
-        self.price.is_zero() && self.time.is_zero()
+    pub fn to_felts(&self) -> [BaseField; 2 * N_U64_FELTS] {
+        let mut felts = [BaseField::default(); 2 * N_U64_FELTS];
+        felts[0..8].copy_from_slice(&self.price.to_felts());
+        felts[8..16].copy_from_slice(&self.time.to_felts());
+        felts
     }
 }
 
@@ -163,9 +165,9 @@ mod tests {
 
     #[test]
     fn test_equality() {
-        let pt1 = PriceTime::new(M31(10), M31(1));
-        let pt2 = PriceTime::new(M31(41), M31(1));
-        let pt3 = PriceTime::new(M31(10), M31(2));
+        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
+        let pt2 = PriceTime::new(Price::new([M31(41); 8]), Time::new([M31(1); 8]));
+        let pt3 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(2); 8]));
 
         assert!(pt1 < pt2);
         assert!(pt1 < pt3);
@@ -175,8 +177,8 @@ mod tests {
 
     #[test]
     fn test_ordering_by_price() {
-        let pt1 = PriceTime::new(M31(10), M31(1));
-        let pt2 = PriceTime::new(M31(20), M31(1));
+        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
+        let pt2 = PriceTime::new(Price::new([M31(20); 8]), Time::new([M31(1); 8]));
 
         assert!(pt1 < pt2);
         assert!(pt2 > pt1);
@@ -184,8 +186,8 @@ mod tests {
 
     #[test]
     fn test_ordering_by_time_when_prices_equal() {
-        let pt1 = PriceTime::new(M31(10), M31(1));
-        let pt2 = PriceTime::new(M31(41), M31(2)); // 41 ≡ 10 (mod 31)
+        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
+        let pt2 = PriceTime::new(Price::new([M31(41); 8]), Time::new([M31(2); 8])); // 41 ≡ 10 (mod 31)
 
         assert!(pt1 < pt2);
         assert!(pt2 > pt1);
@@ -196,11 +198,11 @@ mod tests {
         let mut map = BTreeMap::new();
 
         // Insert in random order
-        let pt3 = PriceTime::new(M31(10), M31(3));
-        let pt1 = PriceTime::new(M31(10), M31(1));
-        let pt2 = PriceTime::new(M31(10), M31(2));
-        let pt4 = PriceTime::new(M31(5), M31(4));
-        let pt5 = PriceTime::new(M31(15), M31(1));
+        let pt3 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(3); 8]));
+        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
+        let pt2 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(2); 8]));
+        let pt4 = PriceTime::new(Price::new([M31(5); 8]), Time::new([M31(4); 8]));
+        let pt5 = PriceTime::new(Price::new([M31(15); 8]), Time::new([M31(1); 8]));
 
         map.insert(pt3, "third");
         map.insert(pt1, "first");

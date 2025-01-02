@@ -10,6 +10,8 @@ pub mod order;
 
 pub const MERKLE_HEIGHT: usize = 20;
 pub const MERKLE_WIDTH: usize = 1 << MERKLE_HEIGHT;
+pub const N_LEAF_FELTS: usize = 41;
+pub const N_U64_FELTS: usize = 8;
 pub type Hash<F> = [F; 8];
 
 /// A structure representing an Indexed Merkle Tree.
@@ -17,7 +19,7 @@ pub type Hash<F> = [F; 8];
 /// An Indexed Merkle Tree is a variant of the Merkle Tree data structure
 /// that includes metadata along with other parts of Node Leaf to ensure
 /// efficient non-membership proofs.
-/// 
+///
 /// The Tree is designed to hold Orders of Buy or Sell type.
 ///
 /// # Examples
@@ -28,7 +30,7 @@ pub type Hash<F> = [F; 8];
 /// // let order = Order::new(PriceTime::new(10, 1), 1);
 /// // let insertion_proof = tree.insert(order);
 /// // insertion_proof.verify();
-/// // 
+/// //
 /// ```
 /// # References
 ///
@@ -352,8 +354,12 @@ impl InsertionProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::constants::EMPTY_HASHES;
+    use crate::{
+        constants::EMPTY_HASHES,
+        types::{Price, Time, Volume},
+    };
     use num_traits::One;
+    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_sparse_imt() {
@@ -364,13 +370,12 @@ mod tests {
         }
         let leaf = Leaf {
             active: BaseField::one(),
-            volume: BaseField::one(),
-            label: PriceTime::new(BaseField::one(), BaseField::one()),
-            next: PriceTime::new(BaseField::one(), BaseField::one()),
+            volume: Volume::from_u64(1),
+            label: create_test_price_time(1, 1),
+            next: create_test_price_time(1, 1),
         };
         imt.leaves.push(leaf);
-        imt.index_map
-            .insert(PriceTime::new(BaseField::one(), BaseField::one()), 1);
+        imt.index_map.insert(create_test_price_time(1, 1), 1);
         imt.finalize_insert();
         assert_eq!(imt.raw[0].len(), 2);
         for i in 1..MERKLE_HEIGHT {
@@ -380,9 +385,13 @@ mod tests {
 
     fn create_test_order(price: u32, time: u32) -> Order {
         Order {
-            price_time: PriceTime::new(BaseField::from(price), BaseField::from(time)),
-            volume: BaseField::from(1), // Using 1 as default volume for simplicity
+            price_time: create_test_price_time(price, time),
+            volume: Volume::new([M31(1); 8]), // Using 1 as default volume for simplicity
         }
+    }
+
+    fn create_test_price_time(price: u32, time: u32) -> PriceTime {
+        PriceTime::new(Price::from_u64(price as u64), Time::from_u64(time as u64))
     }
 
     #[test]
@@ -488,22 +497,10 @@ mod tests {
 
         // Test cases for find_highest_below
         let test_cases = vec![
-            (
-                PriceTime::new(BaseField::from(25), BaseField::from(1)),
-                Some(3),
-            ), // Should find order (20,1)
-            (
-                PriceTime::new(BaseField::from(15), BaseField::from(2)),
-                Some(1),
-            ), // Should find order (15,1)
-            (
-                PriceTime::new(BaseField::from(10), BaseField::from(1)),
-                Some(0),
-            ), // Should find default leaf
-            (
-                PriceTime::new(BaseField::from(5), BaseField::from(1)),
-                Some(0),
-            ), // Should find default leaf
+            (create_test_price_time(25, 1), Some(3)), // Should find order (20,1)
+            (create_test_price_time(15, 2), Some(1)), // Should find order (15,1)
+            (create_test_price_time(10, 1), Some(0)), // Should find default leaf
+            (create_test_price_time(5, 1), Some(0)),  // Should find default leaf
         ];
 
         for (target, expected_index) in test_cases {

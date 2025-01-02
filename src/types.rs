@@ -40,6 +40,28 @@ macro_rules! implement_field_array_type {
                 }
                 u64::from_le_bytes(bytes)
             }
+
+            pub fn to_felts(&self) -> [F; 8] {
+                self.0
+            }
+        }
+
+        impl<F: Copy + Default + Ord + From<u32>> TryFrom<&[F]> for $type_name<F> {
+            type Error = &'static str;
+
+            fn try_from(slice: &[F]) -> Result<Self, Self::Error> {
+                if slice.len() != 8 {
+                    return Err("Slice length must be exactly 8");
+                }
+                let mut array = [F::default(); 8];
+                for (i, &item) in slice.iter().enumerate() {
+                    if item >= F::from(256) {
+                        return Err("Slice contains value(s) greater than or equal to 256");
+                    }
+                    array[i] = item;
+                }
+                Ok(Self(array))
+            }
         }
 
         impl<F: Copy + Default> Default for $type_name<F> {
