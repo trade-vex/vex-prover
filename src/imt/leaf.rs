@@ -63,10 +63,13 @@ impl Leaf {
     }
 
     /// poseidon hash of the leaf
+    /// NOTE: This is a placeholder implementation
+    /// NOTE: The Hasher is not implemented yet
+    /// use with caution
     pub fn hash(&self) -> Hash<BaseField> {
         let felts = self.to_felts();
         let mut input_state = array::from_fn(|_| BaseField::zero());
-        input_state[..6].clone_from_slice(&felts[..6]);
+        input_state[..16].clone_from_slice(&felts[..16]);
         hash_leaf(input_state)
     }
 }
