@@ -1,5 +1,5 @@
 use crate::{
-    imt::BaseField,
+    imt::{BaseField, N_ORDER_FELTS},
     types::{Price, Time, Volume},
 };
 use num_traits::One;
@@ -34,5 +34,13 @@ impl Order {
             label: self.price_time,
             next: *next,
         }
+    }
+
+    /// converts the order to felts
+    pub fn to_felts(&self) -> [BaseField; N_ORDER_FELTS] {
+        let mut felts = [BaseField::default(); N_ORDER_FELTS];
+        felts[0..8].copy_from_slice(&self.volume.to_felts());
+        felts[8..24].copy_from_slice(&self.price_time.to_felts());
+        felts
     }
 }

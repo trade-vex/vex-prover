@@ -12,6 +12,7 @@ pub const MERKLE_HEIGHT: usize = 20;
 pub const MERKLE_WIDTH: usize = 1 << MERKLE_HEIGHT;
 pub const N_LEAF_FELTS: usize = 41;
 pub const N_U64_FELTS: usize = 8;
+pub const N_ORDER_FELTS: usize = 3 * N_U64_FELTS;
 pub type Hash<F> = [F; 8];
 
 /// A structure representing an Indexed Merkle Tree.
@@ -184,7 +185,11 @@ impl IndexedMerkleTree {
 
     /// Updates an order into the IndexedMerkleTree at the end of the leaves list.
     #[inline]
-    pub fn update(&mut self, price_time: PriceTime, volume: Volume<BaseField>) -> UpdateProof {
+    pub fn update(
+        &mut self,
+        price_time: PriceTime,
+        volume: Volume<BaseField>,
+    ) -> UpdateProof<BaseField> {
         // fetch initial root, leaf parameters before update
         let initial_root = self.root;
         // will not panic on unwrap, as a leaf is inserted on creation
@@ -205,6 +210,106 @@ impl IndexedMerkleTree {
             index,
             volume,
             final_root: merkle_updated_path[MERKLE_HEIGHT],
+        }
+    }
+
+    /// Cancel an order into the IndexedMerkleTree at the end of the leaves list.
+    #[inline]
+    pub fn cancel_at_index(&mut self, index: usize) -> CancellationProof {
+        if index == 0 {
+            panic!("Cannot cancel the first leaf");
+        }
+        // fetch initial root, low leaf parameters before insertion
+        let initial_root = self.root;
+        let cancel_leaf = self.leaves[index];
+        let low_index = self.find_highest_below(&cancel_leaf.label).unwrap();
+        let low_leaf = self.leaves[low_index];
+        let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(low_index);
+        // update low_leaf.next to point to the new leaf & finalize the update
+        self.leaves[low_index].next = cancel_leaf.next;
+        let low_merkle_updated_path = self.finalize_update(low_index);
+        // get cancel leaf proof.
+        let (cancel_proof, cancel_path) = self.get_merkle_proof(index);
+        // update cancel leaf to inactive & finalize the update
+        self.leaves[index].active = BaseField::zero();
+        let cancel_updated_path = self.finalize_update(index);
+        // remove from index map
+        self.index_map.remove(&cancel_leaf.label);
+        CancellationProof {
+            initial_root,
+            low_leaf,
+            low_merkle_proof,
+            low_merkle_path,
+            low_merkle_updated_path,
+            low_index,
+            cancel_leaf,
+            cancel_leaf_proof: cancel_proof,
+            cancel_leaf_path: cancel_path,
+            cancel_leaf_updated_path: cancel_updated_path,
+            cancel_leaf_index: index,
+            final_root: cancel_updated_path[MERKLE_HEIGHT],
+        }
+    }
+
+    /// Matches an order of highest priority.
+    #[inline]
+    pub fn match_order(&mut self) -> MatchProof {
+        // fetch initial root, low leaf parameters before insertion
+        let initial_root = self.root;
+        let index = self.find(&self.leaves[0].next).unwrap();
+        let match_leaf = self.leaves[index];
+        let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(0);
+        // update low_leaf.next to point to the new leaf & finalize the update
+        self.leaves[0].next = match_leaf.next;
+        let low_merkle_updated_path = self.finalize_update(0);
+        // get match leaf proof.
+        let (match_proof, match_path) = self.get_merkle_proof(index);
+        // update cancel leaf to inactive & finalize the update
+        self.leaves[index].active = BaseField::zero();
+        let match_updated_path = self.finalize_update(index);
+        // remove from index map
+        self.index_map.remove(&match_leaf.label);
+        MatchProof {
+            initial_root,
+            low_merkle_proof,
+            low_merkle_path,
+            low_merkle_updated_path,
+            match_leaf,
+            match_leaf_proof: match_proof,
+            match_leaf_path: match_path,
+            match_leaf_updated_path: match_updated_path,
+            match_leaf_index: index,
+            final_root: match_updated_path[MERKLE_HEIGHT],
+        }
+    }
+
+    /// Partial Matches an order of highest priority.
+    #[inline]
+    pub fn match_partially(&mut self, volume: u64) -> PartialMatchProof {
+        // fetch initial root, low leaf parameters before insertion
+        let filled_volume = Volume::from_u64(volume);
+        let initial_root = self.root;
+        let index = self.find(&self.leaves[0].next).unwrap();
+        let p_match_leaf = self.leaves[index];
+        let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(0);
+        // get match leaf proof.
+        let (p_match_proof, p_match_path) = self.get_merkle_proof(index);
+        // update volume to the new volume & finalize the update
+        let remaining_volume = p_match_leaf.volume - filled_volume;
+        self.leaves[index].volume = remaining_volume;
+        let match_updated_path = self.finalize_update(index);
+        PartialMatchProof {
+            initial_root,
+            low_merkle_proof,
+            low_merkle_path,
+            p_match_leaf,
+            p_match_leaf_proof: p_match_proof,
+            p_match_leaf_path: p_match_path,
+            p_match_leaf_updated_path: match_updated_path,
+            p_match_leaf_index: index,
+            final_root: match_updated_path[MERKLE_HEIGHT],
+            remaining_volume,
+            filled_volume,
         }
     }
 
@@ -430,27 +535,27 @@ impl InsertionProof {
     }
 }
 
-pub struct UpdateProof {
+pub struct UpdateProof<F> {
     /// initial root hash
-    initial_root: Hash<BaseField>,
+    initial_root: Hash<F>,
     /// low leaf - immediate predecessor of the leaf being inserted
     leaf: Leaf,
     /// low proof - proof of membership of the low leaf
-    merkle_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    merkle_proof: [Hash<F>; MERKLE_HEIGHT],
     /// low merkle path containing the resulting hash at each level of the tree
-    merkle_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    merkle_path: [Hash<F>; MERKLE_HEIGHT + 1],
     /// new volume
-    volume: Volume<BaseField>,
+    volume: Volume<F>,
     /// low merkle update path is the resulting hash at each level of the tree
     /// after updating the low leaf
-    merkle_updated_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    merkle_updated_path: [Hash<F>; MERKLE_HEIGHT + 1],
     /// low_index - index of the low leaf in the leaves
     index: usize,
     /// final root hash after insertion
-    final_root: Hash<BaseField>,
+    final_root: Hash<F>,
 }
 
-impl UpdateProof {
+impl UpdateProof<BaseField> {
     /// sanity check for the update proof
     /// # Panics
     /// Panics if the proof is invalid
@@ -484,6 +589,239 @@ impl UpdateProof {
             &updated_low_leaf,
         );
 
+        // check if final root is correct
+        assert_eq!(final_root, self.final_root, "Final root hash is incorrect");
+    }
+}
+
+pub struct CancellationProof {
+    /// initial root hash
+    pub initial_root: Hash<BaseField>,
+    /// low leaf - immediate predecessor of the leaf being cancelled
+    pub low_leaf: Leaf,
+    /// low proof - proof of membership of the low leaf
+    pub low_merkle_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    /// low merkle path containing the resulting hash at each level of the tree
+    pub low_merkle_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// low merkle update path is the resulting hash at each level of the tree
+    /// after updating the low leaf
+    pub low_merkle_updated_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// low_index - index of the low leaf in the leaves
+    pub low_index: usize,
+    /// leaf containing order tjat is being cancelled
+    pub cancel_leaf: Leaf,
+    /// inactivity proof - proof of inactivity where the order is being inserted
+    pub cancel_leaf_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    /// inactivity path is the resulting hash at each level of the tree
+    pub cancel_leaf_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// inactivity update compute is the resulting hash at each level of the tree
+    /// after updating the inactive leaf
+    pub cancel_leaf_updated_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// inactive index - index of the next inactive leaf in the leaves
+    pub cancel_leaf_index: usize,
+    /// final root hash after insertion
+    pub final_root: Hash<BaseField>,
+}
+impl CancellationProof {
+    /// sanity check for the cancellation proof
+    /// # Panics
+    /// Panics if the proof is invalid
+    pub fn verify(&self) {
+        // check if low leaf is active
+        assert_eq!(
+            self.low_leaf.active,
+            BaseField::one(),
+            "Low leaf should be active"
+        );
+        // verify low_leafs merkle proof
+        assert!(
+            IndexedMerkleTree::verify_merkle_proof(
+                self.low_index,
+                &self.low_merkle_proof,
+                &self.low_merkle_path,
+                &self.low_leaf,
+                &self.initial_root
+            ),
+            "Low leaf merkle proof is invalid"
+        );
+        // update low leaf and recompute root
+        let mut updated_low_leaf = self.low_leaf;
+        updated_low_leaf.next = self.cancel_leaf.next;
+        let intermediate_root = IndexedMerkleTree::recompute_root(
+            self.low_index,
+            &self.low_merkle_proof,
+            &self.low_merkle_updated_path,
+            &updated_low_leaf,
+        );
+        // verify inactivity proof
+        assert!(
+            IndexedMerkleTree::verify_merkle_proof(
+                self.cancel_leaf_index,
+                &self.cancel_leaf_proof,
+                &self.cancel_leaf_path,
+                &self.cancel_leaf,
+                &intermediate_root
+            ),
+            "Inactivity proof is invalid"
+        );
+        // update inactive leaf and recompute root
+        let mut new_leaf = self.cancel_leaf;
+        new_leaf.active = BaseField::zero();
+        let final_root = IndexedMerkleTree::recompute_root(
+            self.cancel_leaf_index,
+            &self.cancel_leaf_proof,
+            &self.cancel_leaf_updated_path,
+            &new_leaf,
+        );
+        // check if final root is correct
+        assert_eq!(final_root, self.final_root, "Final root hash is incorrect");
+    }
+}
+
+pub struct MatchProof {
+    /// initial root hash
+    pub initial_root: Hash<BaseField>,
+    /// low leaf indicated the first leaf in the order tree.
+    /// low proof - proof of membership of the low leaf
+    pub low_merkle_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    /// low merkle path containing the resulting hash at each level of the tree
+    pub low_merkle_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// low merkle update path is the resulting hash at each level of the tree
+    /// after updating the low leaf
+    pub low_merkle_updated_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// leaf containing order tjat is being cancelled
+    pub match_leaf: Leaf,
+    /// inactivity proof - proof of inactivity where the order is being inserted
+    pub match_leaf_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    /// inactivity path is the resulting hash at each level of the tree
+    pub match_leaf_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// inactivity update compute is the resulting hash at each level of the tree
+    /// after updating the inactive leaf
+    pub match_leaf_updated_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// inactive index - index of the next inactive leaf in the leaves
+    pub match_leaf_index: usize,
+    /// final root hash after insertion
+    pub final_root: Hash<BaseField>,
+}
+impl MatchProof {
+    /// sanity check for the cancellation proof
+    /// # Panics
+    /// Panics if the proof is invalid
+    pub fn verify(&self) {
+        let mut low = Leaf::first();
+        low.next = self.match_leaf.label;
+        // verify low_leafs merkle proof
+        assert!(
+            IndexedMerkleTree::verify_merkle_proof(
+                0,
+                &self.low_merkle_proof,
+                &self.low_merkle_path,
+                &low,
+                &self.initial_root
+            ),
+            "Low leaf merkle proof is invalid"
+        );
+        // update low leaf and recompute root
+        low.next = self.match_leaf.next;
+        let intermediate_root = IndexedMerkleTree::recompute_root(
+            0,
+            &self.low_merkle_proof,
+            &self.low_merkle_updated_path,
+            &low,
+        );
+        // verify matched leaf's proof
+        assert!(
+            IndexedMerkleTree::verify_merkle_proof(
+                self.match_leaf_index,
+                &self.match_leaf_proof,
+                &self.match_leaf_path,
+                &self.match_leaf,
+                &intermediate_root
+            ),
+            "Inactivity proof is invalid"
+        );
+        // update inactive leaf and recompute root
+        let mut new_leaf = self.match_leaf;
+        new_leaf.active = BaseField::zero();
+        let final_root = IndexedMerkleTree::recompute_root(
+            self.match_leaf_index,
+            &self.match_leaf_proof,
+            &self.match_leaf_updated_path,
+            &new_leaf,
+        );
+        // check if final root is correct
+        assert_eq!(final_root, self.final_root, "Final root hash is incorrect");
+    }
+}
+
+pub struct PartialMatchProof {
+    /// initial root hash
+    pub initial_root: Hash<BaseField>,
+    /// low leaf indicated the first leaf in the order tree.
+    /// low proof - proof of membership of the low leaf
+    pub low_merkle_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    /// low merkle path containing the resulting hash at each level of the tree
+    pub low_merkle_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// leaf containing order that is being matches
+    pub p_match_leaf: Leaf,
+    /// proof of leaf where the patial matches order is present
+    pub p_match_leaf_proof: [Hash<BaseField>; MERKLE_HEIGHT],
+    /// inactivity path is the resulting hash at each level of the tree
+    pub p_match_leaf_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// inactivity update compute is the resulting hash at each level of the tree
+    /// after updating the inactive leaf
+    pub p_match_leaf_updated_path: [Hash<BaseField>; MERKLE_HEIGHT + 1],
+    /// inactive index - index of the next inactive leaf in the leaves
+    pub p_match_leaf_index: usize,
+    /// volume that has been filled
+    pub filled_volume: Volume<BaseField>,
+    /// remaining volume
+    pub remaining_volume: Volume<BaseField>,
+    /// final root hash after insertion
+    pub final_root: Hash<BaseField>,
+}
+impl PartialMatchProof {
+    /// sanity check for the cancellation proof
+    /// # Panics
+    /// Panics if the proof is invalid
+    pub fn verify(&self) {
+        let mut low = Leaf::first();
+        low.next = self.p_match_leaf.label;
+        // verify low_leafs merkle proof
+        assert!(
+            IndexedMerkleTree::verify_merkle_proof(
+                0,
+                &self.low_merkle_proof,
+                &self.low_merkle_path,
+                &low,
+                &self.initial_root
+            ),
+            "Low leaf merkle proof is invalid"
+        );
+        // verify matched leaf's proof
+        assert!(
+            IndexedMerkleTree::verify_merkle_proof(
+                self.p_match_leaf_index,
+                &self.p_match_leaf_proof,
+                &self.p_match_leaf_path,
+                &self.p_match_leaf,
+                &self.initial_root
+            ),
+            "Inactivity proof is invalid"
+        );
+        // update inactive leaf and recompute root
+        let mut new_leaf = self.p_match_leaf;
+        new_leaf.volume = self.remaining_volume;
+        assert_eq!(
+            self.filled_volume + self.remaining_volume,
+            self.p_match_leaf.volume
+        );
+        let final_root = IndexedMerkleTree::recompute_root(
+            self.p_match_leaf_index,
+            &self.p_match_leaf_proof,
+            &self.p_match_leaf_updated_path,
+            &new_leaf,
+        );
         // check if final root is correct
         assert_eq!(final_root, self.final_root, "Final root hash is incorrect");
     }
