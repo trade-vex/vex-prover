@@ -7,7 +7,7 @@ edition = "2021"
 debug = 1
 
 [dependencies]
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "f24cde6", features = ["parallel"] }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0445252", features = ["parallel"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 num-traits = "0.2.19"
