@@ -19,6 +19,7 @@ parallel = ["rayon"]
 [dev-dependencies]
 rand = "0.8.5"
 criterion = { version = "0.5", features = ["html_reports"] }
+vex-matching-engine = { git = "ssh://git@github.com/aerius-labs/VEX-matching-engine.git" }
 
 [[bench]]
 name = "raw_insertions"
