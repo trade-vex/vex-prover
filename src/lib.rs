@@ -6,6 +6,7 @@ pub mod constants;
 pub mod hash;
 pub mod imt;
 pub mod types;
+pub mod executor;
 
 pub struct VexProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,

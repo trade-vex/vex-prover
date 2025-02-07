@@ -8,20 +8,33 @@ use crate::{
 use num_traits::{One, Zero};
 use stwo_prover::core::fields::m31::BaseField;
 
-#[derive(Default, Clone, Copy)]
-pub struct Leaf {
+#[derive(Clone)]
+pub struct Leaf<F> {
     /// Determines if the leaf is active
     /// active leaf indicate whether the node contains an order eligible to be executed
-    pub active: BaseField,
+    pub active: F,
     /// Unfilled Volume
-    pub volume: Volume<BaseField>,
+    pub volume: Volume<F>,
     /// label determines the ordering in the IMT: Price Time Priority
-    pub label: PriceTime,
+    pub label: PriceTime<F>,
     /// next refers to the next leaf in the order book
-    pub next: PriceTime,
+    pub next: PriceTime<F>,
 }
 
-impl Leaf {
+impl<F: Copy> Copy for Leaf<F> {}
+
+impl<F: Copy + Default> Default for Leaf<F> {
+    fn default() -> Self {
+        Self {
+            active: F::default(),
+            volume: Volume::default(),
+            label: PriceTime::default(),
+            next: PriceTime::default(),
+        }
+    }
+}
+
+impl Leaf<BaseField> {
     /// Return The first leaf of the IMT
     pub fn first() -> Self {
         Self {
@@ -79,25 +92,37 @@ use std::cmp::Ordering;
 use super::{N_LEAF_FELTS, N_U64_FELTS};
 
 // Holds a price and a time, used as a key in the BTreeMap
-#[derive(Debug, Default, Eq, Clone, Copy)]
-pub struct PriceTime {
-    price: Price<BaseField>,
-    time: Time<BaseField>,
+#[derive(Debug, Clone)]
+pub struct PriceTime<F> {
+    price: Price<F>,
+    time: Time<F>,
 }
 
-impl PartialEq for PriceTime {
+impl<F: Copy> Copy for PriceTime<F> {}
+impl<F: Ord> Eq for PriceTime<F> {}
+
+impl<F: Copy + Default> Default for PriceTime<F> {
+    fn default() -> Self {
+        PriceTime {
+            price: Price::default(),
+            time: Time::default(),
+        }
+    }
+}
+
+impl<F: Ord> PartialEq for PriceTime<F> {
     fn eq(&self, other: &Self) -> bool {
         self.price == other.price && self.time == other.time
     }
 }
 
-impl PartialOrd for PriceTime {
+impl<F: Ord + Copy> PartialOrd for PriceTime<F> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for PriceTime {
+impl<F: Ord + Copy> Ord for PriceTime<F> {
     fn cmp(&self, other: &Self) -> Ordering {
         // First comparision by price
         match self.price.cmp(&other.price) {
@@ -110,7 +135,7 @@ impl Ord for PriceTime {
     }
 }
 
-impl TryFrom<&[BaseField]> for PriceTime {
+impl TryFrom<&[BaseField]> for PriceTime<BaseField> {
     type Error = &'static str;
 
     fn try_from(slice: &[BaseField]) -> Result<Self, Self::Error> {
@@ -121,7 +146,7 @@ impl TryFrom<&[BaseField]> for PriceTime {
     }
 }
 
-impl PriceTime {
+impl PriceTime<BaseField> {
     pub fn new(price: Price<BaseField>, time: Time<BaseField>) -> Self {
         Self { price, time }
     }
