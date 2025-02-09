@@ -7,19 +7,19 @@ edition = "2021"
 debug = 1
 
 [dependencies]
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "0445252", features = ["parallel"] }
+stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad", features = ["parallel"] }
+stwo-air-utils = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad" }
 tracing = "0.1"
+itertools = "0.12.0"
 tracing-subscriber = "0.3"
 num-traits = "0.2.19"
-rayon = { version = "1.10.0", optional = true }
-
-[features]
-parallel = ["rayon"]
+rayon = { version = "1.10.0" }
 
 [dev-dependencies]
 rand = "0.8.5"
 criterion = { version = "0.5", features = ["html_reports"] }
 vex-matching-engine = { git = "ssh://git@github.com/aerius-labs/VEX-matching-engine.git" }
+test-log = { version = "0.2.15", features = ["trace"] }
 
 [[bench]]
 name = "raw_insertions"
