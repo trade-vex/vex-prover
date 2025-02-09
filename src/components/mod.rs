@@ -1,14 +1,17 @@
 use std::{marker::PhantomData, vec};
-
 use stwo_prover::core::{
     channel::Channel,
     fields::{qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
     pcs::TreeVec,
 };
 
+pub mod bytes;
+
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {
+    /// Number of columns in the main trace table
     const MAIN_COLS: usize;
+    /// Number of columns in the interaction trace table
     const INTERACTION_COLS: usize;
 
     // Compile-time validation
@@ -24,7 +27,7 @@ pub struct Claim<T: TraceSize> {
 
 impl<T: TraceSize> Claim<T> {
     pub const fn new(log_size: u32) -> Self {
-        let _ = T::ASSERT;
+        _ = T::ASSERT;
 
         Self {
             log_size,
