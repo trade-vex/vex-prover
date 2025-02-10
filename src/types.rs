@@ -3,8 +3,10 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 macro_rules! implement_field_array_type {
     ($type_name:ident) => {
-        #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+        #[derive(Debug, Clone, PartialEq, Eq)]
         pub struct $type_name<F>([F; 8]);
+
+        impl<F: Copy> Copy for $type_name<F> {}
 
         impl<F: Copy + Default + Ord + From<u32>> $type_name<F> {
             /// Create a new instance of the type
