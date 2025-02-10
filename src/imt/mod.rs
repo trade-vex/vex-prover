@@ -908,7 +908,7 @@ mod tests {
 
         // Insert first order
         let order1 = create_test_order(10, 1);
-        imt.insert(order1);
+        imt.insert(order1).unwrap();
 
         assert_eq!(
             imt.leaves.len(),
@@ -939,7 +939,7 @@ mod tests {
 
         let mut previous_root = imt.root();
         for order in orders.iter() {
-            let insertion_proof = imt.insert(*order);
+            let insertion_proof = imt.insert(*order).expect("Insertion should succeed");
             insertion_proof.verify();
             let new_root = imt.root();
             assert_ne!(
@@ -975,16 +975,16 @@ mod tests {
         ];
 
         for order in orders {
-            let insertion_proof = imt.insert(order);
+            let insertion_proof = imt.insert(order).expect("Insertion should succeed");
             insertion_proof.verify();
         }
 
         // Test cases for find_low
         let test_cases = vec![
-            (create_test_price_time(25, 1), Some(3)), // Should find order (20,1)
-            (create_test_price_time(15, 2), Some(1)), // Should find order (15,1)
-            (create_test_price_time(10, 1), Some(0)), // Should find default leaf
-            (create_test_price_time(5, 1), Some(0)),  // Should find default leaf
+            (create_test_price_time(25, 1), 3), // Should find order (20,1)
+            (create_test_price_time(15, 2), 1), // Should find order (15,1)
+            (create_test_price_time(10, 1), 0), // Should find default leaf
+            (create_test_price_time(5, 1), 0),  // Should find default leaf
         ];
 
         for (target, expected_index) in test_cases {
@@ -1003,7 +1003,7 @@ mod tests {
 
         // Insert some orders
         let order = create_test_order(10, 1);
-        imt.insert(order);
+        imt.insert(order).unwrap();
 
         // Get merkle proof for index 1
         let (proof, _) = imt.get_merkle_proof(1);
@@ -1033,13 +1033,13 @@ mod tests {
         let order1 = create_test_order(10, 1);
         let order2 = create_test_order(15, 1);
         let order3 = create_test_order(10, 2);
-        imt.insert(order1);
-        imt.insert(order2);
-        imt.insert(order3);
+        imt.insert(order1).unwrap();
+        imt.insert(order2).unwrap();
+        imt.insert(order3).unwrap();
 
         // Update the volume of the first order
         let new_volume = Volume::from_u64(2);
-        let update_proof = imt.update(order1.price_time, new_volume);
+        let update_proof = imt.update(order1.price_time, new_volume).expect("Update should succeed");
         update_proof.verify();
 
         // Check that the volume of the first order has been updated

@@ -89,6 +89,9 @@ macro_rules! implement_field_array_type {
                         carry = F::from(0);
                     }
                 }
+                if carry != F::from(0) {
+                    panic!("Addition overflow");
+                }
                 Self(result)
             }
         }
@@ -112,6 +115,9 @@ macro_rules! implement_field_array_type {
                     // Subtract both the rhs and any previous borrow
                     let mut diff = self.0[i];
                     if diff < rhs.0[i] + borrow {
+                        if i == 7 {
+                            panic!("Subtraction underflow");
+                        }
                         // Need to borrow from next digit
                         diff = diff + F::from(256);
                         result[i] = diff - rhs.0[i] - borrow;
@@ -261,55 +267,23 @@ mod tests {
         // Test conversion to u64
         assert_eq!(sub.to_u64(), a - b);
     }
+
     #[test]
-    fn test_overflow_in_multiple_elements() {
+    #[should_panic(expected = "Addition overflow")]
+    fn test_addition_overflow() {
         // Test addition overflow
         let p1: Price<M31> = Price::new([M31(255); 8]);
         let p2: Price<M31> = Price::new([M31(1); 8]);
-        let sum = p1 + p2;
+        let _sum = p1 + p2;
+    }
 
-        // Each limb should be within [0, 256) range
-        for limb in sum.0.iter() {
-            assert!(limb.0 < 256);
-        }
-        // Test Sum
-        assert_eq!(
-            sum,
-            Price::new([
-                M31(0), // 255 + 1 = 0 (carry 1)
-                M31(1), // 255 + 1 + 1(carry) = 1 (carry 1)
-                M31(1), // and so on...
-                M31(1),
-                M31(1),
-                M31(1),
-                M31(1),
-                M31(1) // Most significant limb
-            ])
-        );
-
+    #[test]
+    #[should_panic(expected = "Subtraction underflow")]
+    fn test_subtraction_underflow() {
         // Test subtraction underflow
         let p3: Price<M31> = Price::new([M31(0); 8]);
         let p4: Price<M31> = Price::new([M31(1); 8]);
-        let sub = p3 - p4;
-
-        // Each limb should be within [0, 256) range
-        for limb in sub.0.iter() {
-            assert!(limb.0 < 256);
-        }
-        // Test Sub
-        assert_eq!(
-            sub,
-            Price::new([
-                M31(255),
-                M31(254),
-                M31(254),
-                M31(254),
-                M31(254),
-                M31(254),
-                M31(254),
-                M31(254)
-            ])
-        );
+        let _sub = p3 - p4;
     }
 
     #[test]
