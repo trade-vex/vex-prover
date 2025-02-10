@@ -36,7 +36,7 @@ pub type PoseidonEvents = Vec<[BaseField; 158]>;
 /// These Instructions require additional Auxillary Operations to be computed for Constraint Evaluation
 /// 1. Add Operations: Add two Field Elements
 /// 2. Less Than Operations: Compare two Price pairs, comprising 8 Field Elements each
-/// 3. Comparision Operations: Compare two Price, Time pairs
+/// 3. Comparison Operations: Compare two Price, Time pairs
 /// 4. Hash Operations: Poseidon Hash Operations
 /// 5. Byte Operations: U8 Operations such as and, less than, range check
 pub struct ExecutionTrace<F> {
@@ -69,10 +69,10 @@ pub struct ExecutionTrace<F> {
     add_operations: Vec<[F; 31]>,
     /// Less Than Events. Compares Price pairs, comprising 8 Field Elements each
     less_than_operations: Vec<[F; 26]>,
-    /// Comparision Events. Compares two Price, Time pairs
+    /// Comparison Events. Compares two Price, Time pairs
     comparision_operations: Vec<[F; 53]>,
     /// Hash Events.
-    posiedon_operations: PoseidonEvents,
+    poseidon_operations: PoseidonEvents,
     /// Byte Events for U8 Operations
     pub byte_operations: ByteEvents,
 }
@@ -95,7 +95,7 @@ impl ExecutionTrace<BaseField> {
             add_operations: Vec::new(),
             less_than_operations: Vec::new(),
             comparision_operations: Vec::new(),
-            posiedon_operations: Vec::new(),
+            poseidon_operations: Vec::new(),
             byte_operations: array::from_fn(|_| unsafe { BaseColumn::uninitialized(1 << 16) }),
         }
     }
@@ -136,7 +136,7 @@ impl ExecutionTrace<BaseField> {
 
     /// Adds a Poseidon Event by recording the corresponding Trace Row
     pub fn add_poseidon_event(&mut self, event: [BaseField; 158]) {
-        self.posiedon_operations.push(event);
+        self.poseidon_operations.push(event);
     }
 
     /// Adds an And U8 Event by recording the corresponding Trace Row

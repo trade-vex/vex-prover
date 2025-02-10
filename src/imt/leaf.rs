@@ -124,10 +124,10 @@ impl<F: Ord + Copy> PartialOrd for PriceTime<F> {
 
 impl<F: Ord + Copy> Ord for PriceTime<F> {
     fn cmp(&self, other: &Self) -> Ordering {
-        // First comparision by price
+        // First comparison by price
         match self.price.cmp(&other.price) {
             Ordering::Equal => {
-                // If prices are equal, comparision is by time
+                // If prices are equal, comparison is by time
                 self.time.cmp(&other.time)
             }
             ordering => ordering,
