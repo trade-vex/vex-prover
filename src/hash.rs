@@ -12,20 +12,20 @@ pub const N_PARTIAL_ROUNDS: usize = 14;
 pub const N_HALF_FULL_ROUNDS: usize = 4;
 pub const N_STATE: usize = 16;
 
-pub fn permutation(mut state: [BaseField; N_STATE]) -> [BaseField; N_STATE] {
+pub fn permutation(state: &mut [BaseField; N_STATE]) {
     // 4 full rounds.
     (0..N_HALF_FULL_ROUNDS).for_each(|round| {
         (0..N_STATE).for_each(|i| {
             state[i] += EXTERNAL_ROUND_CONSTS[round][i];
         });
-        apply_external_round_matrix(&mut state);
-        state = std::array::from_fn(|i| pow5(state[i]));
+        apply_external_round_matrix(state);
+        *state = std::array::from_fn(|i| pow5(state[i]));
     });
 
     // Partial rounds.
     (0..N_PARTIAL_ROUNDS).for_each(|round| {
         state[0] += BaseField::from(INTERNAL_ROUND_CONSTS[round]);
-        apply_internal_round_matrix(&mut state);
+        apply_internal_round_matrix(state);
         state[0] = pow5(state[0]);
     });
 
@@ -34,16 +34,15 @@ pub fn permutation(mut state: [BaseField; N_STATE]) -> [BaseField; N_STATE] {
         (0..N_STATE).for_each(|i| {
             state[i] += BaseField::from(EXTERNAL_ROUND_CONSTS[round + N_HALF_FULL_ROUNDS][i]);
         });
-        apply_external_round_matrix(&mut state);
-        state = std::array::from_fn(|i| pow5(state[i]));
+        apply_external_round_matrix(state);
+        *state = std::array::from_fn(|i| pow5(state[i]));
     });
-    state
 }
 
-pub fn hash_leaf(input: [BaseField; 16]) -> [BaseField; 8] {
-    let result: [BaseField; 16] = permutation(input);
+pub fn hash_leaf(mut state: [BaseField; 16]) -> [BaseField; 8] {
+    permutation(&mut state);
     let mut output = array::from_fn(|_| BaseField::zero());
-    output[..8].copy_from_slice(&result[..8]);
+    output[..8].copy_from_slice(&state[..8]);
     output
 }
 
@@ -54,11 +53,11 @@ pub fn compress(input: &[&[BaseField; 8]; 2]) -> [BaseField; 8] {
     combined[8..].copy_from_slice(&input[1][..]);
 
     // Apply the permutation function to the combined array
-    let permuted = permutation(combined);
+    permutation(&mut combined);
 
     // The first 8 elements as hash of the permuted array are returned as the result
     let mut output = [BaseField::zero(); 8];
-    output.copy_from_slice(&permuted[..8]);
+    output.copy_from_slice(&combined[..8]);
     output
 }
 
