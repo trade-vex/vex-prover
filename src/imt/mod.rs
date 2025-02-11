@@ -1,10 +1,12 @@
 use crate::{constants::EMPTY_HASHES, hash::compress, types::Volume};
+use error::IMTError;
 use leaf::{Leaf, PriceTime};
 use num_traits::{One, Zero};
 use order::Order;
 use std::{array, collections::BTreeMap};
 use stwo_prover::core::fields::m31::BaseField;
 
+pub mod error;
 pub mod leaf;
 pub mod order;
 
@@ -88,6 +90,7 @@ impl IndexedMerkleTree {
     /// finalize the insert at the end of the leaves list and returns the root
     #[inline]
     pub fn finalize_insert(&mut self) -> MerklePath<BaseField> {
+        // will not panic on unwrap, as a leaf is inserted on creation
         let leaf_hash = self.leaves.last().unwrap().hash();
         let mut path = array::from_fn(|_| array::from_fn(|_| BaseField::zero()));
         self.raw[0].push(leaf_hash);
@@ -149,11 +152,11 @@ impl IndexedMerkleTree {
 
     /// Inserts an order into the IndexedMerkleTree at the end of the leaves list.
     #[inline]
-    pub fn insert(&mut self, order: Order<BaseField>) -> InsertionProof {
+    pub fn insert(&mut self, order: Order<BaseField>) -> Result<InsertionProof, IMTError> {
         // fetch initial root, low leaf parameters before insertion
         let initial_root = self.root;
         // will not panic on unwrap, as a leaf is inserted on creation
-        let low_index = self.find_low(&order.price_time).unwrap();
+        let low_index = self.find_low(&order.price_time)?;
         let low_leaf = self.leaves[low_index];
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(low_index);
 
@@ -169,7 +172,7 @@ impl IndexedMerkleTree {
         self.leaves.push(order.to_leaf(&low_leaf.next));
         self.index_map.insert(order.price_time, inactive_index);
         let inactive_updated_path = self.finalize_insert();
-        InsertionProof {
+        Ok(InsertionProof {
             initial_root,
             low_leaf,
             low_merkle_proof,
@@ -182,7 +185,7 @@ impl IndexedMerkleTree {
             inactive_updated_path,
             inactive_index,
             final_root: inactive_updated_path[MERKLE_HEIGHT],
-        }
+        })
     }
 
     /// Updates an order into the IndexedMerkleTree at the end of the leaves list.
@@ -191,11 +194,14 @@ impl IndexedMerkleTree {
         &mut self,
         price_time: PriceTime<BaseField>,
         volume: Volume<BaseField>,
-    ) -> UpdateProof<BaseField> {
+    ) -> Result<UpdateProof<BaseField>, IMTError> {
+        if price_time == PriceTime::default() {
+            return Err(IMTError::CannotUpdateFirstLeaf);
+        }
         // fetch initial root, leaf parameters before update
         let initial_root = self.root;
         // will not panic on unwrap, as a leaf is inserted on creation
-        let index = self.find(&price_time).unwrap();
+        let index = self.find(&price_time)?;
         let leaf = self.leaves[index];
         let (merkle_proof, merkle_path) = self.get_merkle_proof(index);
 
@@ -203,7 +209,7 @@ impl IndexedMerkleTree {
         self.leaves[index].volume = volume;
         let merkle_updated_path = self.finalize_update(index);
 
-        UpdateProof {
+        Ok(UpdateProof {
             initial_root,
             leaf,
             merkle_proof,
@@ -212,19 +218,19 @@ impl IndexedMerkleTree {
             index,
             volume,
             final_root: merkle_updated_path[MERKLE_HEIGHT],
-        }
+        })
     }
 
     /// Cancel an order into the IndexedMerkleTree at the end of the leaves list.
     #[inline]
-    pub fn cancel_at_index(&mut self, index: usize) -> CancellationProof {
+    pub fn cancel_at_index(&mut self, index: usize) -> Result<CancellationProof, IMTError> {
         if index == 0 {
-            panic!("Cannot cancel the first leaf");
+            return Err(IMTError::CannotCancelFirstLeaf);
         }
         // fetch initial root, low leaf parameters before insertion
         let initial_root = self.root;
         let cancel_leaf = self.leaves[index];
-        let low_index = self.find_low(&cancel_leaf.label).unwrap();
+        let low_index = self.find_low(&cancel_leaf.label)?;
         let low_leaf = self.leaves[low_index];
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(low_index);
         // update low_leaf.next to point to the new leaf & finalize the update
@@ -237,7 +243,7 @@ impl IndexedMerkleTree {
         let cancel_updated_path = self.finalize_update(index);
         // remove from index map
         self.index_map.remove(&cancel_leaf.label);
-        CancellationProof {
+        Ok(CancellationProof {
             initial_root,
             low_leaf,
             low_merkle_proof,
@@ -250,15 +256,15 @@ impl IndexedMerkleTree {
             cancel_leaf_updated_path: cancel_updated_path,
             cancel_leaf_index: index,
             final_root: cancel_updated_path[MERKLE_HEIGHT],
-        }
+        })
     }
 
     /// Matches an order of highest priority.
     #[inline]
-    pub fn match_order(&mut self) -> MatchProof {
+    pub fn match_order(&mut self) -> Result<MatchProof, IMTError> {
         // fetch initial root, low leaf parameters before insertion
         let initial_root = self.root;
-        let index = self.find(&self.leaves[0].next).unwrap();
+        let index = self.find(&self.leaves[0].next)?;
         let match_leaf = self.leaves[index];
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(0);
         // update low_leaf.next to point to the new leaf & finalize the update
@@ -271,7 +277,7 @@ impl IndexedMerkleTree {
         let match_updated_path = self.finalize_update(index);
         // remove from index map
         self.index_map.remove(&match_leaf.label);
-        MatchProof {
+        Ok(MatchProof {
             initial_root,
             low_merkle_proof,
             low_merkle_path,
@@ -282,16 +288,16 @@ impl IndexedMerkleTree {
             match_leaf_updated_path: match_updated_path,
             match_leaf_index: index,
             final_root: match_updated_path[MERKLE_HEIGHT],
-        }
+        })
     }
 
     /// Partial Matches an order of highest priority.
     #[inline]
-    pub fn match_partially(&mut self, volume: u64) -> PartialMatchProof {
+    pub fn match_partially(&mut self, volume: u64) -> Result<PartialMatchProof, IMTError> {
         // fetch initial root, low leaf parameters before insertion
         let filled_volume = Volume::from_u64(volume);
         let initial_root = self.root;
-        let index = self.find(&self.leaves[0].next).unwrap();
+        let index = self.find(&self.leaves[0].next)?;
         let p_match_leaf = self.leaves[index];
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(0);
         // get match leaf proof.
@@ -300,7 +306,7 @@ impl IndexedMerkleTree {
         let remaining_volume = p_match_leaf.volume - filled_volume;
         self.leaves[index].volume = remaining_volume;
         let match_updated_path = self.finalize_update(index);
-        PartialMatchProof {
+        Ok(PartialMatchProof {
             initial_root,
             low_merkle_proof,
             low_merkle_path,
@@ -312,22 +318,26 @@ impl IndexedMerkleTree {
             final_root: match_updated_path[MERKLE_HEIGHT],
             remaining_volume,
             filled_volume,
-        }
+        })
     }
 
     /// Finds low_leaf - immediate predecessor of the leaf being inserted
     #[inline]
-    fn find_low(&self, target: &PriceTime<BaseField>) -> Option<usize> {
+    fn find_low(&self, target: &PriceTime<BaseField>) -> Result<usize, IMTError> {
         self.index_map
             .range(..target)
             .next_back()
             .map(|(_, &index)| index)
+            .ok_or(IMTError::LowLeafNotFound)
     }
 
-    /// Finds low_leaf - immediate predecessor of the leaf being inserted
+    /// Finds the index of the leaf in the tree which has the given Price, Time.
     #[inline]
-    fn find(&self, key: &PriceTime<BaseField>) -> Option<usize> {
-        self.index_map.get(key).copied()
+    fn find(&self, key: &PriceTime<BaseField>) -> Result<usize, IMTError> {
+        self.index_map
+            .get(key)
+            .copied()
+            .ok_or(IMTError::LeafNotFound)
     }
 
     /// gets merkle proof of the leaf at the given index
@@ -898,7 +908,7 @@ mod tests {
 
         // Insert first order
         let order1 = create_test_order(10, 1);
-        imt.insert(order1);
+        imt.insert(order1).unwrap();
 
         assert_eq!(
             imt.leaves.len(),
@@ -929,7 +939,7 @@ mod tests {
 
         let mut previous_root = imt.root();
         for order in orders.iter() {
-            let insertion_proof = imt.insert(*order);
+            let insertion_proof = imt.insert(*order).expect("Insertion should succeed");
             insertion_proof.verify();
             let new_root = imt.root();
             assert_ne!(
@@ -965,20 +975,20 @@ mod tests {
         ];
 
         for order in orders {
-            let insertion_proof = imt.insert(order);
+            let insertion_proof = imt.insert(order).expect("Insertion should succeed");
             insertion_proof.verify();
         }
 
         // Test cases for find_low
         let test_cases = vec![
-            (create_test_price_time(25, 1), Some(3)), // Should find order (20,1)
-            (create_test_price_time(15, 2), Some(1)), // Should find order (15,1)
-            (create_test_price_time(10, 1), Some(0)), // Should find default leaf
-            (create_test_price_time(5, 1), Some(0)),  // Should find default leaf
+            (create_test_price_time(25, 1), 3), // Should find order (20,1)
+            (create_test_price_time(15, 2), 1), // Should find order (15,1)
+            (create_test_price_time(10, 1), 0), // Should find default leaf
+            (create_test_price_time(5, 1), 0),  // Should find default leaf
         ];
 
         for (target, expected_index) in test_cases {
-            let result = imt.find_low(&target);
+            let result = imt.find_low(&target).unwrap();
             assert_eq!(
                 result, expected_index,
                 "Failed for target {:?}, expected index {:?}, got {:?}",
@@ -993,7 +1003,7 @@ mod tests {
 
         // Insert some orders
         let order = create_test_order(10, 1);
-        imt.insert(order);
+        imt.insert(order).unwrap();
 
         // Get merkle proof for index 1
         let (proof, _) = imt.get_merkle_proof(1);
@@ -1023,13 +1033,13 @@ mod tests {
         let order1 = create_test_order(10, 1);
         let order2 = create_test_order(15, 1);
         let order3 = create_test_order(10, 2);
-        imt.insert(order1);
-        imt.insert(order2);
-        imt.insert(order3);
+        imt.insert(order1).unwrap();
+        imt.insert(order2).unwrap();
+        imt.insert(order3).unwrap();
 
         // Update the volume of the first order
         let new_volume = Volume::from_u64(2);
-        let update_proof = imt.update(order1.price_time, new_volume);
+        let update_proof = imt.update(order1.price_time, new_volume).expect("Update should succeed");
         update_proof.verify();
 
         // Check that the volume of the first order has been updated
