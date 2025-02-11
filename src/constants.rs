@@ -2,7 +2,7 @@ use stwo_prover::core::fields::m31::{BaseField, M31};
 
 use crate::hash::{N_HALF_FULL_ROUNDS, N_PARTIAL_ROUNDS, N_STATE};
 
-/// The constants used in Posiedon permutation are generated using [poseidon2_rust_params.sage](https://github.com/HorizenLabs/poseidon2/blob/main/poseidon2_rust_params.sage)
+/// The constants used in Poseidon permutation are generated using [poseidon2_rust_params.sage](https://github.com/HorizenLabs/poseidon2/blob/main/poseidon2_rust_params.sage)
 pub const MAT_DIAG16_M_1: [BaseField; 16] = [
     M31(0x07b80ac4),
     M31(0x6bd9cb33),
