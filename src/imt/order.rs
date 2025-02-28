@@ -1,7 +1,4 @@
-use crate::{
-    imt::N_ORDER_FELTS,
-    types::{Price, Time, Volume},
-};
+use crate::{imt::N_ORDER_FELTS, types::Volume};
 use num_traits::One;
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -18,9 +15,9 @@ pub struct Order<F> {
 
 impl Order<BaseField> {
     /// Creates a new Order.
-    pub fn new(volume: Volume<BaseField>, price: Price<BaseField>, time: Time<BaseField>) -> Self {
+    pub fn new(volume: u64, price: u64, time: u64) -> Self {
         Self {
-            volume,
+            volume: Volume::from_u64(volume),
             price_time: PriceTime::new(price, time),
         }
     }

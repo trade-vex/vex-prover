@@ -4,7 +4,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 macro_rules! implement_field_array_type {
     ($type_name:ident) => {
         #[derive(Debug, Clone, PartialEq, Eq)]
-        pub struct $type_name<F>([F; 8]);
+        pub struct $type_name<F>([F; N_U64_LIMBS]);
 
         impl<F: Copy> Copy for $type_name<F> {}
 
@@ -12,13 +12,13 @@ macro_rules! implement_field_array_type {
             /// Create a new instance of the type
             /// # Panics
             /// Panics if any of the values in the array are greater than 255
-            pub fn new(value: [F; 8]) -> Self {
+            pub fn new(value: [F; N_U64_LIMBS]) -> Self {
                 assert!(value.iter().all(|&x| x < F::from(256)));
                 Self(value)
             }
 
             pub fn zero() -> Self {
-                Self([F::default(); 8])
+                Self([F::default(); N_U64_LIMBS])
             }
 
             // Convert from u64 to field elements in little-endian order
@@ -27,38 +27,29 @@ macro_rules! implement_field_array_type {
                 F: From<u32>,
             {
                 let bytes = value.to_le_bytes();
-                let mut limbs = [F::default(); 8];
+                let mut limbs = [F::default(); N_U64_LIMBS];
                 for (i, &byte) in bytes.iter().enumerate() {
-                    limbs[i] = F::from(byte as u32).into();
+                    limbs[i] = F::from(byte as u32);
                 }
                 Self(limbs)
             }
 
-            pub fn to_u64(&self) -> u64 {
-                let mut bytes = [0u8; 8];
-                for i in 0..8 {
-                    let t: F = self.0[i];
-                    bytes[i] = unsafe { *(&t as *const F as *const M31) }.0 as u8;
-                }
-                u64::from_le_bytes(bytes)
-            }
-
-            pub fn to_felts(&self) -> [F; 8] {
+            pub fn to_felts(&self) -> [F; N_U64_LIMBS] {
                 self.0
             }
         }
 
         impl<F: Copy + Default + Ord + From<u32>> TryFrom<&[F]> for $type_name<F> {
-            type Error = &'static str;
+            type Error = GenericError;
 
             fn try_from(slice: &[F]) -> Result<Self, Self::Error> {
-                if slice.len() != 8 {
-                    return Err("Slice length must be exactly 8");
+                if slice.len() != N_U64_LIMBS {
+                    return Err(GenericError::InvalidSliceLength(N_U64_LIMBS, slice.len()));
                 }
                 let mut array = [F::default(); 8];
                 for (i, &item) in slice.iter().enumerate() {
                     if item >= F::from(256) {
-                        return Err("Slice contains value(s) greater than or equal to 256");
+                        return Err(GenericError::InvalidUint8);
                     }
                     array[i] = item;
                 }
@@ -68,7 +59,7 @@ macro_rules! implement_field_array_type {
 
         impl<F: Copy + Default> Default for $type_name<F> {
             fn default() -> Self {
-                Self([F::default(); 8])
+                Self([F::default(); N_U64_LIMBS])
             }
         }
 
@@ -77,9 +68,9 @@ macro_rules! implement_field_array_type {
         {
             type Output = Self;
             fn add(self, rhs: Self) -> Self {
-                let mut result = [F::default(); 8];
+                let mut result = [F::default(); N_U64_LIMBS];
                 let mut carry = F::default();
-                for i in 0..8 {
+                for i in 0..N_U64_LIMBS {
                     let sum = self.0[i] + rhs.0[i] + carry;
                     if sum >= F::from(256) {
                         result[i] = sum - F::from(256);
@@ -96,11 +87,11 @@ macro_rules! implement_field_array_type {
             }
         }
 
-        impl<F: Copy + AddAssign> AddAssign for $type_name<F> {
+        impl<F: Copy + Default + Add<Output = F> + Sub<Output = F> + From<u32> + Ord> AddAssign
+            for $type_name<F>
+        {
             fn add_assign(&mut self, rhs: Self) {
-                for i in 0..8 {
-                    self.0[i] += rhs.0[i];
-                }
+                *self = *self + rhs;
             }
         }
 
@@ -109,13 +100,13 @@ macro_rules! implement_field_array_type {
         {
             type Output = Self;
             fn sub(self, rhs: Self) -> Self {
-                let mut result = [F::default(); 8];
+                let mut result = [F::default(); N_U64_LIMBS];
                 let mut borrow = F::default();
-                for i in 0..8 {
+                for i in 0..N_U64_LIMBS {
                     // Subtract both the rhs and any previous borrow
                     let mut diff = self.0[i];
                     if diff < rhs.0[i] + borrow {
-                        if i == 7 {
+                        if i == N_U64_LIMBS - 1 {
                             panic!("Subtraction underflow");
                         }
                         // Need to borrow from next digit
@@ -131,11 +122,11 @@ macro_rules! implement_field_array_type {
             }
         }
 
-        impl<F: Copy + SubAssign> SubAssign for $type_name<F> {
+        impl<F: Copy + Default + Add<Output = F> + Sub<Output = F> + From<u32> + Ord> SubAssign
+            for $type_name<F>
+        {
             fn sub_assign(&mut self, rhs: Self) {
-                for i in 0..8 {
-                    self.0[i] -= rhs.0[i];
-                }
+                *self = *self - rhs;
             }
         }
 
@@ -163,11 +154,24 @@ macro_rules! implement_field_array_type {
                 Ordering::Equal
             }
         }
+
+        impl $type_name<M31> {
+            pub fn to_u64(&self) -> u64 {
+                let mut bytes = [0u8; N_U64_LIMBS];
+                for i in 0..N_U64_LIMBS {
+                    // Elements are always within [0, 256) range
+                    bytes[i] = self.0[i].0 as u8;
+                }
+                u64::from_le_bytes(bytes)
+            }
+        }
     };
 }
 
-pub use stwo_prover::core::fields::m31::M31;
+use crate::error::GenericError;
+use stwo_prover::core::fields::m31::M31;
 
+pub const N_U64_LIMBS: usize = 8;
 implement_field_array_type!(Price);
 implement_field_array_type!(Time);
 implement_field_array_type!(Volume);
@@ -544,5 +548,37 @@ mod tests {
                 M31(0)
             ])
         );
+    }
+
+    #[test]
+    fn test_add_assign() {
+        let mut p1: Price<M31> = Price::from_u64(123);
+        let p2: Price<M31> = Price::from_u64(456);
+        p1 += p2;
+        assert_eq!(p1.to_u64(), 579);
+    }
+
+    #[test]
+    fn test_sub_assign() {
+        let mut p1: Price<M31> = Price::from_u64(789);
+        let p2: Price<M31> = Price::from_u64(123);
+        p1 -= p2;
+        assert_eq!(p1.to_u64(), 666);
+    }
+
+    #[test]
+    #[should_panic(expected = "Addition overflow")]
+    fn test_add_assign_overflow() {
+        let mut p1 = Price::new([M31(255); 8]);
+        let p2 = Price::new([M31(1); 8]);
+        p1 += p2;
+    }
+
+    #[test]
+    #[should_panic(expected = "Subtraction underflow")]
+    fn test_sub_assign_underflow() {
+        let mut p1 = Price::new([M31(0); 8]);
+        let p2 = Price::new([M31(1); 8]);
+        p1 -= p2;
     }
 }

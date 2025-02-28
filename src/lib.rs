@@ -4,6 +4,7 @@ use components::{bytes::BytesPreProcessedColumn, Claim, InteractionClaim};
 use stwo_prover::core::{prover::StarkProof, vcs::ops::MerkleHasher};
 pub mod components;
 pub mod constants;
+pub mod error;
 pub mod executor;
 pub mod hash;
 pub mod imt;

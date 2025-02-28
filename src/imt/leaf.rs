@@ -1,6 +1,7 @@
 use std::array;
 
 use crate::{
+    error::GenericError,
     hash::hash_leaf,
     imt::Hash,
     types::{Price, Time, Volume},
@@ -136,19 +137,22 @@ impl<F: Ord + Copy> Ord for PriceTime<F> {
 }
 
 impl TryFrom<&[BaseField]> for PriceTime<BaseField> {
-    type Error = &'static str;
+    type Error = GenericError;
 
     fn try_from(slice: &[BaseField]) -> Result<Self, Self::Error> {
         let price = Price::try_from(&slice[0..9])?;
         let time = Time::try_from(&slice[9..16])?;
-        let price_time = PriceTime::new(price, time);
+        let price_time = PriceTime { price, time };
         Ok(price_time)
     }
 }
 
 impl PriceTime<BaseField> {
-    pub fn new(price: Price<BaseField>, time: Time<BaseField>) -> Self {
-        Self { price, time }
+    pub fn new(price: u64, time: u64) -> Self {
+        Self {
+            price: Price::from_u64(price),
+            time: Time::from_u64(time),
+        }
     }
 
     pub fn price(&self) -> &Price<BaseField> {
@@ -189,13 +193,12 @@ impl PriceTime<BaseField> {
 mod tests {
     use super::*;
     use std::collections::BTreeMap;
-    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_equality() {
-        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
-        let pt2 = PriceTime::new(Price::new([M31(41); 8]), Time::new([M31(1); 8]));
-        let pt3 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(2); 8]));
+        let pt1 = PriceTime::new(100, 8);
+        let pt2 = PriceTime::new(410, 8);
+        let pt3 = PriceTime::new(100, 9);
 
         assert!(pt1 < pt2);
         assert!(pt1 < pt3);
@@ -205,8 +208,8 @@ mod tests {
 
     #[test]
     fn test_ordering_by_price() {
-        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
-        let pt2 = PriceTime::new(Price::new([M31(20); 8]), Time::new([M31(1); 8]));
+        let pt1 = PriceTime::new(100, 8);
+        let pt2 = PriceTime::new(200, 8);
 
         assert!(pt1 < pt2);
         assert!(pt2 > pt1);
@@ -214,8 +217,8 @@ mod tests {
 
     #[test]
     fn test_ordering_by_time_when_prices_equal() {
-        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
-        let pt2 = PriceTime::new(Price::new([M31(41); 8]), Time::new([M31(2); 8])); // 41 ≡ 10 (mod 31)
+        let pt1 = PriceTime::new(100, 8);
+        let pt2 = PriceTime::new(410, 2); // 41 ≡ 10 (mod 31)
 
         assert!(pt1 < pt2);
         assert!(pt2 > pt1);
@@ -226,11 +229,11 @@ mod tests {
         let mut map = BTreeMap::new();
 
         // Insert in random order
-        let pt3 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(3); 8]));
-        let pt1 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(1); 8]));
-        let pt2 = PriceTime::new(Price::new([M31(10); 8]), Time::new([M31(2); 8]));
-        let pt4 = PriceTime::new(Price::new([M31(5); 8]), Time::new([M31(4); 8]));
-        let pt5 = PriceTime::new(Price::new([M31(15); 8]), Time::new([M31(1); 8]));
+        let pt3 = PriceTime::new(100, 3);
+        let pt1 = PriceTime::new(100, 1);
+        let pt2 = PriceTime::new(100, 2);
+        let pt4 = PriceTime::new(50, 4);
+        let pt5 = PriceTime::new(150, 5);
 
         map.insert(pt3, "third");
         map.insert(pt1, "first");

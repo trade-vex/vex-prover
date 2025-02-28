@@ -838,12 +838,8 @@ impl PartialMatchProof {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        constants::EMPTY_HASHES,
-        types::{Price, Time, Volume},
-    };
+    use crate::{constants::EMPTY_HASHES, types::Volume};
     use num_traits::One;
-    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_sparse_imt() {
@@ -855,27 +851,16 @@ mod tests {
         let leaf = Leaf {
             active: BaseField::one(),
             volume: Volume::from_u64(1),
-            label: create_test_price_time(1, 1),
-            next: create_test_price_time(1, 1),
+            label: PriceTime::new(1, 1),
+            next: PriceTime::new(1, 1),
         };
         imt.leaves.push(leaf);
-        imt.index_map.insert(create_test_price_time(1, 1), 1);
+        imt.index_map.insert(PriceTime::new(1, 1), 1);
         imt.finalize_insert();
         assert_eq!(imt.raw[0].len(), 2);
         for i in 1..MERKLE_HEIGHT {
             assert_eq!(imt.raw[i].len(), 1);
         }
-    }
-
-    fn create_test_order(price: u32, time: u32) -> Order<BaseField> {
-        Order {
-            price_time: create_test_price_time(price, time),
-            volume: Volume::new([M31(1); 8]), // Using 1 as default volume for simplicity
-        }
-    }
-
-    fn create_test_price_time(price: u32, time: u32) -> PriceTime<BaseField> {
-        PriceTime::new(Price::from_u64(price as u64), Time::from_u64(time as u64))
     }
 
     #[test]
@@ -907,7 +892,7 @@ mod tests {
         let initial_root = imt.root();
 
         // Insert first order
-        let order1 = create_test_order(10, 1);
+        let order1 = Order::new(1, 10, 1);
         imt.insert(order1).unwrap();
 
         assert_eq!(
@@ -932,9 +917,9 @@ mod tests {
 
         // Insert multiple orders with different price-time combinations
         let orders = [
-            create_test_order(10, 1),
-            create_test_order(15, 1),
-            create_test_order(10, 2),
+            Order::new(1, 10, 1),
+            Order::new(1, 15, 1),
+            Order::new(1, 10, 2),
         ];
 
         let mut previous_root = imt.root();
@@ -969,9 +954,9 @@ mod tests {
 
         // Insert orders in non-sequential order
         let orders = vec![
-            create_test_order(15, 1), // index 1
-            create_test_order(10, 2), // index 2
-            create_test_order(20, 1), // index 3
+            Order::new(1, 15, 1), // index 1
+            Order::new(1, 10, 2), // index 2
+            Order::new(1, 20, 1), // index 3
         ];
 
         for order in orders {
@@ -981,10 +966,10 @@ mod tests {
 
         // Test cases for find_low
         let test_cases = vec![
-            (create_test_price_time(25, 1), 3), // Should find order (20,1)
-            (create_test_price_time(15, 2), 1), // Should find order (15,1)
-            (create_test_price_time(10, 1), 0), // Should find default leaf
-            (create_test_price_time(5, 1), 0),  // Should find default leaf
+            (PriceTime::new(25, 1), 3), // Should find order (20,1)
+            (PriceTime::new(15, 2), 1), // Should find order (15,1)
+            (PriceTime::new(10, 1), 0), // Should find default leaf
+            (PriceTime::new(5, 1), 0),  // Should find default leaf
         ];
 
         for (target, expected_index) in test_cases {
@@ -1002,7 +987,7 @@ mod tests {
         let mut imt = IndexedMerkleTree::new();
 
         // Insert some orders
-        let order = create_test_order(10, 1);
+        let order = Order::new(1, 10, 1);
         imt.insert(order).unwrap();
 
         // Get merkle proof for index 1
@@ -1030,16 +1015,18 @@ mod tests {
         let mut imt = IndexedMerkleTree::new();
 
         // Insert some orders
-        let order1 = create_test_order(10, 1);
-        let order2 = create_test_order(15, 1);
-        let order3 = create_test_order(10, 2);
+        let order1 = Order::new(1, 10, 1);
+        let order2 = Order::new(1, 15, 1);
+        let order3 = Order::new(1, 10, 2);
         imt.insert(order1).unwrap();
         imt.insert(order2).unwrap();
         imt.insert(order3).unwrap();
 
         // Update the volume of the first order
         let new_volume = Volume::from_u64(2);
-        let update_proof = imt.update(order1.price_time, new_volume).expect("Update should succeed");
+        let update_proof = imt
+            .update(order1.price_time, new_volume)
+            .expect("Update should succeed");
         update_proof.verify();
 
         // Check that the volume of the first order has been updated
