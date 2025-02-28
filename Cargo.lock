@@ -1516,7 +1516,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 [[package]]
 name = "vex-matching-engine"
 version = "0.1.0"
-source = "git+ssh://git@github.com/aerius-labs/VEX-matching-engine.git#f177f893a18e5e1229cb9bbe2503f3dfd2cd6b20"
+source = "git+https://github.com/aerius-labs/VEX-matching-engine.git#f177f893a18e5e1229cb9bbe2503f3dfd2cd6b20"
 dependencies = [
  "rust_decimal",
  "rust_decimal_macros",
