@@ -3,27 +3,21 @@ use rand::Rng;
 use std::hint::black_box;
 use vex_prover::imt::order::Order;
 use vex_prover::imt::IndexedMerkleTree;
-use vex_prover::types::{Price, Time, Volume};
 
-fn insert_batch(n: u32) {
+fn insert_batch(n: u64) {
     let mut imt = IndexedMerkleTree::new();
     let mut rng = rand::thread_rng();
-    let orders = (0..n)
-        .map(|i| {
-            Order::new(
-                Volume::from_u64(rng.gen()),
-                Price::from_u64(rng.gen()),
-                Time::from_u64((i + 2) as u64),
-            )
-        })
-        .collect::<Vec<_>>();
-    for order in orders {
-        imt.insert(order);
+    let mut time = 1;
+    for _ in 0..n {
+        let time_inc = rng.gen_range(1..=16);
+        time += time_inc;
+        let order = Order::new(rng.gen(), rng.gen(), time);
+        imt.insert(order).unwrap();
     }
 }
 
 fn criterion_benchmark(c: &mut Criterion) {
-    c.bench_function("insert 2^16", |b| {
+    c.bench_function("insert 2^13", |b| {
         b.iter(|| insert_batch(black_box(1 << 13)))
     });
 }
