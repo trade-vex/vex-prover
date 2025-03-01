@@ -302,6 +302,13 @@ impl IndexedMerkleTree {
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(0);
         // get match leaf proof.
         let (p_match_proof, p_match_path) = self.get_merkle_proof(index);
+        // check if the leaf has enough volume to fill
+        if p_match_leaf.volume < filled_volume {
+            return Err(IMTError::InsufficientVolumeToFill(
+                volume,
+                p_match_leaf.volume.to_u64(),
+            ));
+        }
         // update volume to the new volume & finalize the update
         let remaining_volume = p_match_leaf.volume - filled_volume;
         self.leaves[index].volume = remaining_volume;
