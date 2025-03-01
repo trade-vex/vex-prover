@@ -1,4 +1,8 @@
-use stwo_prover::{constraint_framework::preprocessed_columns::PreProcessedColumnId, relation};
+use stwo_prover::{
+    constraint_framework::preprocessed_columns::PreProcessedColumnId,
+    core::{backend::simd::column::BaseColumn, fields::secure_column::SECURE_EXTENSION_DEGREE},
+    relation,
+};
 
 use super::TraceSize;
 
@@ -7,6 +11,12 @@ mod trace;
 
 pub use constraints::BytesComponent;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
+
+/// U8 Operations
+/// Index- 0: multiplicities of and operation for a u8 pair
+/// Index- 1: multiplicities of less than range checks for u8 pairs. checks a < b < 256
+/// Index- 2: multiplicities of range check for a pair of u8. checks if a < 256 && b < 256
+pub type ByteOperations = [BaseColumn; 3];
 
 /// Element Bits Represents the number of bits for which the operation is pre-computed.
 pub const ELEMENT_BITS: u32 = 8;
@@ -29,7 +39,7 @@ pub enum BytesPreProcessedColumn {
 
 impl TraceSize for BytesPreProcessedColumn {
     const MAIN_COLS: usize = 3;
-    const INTERACTION_COLS: usize = 3 * 4;
+    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
 impl BytesPreProcessedColumn {

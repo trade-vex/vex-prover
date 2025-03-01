@@ -19,7 +19,7 @@ pub struct BytesEval {
 
 /// This implementation of the `FrameworkEval` trait for `BytesEval` provides methods to evaluate
 /// constraints on byte operations. The primary purpose of this
-/// implementation is to evaluate specific constraints related to bitwise AND, 
+/// implementation is to evaluate specific constraints related to bitwise AND,
 /// comparisons, and range checks on byte values.
 ///
 /// # Constaint Evaluation
@@ -50,10 +50,10 @@ pub struct BytesEval {
 /// whose commitment is known to verifier prior to the proof generation.
 impl FrameworkEval for BytesEval {
     fn log_size(&self) -> u32 {
-        LOG_SIZE as u32
+        LOG_SIZE
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        LOG_SIZE as u32 + 1
+        LOG_SIZE + 1
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Retrieve preprocessed columns
@@ -73,21 +73,21 @@ impl FrameworkEval for BytesEval {
         eval.add_to_relation(RelationEntry::new(
             &self.and_elements,
             E::EF::from(-and_mult),
-            &vec![a.clone(), b.clone(), c_and.clone()],
+            &[a.clone(), b.clone(), c_and.clone()],
         ));
 
         // Yields a < b = c_less_than
         eval.add_to_relation(RelationEntry::new(
             &self.less_than_u8_elements,
             E::EF::from(-less_than_u8_mult),
-            &vec![a.clone(), b.clone(), c_less_than.clone()],
+            &[a.clone(), b.clone(), c_less_than.clone()],
         ));
 
         // Yields a, b < 256
         eval.add_to_relation(RelationEntry::new(
             &self.range_check_u8_elements,
             E::EF::from(-range_check_u8_mult),
-            &vec![a.clone(), b.clone()],
+            &[a.clone(), b.clone()],
         ));
 
         eval.finalize_logup_in_pairs();
