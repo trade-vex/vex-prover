@@ -67,13 +67,14 @@ impl Leaf<BaseField> {
     }
 
     /// construct leaf from felts
-    pub fn from_felts(felts: [BaseField; N_LEAF_FELTS]) -> Self {
-        Self {
+    pub fn from_felts(felts: [BaseField; N_LEAF_FELTS]) -> Result<Self, GenericError> {
+        let leaf = Self {
             active: felts[0],
-            volume: Volume::try_from(&felts[1..9]).unwrap(),
-            label: PriceTime::try_from(&felts[9..25]).unwrap(),
-            next: PriceTime::try_from(&felts[25..41]).unwrap(),
-        }
+            volume: Volume::try_from(&felts[1..9])?,
+            label: PriceTime::try_from(&felts[9..25])?,
+            next: PriceTime::try_from(&felts[25..41])?,
+        };
+        Ok(leaf)
     }
 
     /// poseidon hash of the leaf
@@ -174,11 +175,12 @@ impl PriceTime<BaseField> {
         }
     }
 
-    pub fn from_felts(felts: [BaseField; 2 * N_U64_FELTS]) -> Self {
-        Self {
-            price: Price::try_from(&felts[0..8]).unwrap(),
-            time: Time::try_from(&felts[8..16]).unwrap(),
-        }
+    pub fn from_felts(felts: [BaseField; 2 * N_U64_FELTS]) -> Result<Self, GenericError> {
+        let price_time = Self {
+            price: Price::try_from(&felts[0..8])?,
+            time: Time::try_from(&felts[8..16])?,
+        };
+        Ok(price_time)
     }
 
     pub fn to_felts(&self) -> [BaseField; 2 * N_U64_FELTS] {
