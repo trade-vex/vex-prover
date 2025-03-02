@@ -3,7 +3,7 @@ use crate::imt::{leaf::Leaf, MerklePath, MerkleProof};
 /// Instruction represents a single instruction in the program
 /// Represents an instruction with its opcode, Merkle proof, and Merkle path.
 /// Every Row in the main trace corresponds to an instruction
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Instruction<F> {
     /// The opcode of the instruction
     pub opcode: Opcode,
@@ -30,8 +30,6 @@ pub struct Instruction<F> {
     /// Leaf to which the instruction applies
     pub leaf: Leaf<F>,
 }
-
-impl<F: Copy> Copy for Instruction<F> {}
 
 #[derive(Clone, Copy)]
 pub enum Opcode {
