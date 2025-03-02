@@ -1,14 +1,32 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
+#![feature(btree_cursors, portable_simd, iter_array_chunks)]
+
+use components::{bytes::BytesPreProcessedColumn, Claim, InteractionClaim};
+use stwo_prover::core::{prover::StarkProof, vcs::ops::MerkleHasher};
+pub mod components;
+pub mod constants;
+pub mod error;
+pub mod executor;
+pub mod hash;
+pub mod imt;
+pub mod types;
+
+pub struct VexProof<H: MerkleHasher> {
+    pub stark_proof: StarkProof<H>,
+    pub claim: VexClaim,
+    pub interaction_claim: VexInteractionClaim,
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+pub struct VexClaim {
+    /// The public inputs to the circuit.
+    pub inputs: Vec<u8>,
+    /// public outputs contains the root hash of the IMT
+    pub outputs: Vec<u8>,
+    /// bytes component claim
+    pub bytes_claim: Claim<BytesPreProcessedColumn>,
+    // followed by claims for each component
+}
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+pub struct VexInteractionClaim {
+    /// Bytes component interaction claim
+    pub bytes_interaction_claim: InteractionClaim<BytesPreProcessedColumn>,
 }
