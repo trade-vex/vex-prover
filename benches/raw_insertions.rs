@@ -2,10 +2,10 @@ use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 use std::hint::black_box;
 use vex_prover::imt::order::Order;
-use vex_prover::imt::IndexedMerkleTree;
+use vex_prover::imt::SellIMT;
 
 fn insert_batch(n: u64) {
-    let mut imt = IndexedMerkleTree::new();
+    let mut imt = SellIMT::new();
     let mut rng = rand::thread_rng();
     let mut time = 1;
     for _ in 0..n {

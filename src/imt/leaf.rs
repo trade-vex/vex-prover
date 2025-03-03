@@ -1,4 +1,10 @@
-use std::array;
+use std::cmp::Ordering;
+use std::{array, marker::PhantomData, u64};
+
+use super::{
+    side::{Buy, OrderSide, Sell, Side},
+    N_LEAF_FELTS, N_U64_FELTS,
+};
 
 use crate::{
     error::GenericError,
@@ -9,22 +15,22 @@ use crate::{
 use num_traits::{One, Zero};
 use stwo_prover::core::fields::m31::BaseField;
 
-#[derive(Clone)]
-pub struct Leaf<F> {
+#[derive(Clone, Debug)]
+pub struct Leaf<F, S> {
     /// Determines if the leaf is active
     /// active leaf indicate whether the node contains an order eligible to be executed
     pub active: F,
     /// Unfilled Volume
     pub volume: Volume<F>,
     /// label determines the ordering in the IMT: Price Time Priority
-    pub label: PriceTime<F>,
+    pub label: PriceTime<F, S>,
     /// next refers to the next leaf in the order book
-    pub next: PriceTime<F>,
+    pub next: PriceTime<F, S>,
 }
 
-impl<F: Copy> Copy for Leaf<F> {}
+impl<F: Copy, S: Clone> Copy for Leaf<F, S> {}
 
-impl<F: Copy + Default> Default for Leaf<F> {
+impl<F: Copy + Default, S> Default for Leaf<F, S> {
     fn default() -> Self {
         Self {
             active: F::default(),
@@ -35,14 +41,22 @@ impl<F: Copy + Default> Default for Leaf<F> {
     }
 }
 
-impl Leaf<BaseField> {
+impl<S: OrderSide> Leaf<BaseField, S> {
     /// Return The first leaf of the IMT
     pub fn first() -> Self {
-        Self {
-            active: BaseField::one(),
-            volume: Volume::default(),
-            label: PriceTime::default(),
-            next: PriceTime::default(),
+        match S::side() {
+            Side::Buy => Self {
+                active: BaseField::one(),
+                volume: Volume::default(),
+                label: PriceTime::first(),
+                next: PriceTime::last(),
+            },
+            Side::Sell => Self {
+                active: BaseField::one(),
+                volume: Volume::default(),
+                label: PriceTime::first(),
+                next: PriceTime::last(),
+            },
         }
     }
 
@@ -89,45 +103,46 @@ impl Leaf<BaseField> {
     }
 }
 
-use std::cmp::Ordering;
-
-use super::{N_LEAF_FELTS, N_U64_FELTS};
+pub type BuyLeaf<F> = Leaf<F, Buy>;
+pub type SellLeaf<F> = Leaf<F, Sell>;
 
 // Holds a price and a time, used as a key in the BTreeMap
 #[derive(Debug, Clone)]
-pub struct PriceTime<F> {
+pub struct PriceTime<F, S> {
     price: Price<F>,
     time: Time<F>,
+    _marker: PhantomData<S>,
 }
 
-impl<F: Copy> Copy for PriceTime<F> {}
-impl<F: Ord> Eq for PriceTime<F> {}
+impl<F: Copy, S: Clone> Copy for PriceTime<F, S> {}
+impl<F: Ord, S: OrderSide> Eq for PriceTime<F, S> {}
 
-impl<F: Copy + Default> Default for PriceTime<F> {
+impl<F: Copy + Default, S> Default for PriceTime<F, S> {
     fn default() -> Self {
         PriceTime {
             price: Price::default(),
             time: Time::default(),
+            _marker: PhantomData,
         }
     }
 }
 
-impl<F: Ord> PartialEq for PriceTime<F> {
+impl<F: Ord, S: OrderSide> PartialEq for PriceTime<F, S> {
     fn eq(&self, other: &Self) -> bool {
         self.price == other.price && self.time == other.time
     }
 }
 
-impl<F: Ord + Copy> PartialOrd for PriceTime<F> {
+impl<F: Ord + Copy, S: OrderSide> PartialOrd for PriceTime<F, S> {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<F: Ord + Copy> Ord for PriceTime<F> {
+impl<F: Ord + Copy, S: OrderSide> Ord for PriceTime<F, S> {
     fn cmp(&self, other: &Self) -> Ordering {
         // First comparison by price
-        match self.price.cmp(&other.price) {
+        match S::compare_prices(&self.price, &other.price) {
             Ordering::Equal => {
                 // If prices are equal, comparison is by time
                 self.time.cmp(&other.time)
@@ -137,22 +152,59 @@ impl<F: Ord + Copy> Ord for PriceTime<F> {
     }
 }
 
-impl TryFrom<&[BaseField]> for PriceTime<BaseField> {
+impl<S> TryFrom<&[BaseField]> for PriceTime<BaseField, S> {
     type Error = GenericError;
 
     fn try_from(slice: &[BaseField]) -> Result<Self, Self::Error> {
         let price = Price::try_from(&slice[0..9])?;
         let time = Time::try_from(&slice[9..16])?;
-        let price_time = PriceTime { price, time };
+        let price_time = PriceTime {
+            price,
+            time,
+            _marker: PhantomData,
+        };
         Ok(price_time)
     }
 }
 
-impl PriceTime<BaseField> {
+impl<S: OrderSide> PriceTime<BaseField, S> {
     pub fn new(price: u64, time: u64) -> Self {
         Self {
             price: Price::from_u64(price),
             time: Time::from_u64(time),
+            _marker: PhantomData,
+        }
+    }
+
+    /// Return The first PriceTime of in the index map of the IMT
+    pub fn first() -> Self {
+        match S::side() {
+            Side::Buy => Self {
+                price: Price::from_u64(u64::MAX),
+                time: Time::from_u64(0),
+                _marker: PhantomData,
+            },
+            Side::Sell => Self {
+                price: Price::from_u64(0),
+                time: Time::from_u64(0),
+                _marker: PhantomData,
+            },
+        }
+    }
+
+    /// Return The last PriceTime of in the index map of the IMT
+    pub fn last() -> Self {
+        match S::side() {
+            Side::Buy => Self {
+                price: Price::from_u64(0),
+                time: Time::from_u64(u64::MAX),
+                _marker: PhantomData,
+            },
+            Side::Sell => Self {
+                price: Price::from_u64(u64::MAX),
+                time: Time::from_u64(u64::MAX),
+                _marker: PhantomData,
+            },
         }
     }
 
@@ -172,6 +224,7 @@ impl PriceTime<BaseField> {
         Self {
             price: *price,
             time: *time,
+            _marker: PhantomData,
         }
     }
 
@@ -179,6 +232,7 @@ impl PriceTime<BaseField> {
         let price_time = Self {
             price: Price::try_from(&felts[0..8])?,
             time: Time::try_from(&felts[8..16])?,
+            _marker: PhantomData,
         };
         Ok(price_time)
     }
@@ -191,6 +245,12 @@ impl PriceTime<BaseField> {
     }
 }
 
+// For sell orders, lower prices have higher priority.
+pub type SellPriceTime<F> = PriceTime<F, Sell>;
+
+// For buy orders, higher prices have higher priority.
+pub type BuyPriceTime<F> = PriceTime<F, Buy>;
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,9 +258,9 @@ mod tests {
 
     #[test]
     fn test_equality() {
-        let pt1 = PriceTime::new(100, 8);
-        let pt2 = PriceTime::new(410, 8);
-        let pt3 = PriceTime::new(100, 9);
+        let pt1 = SellPriceTime::new(100, 8);
+        let pt2 = SellPriceTime::new(410, 8);
+        let pt3 = SellPriceTime::new(100, 9);
 
         assert!(pt1 < pt2);
         assert!(pt1 < pt3);
@@ -210,8 +270,8 @@ mod tests {
 
     #[test]
     fn test_ordering_by_price() {
-        let pt1 = PriceTime::new(100, 8);
-        let pt2 = PriceTime::new(200, 8);
+        let pt1 = SellPriceTime::new(100, 8);
+        let pt2 = SellPriceTime::new(200, 8);
 
         assert!(pt1 < pt2);
         assert!(pt2 > pt1);
@@ -219,8 +279,8 @@ mod tests {
 
     #[test]
     fn test_ordering_by_time_when_prices_equal() {
-        let pt1 = PriceTime::new(100, 8);
-        let pt2 = PriceTime::new(410, 2); // 41 ≡ 10 (mod 31)
+        let pt1 = SellPriceTime::new(100, 8);
+        let pt2 = SellPriceTime::new(410, 2); // 41 ≡ 10 (mod 31)
 
         assert!(pt1 < pt2);
         assert!(pt2 > pt1);
@@ -231,11 +291,11 @@ mod tests {
         let mut map = BTreeMap::new();
 
         // Insert in random order
-        let pt3 = PriceTime::new(100, 3);
-        let pt1 = PriceTime::new(100, 1);
-        let pt2 = PriceTime::new(100, 2);
-        let pt4 = PriceTime::new(50, 4);
-        let pt5 = PriceTime::new(150, 5);
+        let pt3 = SellPriceTime::new(100, 3);
+        let pt1 = SellPriceTime::new(100, 1);
+        let pt2 = SellPriceTime::new(100, 2);
+        let pt4 = SellPriceTime::new(50, 4);
+        let pt5 = SellPriceTime::new(150, 5);
 
         map.insert(pt3, "third");
         map.insert(pt1, "first");
@@ -252,5 +312,100 @@ mod tests {
         assert_eq!(entries[2].0, pt2); // Price 10, middle time
         assert_eq!(entries[3].0, pt3); // Price 10, latest time
         assert_eq!(entries[4].0, pt5); // Highest price (15) comes last
+    }
+    #[test]
+    fn test_buy_price_time_equality() {
+        let pt1 = BuyPriceTime::new(100, 8);
+        let pt2 = BuyPriceTime::new(410, 8);
+        let pt3 = BuyPriceTime::new(100, 9);
+
+        assert_ne!(pt1, pt2);
+        assert_ne!(pt1, pt3);
+        assert_ne!(pt2, pt3);
+    }
+
+    #[test]
+    fn test_buy_ordering_by_price() {
+        let pt1 = BuyPriceTime::new(200, 8);
+        let pt2 = BuyPriceTime::new(100, 8);
+
+        // For buy orders, higher prices should come first
+        assert!(pt1 < pt2);
+        assert!(pt2 > pt1);
+    }
+
+    #[test]
+    fn test_buy_ordering_by_time_when_prices_equal() {
+        let pt1 = BuyPriceTime::new(100, 8);
+        let pt2 = BuyPriceTime::new(100, 10);
+
+        // When prices are equal, earlier time should come first
+        assert!(pt1 < pt2);
+        assert!(pt2 > pt1);
+    }
+
+    #[test]
+    fn test_buy_btreemap_ordering() {
+        let mut map = BTreeMap::new();
+
+        // Insert in random order
+        let pt3 = BuyPriceTime::new(100, 3);
+        let pt1 = BuyPriceTime::new(100, 1);
+        let pt2 = BuyPriceTime::new(100, 2);
+        let pt4 = BuyPriceTime::new(150, 4);
+        let pt5 = BuyPriceTime::new(50, 5);
+
+        map.insert(pt3, "third");
+        map.insert(pt1, "first");
+        map.insert(pt2, "second");
+        map.insert(pt4, "fourth");
+        map.insert(pt5, "fifth");
+
+        // Convert to vec for easier testing
+        let entries: Vec<_> = map.into_iter().collect();
+
+        // Check ordering - for buy orders, highest price comes first
+        assert_eq!(entries[0].0, pt4); // Highest price (150) comes first
+        assert_eq!(entries[1].0, pt1); // Price 100, earliest time
+        assert_eq!(entries[2].0, pt2); // Price 100, middle time
+        assert_eq!(entries[3].0, pt3); // Price 100, latest time
+        assert_eq!(entries[4].0, pt5); // Lowest price (50) comes last
+    }
+
+    #[test]
+    fn test_buy_find_low() {
+        let mut map = BTreeMap::new();
+
+        // Insert in random order
+        let pt0 = BuyPriceTime::new(u64::MAX, 0);
+        let pt3 = BuyPriceTime::new(100, 3);
+        let pt1 = BuyPriceTime::new(100, 1);
+        let pt2 = BuyPriceTime::new(100, 2);
+        let pt4 = BuyPriceTime::new(150, 4);
+        let pt5 = BuyPriceTime::new(50, 5);
+
+        map.insert(pt0, "zero");
+        let low = map
+            .range(..pt3)
+            .next_back()
+            .map(|(_, &index)| index)
+            .unwrap();
+        println!("Low: {:?}", low);
+        map.insert(pt3, "third");
+        map.insert(pt1, "first");
+        map.insert(pt2, "second");
+        map.insert(pt4, "fourth");
+        map.insert(pt5, "fifth");
+
+        // Convert to vec for easier testing
+        let entries: Vec<_> = map.into_iter().collect();
+
+        // Check ordering - for buy orders, highest price comes first
+        assert_eq!(entries[0].0, pt0); // 0th Entry
+        assert_eq!(entries[1].0, pt4); // Highest price (150) comes first
+        assert_eq!(entries[2].0, pt1); // Price 100, earliest time
+        assert_eq!(entries[3].0, pt2); // Price 100, middle time
+        assert_eq!(entries[4].0, pt3); // Price 100, latest time
+        assert_eq!(entries[5].0, pt5); // Lowest price (50) comes last
     }
 }
