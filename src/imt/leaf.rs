@@ -1,5 +1,5 @@
 use std::cmp::Ordering;
-use std::{array, marker::PhantomData, u64};
+use std::{array, marker::PhantomData};
 
 use super::{
     side::{Buy, OrderSide, Sell, Side},

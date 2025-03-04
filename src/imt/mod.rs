@@ -69,7 +69,7 @@ pub struct IndexedMerkleTree<'a, S> {
 pub type SellIMT<'a> = IndexedMerkleTree<'a, Sell>;
 pub type BuyIMT<'a> = IndexedMerkleTree<'a, Buy>;
 
-impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
+impl<S: OrderSide> IndexedMerkleTree<'_, S> {
     /// finalize the update at given index and returns the computed hash at each level
     #[inline]
     pub fn finalize_update(&mut self, mut index: usize) -> MerklePath<BaseField> {
