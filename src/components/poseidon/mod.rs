@@ -12,7 +12,7 @@ use stwo_prover::{
     },
     core::{
         backend::simd::{
-            m31::{PackedBaseField, LOG_N_LANES, N_LANES},
+            m31::{PackedBaseField, N_LANES},
             qm31::{PackedQM31, PackedSecureField},
             SimdBackend,
         },
@@ -132,7 +132,7 @@ impl FrameworkEval for PoseidonEval {
             eval.add_to_relation(RelationEntry::new(
                 &self.poseidon_elements,
                 -E::EF::from(is_real.clone()),
-                &values.map(|s| s.clone()).collect_vec(),
+                &values.cloned().collect_vec(),
             ))
         }
 
@@ -249,7 +249,7 @@ pub fn interaction_trace(
 
     for rep_i in 0..N_INSTANCES_PER_ROW {
         let mut col_gen = logup_gen.new_col();
-        for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
+        for (vec_row, is_real) in is_real_col.iter().enumerate() {
             // fetch the initial state and the final hash from the trace.
             let values: [PackedBaseField; N_ELEMENTS] = array::from_fn(|i| {
                 if i < 16 {
@@ -260,7 +260,7 @@ pub fn interaction_trace(
             });
             let denom0: PackedSecureField = poseidon_elements.combine(&values);
             // the multiplicity is negative as the output is "yielded".
-            col_gen.write_frac(vec_row, -PackedQM31::one() * is_real_col[vec_row], denom0);
+            col_gen.write_frac(vec_row, -PackedQM31::one() * (*is_real), denom0);
         }
         col_gen.finalize_col();
     }
