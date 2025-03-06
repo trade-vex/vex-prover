@@ -17,7 +17,7 @@ pub struct LessThanEval {
 /// constraints on less than operations. The primary purpose of this
 /// implementation is to evaluate specific constraints related to less than operations used by other components.
 ///
-/// # Constaint Evaluation
+/// # Constraint Evaluation
 ///
 /// - `evaluate<E: EvalAtRow>(&self, mut eval: E) -> E`:
 ///   It retrieves the LessThanOp for a particular row, each row represents a single less than operation.

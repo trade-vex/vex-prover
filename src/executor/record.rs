@@ -1,5 +1,5 @@
 use std::array;
-
+use crate::components::TraceSize;
 use itertools::izip;
 use num_traits::{One, Zero};
 use stwo_prover::core::{
@@ -12,6 +12,7 @@ use crate::{
     components::{
         bytes::ByteOperations,
         less_than::{LessThanColumn, LessThanOperations},
+        addition::{AddColumn, AddOperations},
     },
     types::N_U64_LIMBS,
 };
@@ -70,7 +71,7 @@ pub struct ExecutionTrace<F> {
     pub instructions: Vec<Instruction<F>>,
     /// Auxillary Operations that are Looked up by the above instructions
     /// Add Operation for Field Representations of Price, Time
-    pub add_operations: Vec<[F; 31]>,
+    pub add_operations: Vec<[F; 32]>,
     /// Less Than Operation. Compares Price pairs, comprising 8 Field Elements each
     pub less_than_operations: LessThanOperations,
     /// Comparison Operations. Compares two Price, Time pairs
@@ -130,9 +131,43 @@ impl ExecutionTrace<BaseField> {
     //@todo: the following methods will take input as an event
     // and compute the corresponding Trace Row For constraint evaluations
     /// Adds an Add Event to the Execution Trace
-    pub fn add_add_event(&mut self, event: [BaseField; 31]) {
-        self.add_operations.push(event);
+    // pub fn add_add_event(&mut self, event: [BaseField; 31]) {
+    //     self.add_operations.push(event);
+    // }
+    /// Adds an Add Event to the Execution Trace
+    pub fn add_add_event(&mut self, a: [BaseField; N_U64_LIMBS], b: [BaseField; N_U64_LIMBS]) {
+        let mut row = [BaseField::zero(); AddColumn::MAIN_COLS];
+    
+        // Copy input operands a and b into the trace row
+        row[AddColumn::A..AddColumn::B].copy_from_slice(&a);
+        row[AddColumn::B..AddColumn::C].copy_from_slice(&b);
+    
+        let mut carry = [BaseField::zero(); N_U64_LIMBS - 1];
+        let mut c = [BaseField::zero(); N_U64_LIMBS];
+    
+        let mut carry_bit = BaseField::zero();
+        
+        for i in 0..N_U64_LIMBS {
+            let sum = a[i] + b[i] + carry_bit;
+            c[i] = sum; // Store result of addition
+            
+            if i < N_U64_LIMBS - 1 {
+                carry[i] = if sum < a[i] { BaseField::one() } else { BaseField::zero() }; // Set carry if overflow occurs
+                carry_bit = carry[i]; // Only update carry_bit when we have a valid index
+            }
+            // Note: we don't update carry_bit in the last iteration as there's no carry[N_U64_LIMBS-1]
+        }
+    
+        // Copy computed c and carry values into the row
+        row[AddColumn::C..AddColumn::CARRY].copy_from_slice(&c);
+        row[AddColumn::CARRY..AddColumn::IS_REAL].copy_from_slice(&carry);
+    
+        // Mark this as a real operation
+        row[AddColumn::IS_REAL] = BaseField::one();
+    
+        self.add_operations.push(row);
     }
+
 
     /// Adds a Less Than Event by recording the corresponding Trace Row
     pub fn add_less_than_event(
