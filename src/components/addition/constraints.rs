@@ -106,27 +106,61 @@ impl FrameworkEval for AddEval {
 
         // CONSTRAINT 6: U8 Range checks for each byte
         // Verify that each byte of a, b, c are within the valid byte range
-        for i in 0..N_U64_LIMBS {
-            // Check that a[i] is in range
+        // for i in 0..N_U64_LIMBS {
+        //     // Check that a[i] is in range
+        //     eval.add_to_relation(RelationEntry::new(
+        //         &self.range_check_u8_elements, // Use the 2-argument range checker
+        //         E::EF::from(op.is_real.clone()),
+        //         &[op.a[i].clone(), op.b[i].clone()], // Use zero as a dummy second argument
+        //     ));
+        
+        //     // // Check that b[i] is in range
+        //     // eval.add_to_relation(RelationEntry::new(
+        //     //     &self.range_check_u8_elements,
+        //     //     E::EF::from(op.is_real.clone()),
+        //     //     &[op.b[i].clone(), E::EF::zero()],
+        //     // ));
+        
+        //     // // Check that c[i] is in range
+        //     // eval.add_to_relation(RelationEntry::new(
+        //     //     &self.range_check_u8_elements,
+        //     //     E::EF::from(op.is_real.clone()),
+        //     //     &[op.c[i].clone(), E::EF::zero()],
+        //     // ));
+        // }
+        for i in (0..N_U64_LIMBS).step_by(4) {
             eval.add_to_relation(RelationEntry::new(
-                &self.range_check_u8_elements, // Use the 2-argument range checker
+                &self.range_check_u8_elements,
                 E::EF::from(op.is_real.clone()),
-                &[op.a[i].clone(), op.b[i].clone()], // Use zero as a dummy second argument
+                &[op.a[i].clone(), op.a[i + 1].clone()],
+            ));
+            eval.add_to_relation(RelationEntry::new(
+                &self.range_check_u8_elements,
+                E::EF::from(op.is_real.clone()),
+                &[op.a[i + 2].clone(), op.a[i + 3].clone()],
             ));
         
-            // // Check that b[i] is in range
-            // eval.add_to_relation(RelationEntry::new(
-            //     &self.range_check_u8_elements,
-            //     E::EF::from(op.is_real.clone()),
-            //     &[op.b[i].clone(), E::EF::zero()],
-            // ));
+            eval.add_to_relation(RelationEntry::new(
+                &self.range_check_u8_elements,
+                E::EF::from(op.is_real.clone()),
+                &[op.b[i].clone(), op.b[i + 1].clone()],
+            ));
+            eval.add_to_relation(RelationEntry::new(
+                &self.range_check_u8_elements,
+                E::EF::from(op.is_real.clone()),
+                &[op.b[i + 2].clone(), op.b[i + 3].clone()],
+            ));
         
-            // // Check that c[i] is in range
-            // eval.add_to_relation(RelationEntry::new(
-            //     &self.range_check_u8_elements,
-            //     E::EF::from(op.is_real.clone()),
-            //     &[op.c[i].clone(), E::EF::zero()],
-            // ));
+            eval.add_to_relation(RelationEntry::new(
+                &self.range_check_u8_elements,
+                E::EF::from(op.is_real.clone()),
+                &[op.c[i].clone(), op.c[i + 1].clone()],
+            ));
+            eval.add_to_relation(RelationEntry::new(
+                &self.range_check_u8_elements,
+                E::EF::from(op.is_real.clone()),
+                &[op.c[i + 2].clone(), op.c[i + 3].clone()],
+            ));
         }
         
 
