@@ -79,7 +79,11 @@ impl TraceSize for LessThanColumn {
     const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
-relation!(LessThanElements, 18);
+// A Total of 17 elements are "used" or "yielded" for the less than operation
+// a - 8 limbs corresponding to the first operand(u64)
+// b - 8 limbs corresponding to the second operand(u64)
+// c - 1 limb corresponding to the result of the comparison
+relation!(LessThanElements, 17);
 
 #[cfg(test)]
 mod tests {
