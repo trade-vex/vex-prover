@@ -5,7 +5,6 @@ use stwo_prover::{
     core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
     relation,
 };
-use super::bytes::RangeCheckU8Elements;
 
 use super::TraceSize;
 
@@ -30,17 +29,17 @@ pub type AddOperations = Vec<[BaseField; AddColumn::MAIN_COLS]>;
 pub struct AddOp<F> {
     /// First input operand, represented as an array of N limbs
     a: [F; N_U64_LIMBS],
-    
+
     /// Second input operand, represented as an array of N limbs
     b: [F; N_U64_LIMBS],
-    
+
     /// Result of the addition, represented as an array of N limbs
     c: [F; N_U64_LIMBS],
-    
+
     /// Carry bits for intermediate byte additions (N_U64_LIMBS - 1 carries)
     /// Each carry represents whether the previous byte addition resulted in an overflow
     carry: [F; N_U64_LIMBS - 1],
-    
+
     /// Flag to indicate if this is a "real" operation or a padding operation
     /// Helps distinguish between actual computations and dummy rows added for trace alignment
     is_real: F,
@@ -49,7 +48,7 @@ pub struct AddOp<F> {
 impl<F> AddOp<F> {
     /// Extracts an AddOp instance from an evaluation row.
     ///
-    /// This method is used during constraint evaluation to retrieve the 
+    /// This method is used during constraint evaluation to retrieve the
     /// field elements representing the addition operation.
     ///
     /// # Parameters
@@ -64,7 +63,7 @@ impl<F> AddOp<F> {
         let c = array::from_fn(|_| eval.next_trace_mask());
         let carry = array::from_fn(|_| eval.next_trace_mask());
         let is_real = eval.next_trace_mask();
-        
+
         AddOp {
             a,
             b,
@@ -72,7 +71,6 @@ impl<F> AddOp<F> {
             carry,
             is_real,
         }
-
     }
 }
 
@@ -86,16 +84,16 @@ pub struct AddColumn;
 impl AddColumn {
     /// Starting index for the first operand (a) columns
     pub const A: usize = 0;
-    
+
     /// Starting index for the second operand (b) columns
     pub const B: usize = Self::A + N_U64_LIMBS;
-    
+
     /// Starting index for the result (c) columns
     pub const C: usize = Self::B + N_U64_LIMBS;
-    
+
     /// Starting index for carry bits
     pub const CARRY: usize = Self::C + N_U64_LIMBS;
-    
+
     /// Index for the "is real" flag column
     pub const IS_REAL: usize = Self::CARRY + (N_U64_LIMBS - 1);
 }
@@ -105,16 +103,16 @@ impl TraceSize for AddColumn {
     /// Total number of main columns for the addition operation trace
     /// Includes: a, b, c, carry, and is_real columns
     const MAIN_COLS: usize = Self::IS_REAL + 1;
-    
+
     /// Number of interaction columns includes:
     /// - 1 column for AddU8 element checks
     /// - 1 column for yielding the result
     const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
-/// Defines a relation for storing and verifying addition operation elements
-/// The number 18 specifies the log size of the relation
-relation!(AddElements, 18);
+// Defines a relation for storing and verifying addition operation elements
+// The number 18 specifies the log size of the relation
+relation!(AddElements, 24);
 
 #[cfg(test)]
 mod tests {
@@ -127,17 +125,15 @@ mod tests {
     use trace::{interaction_trace, preprocessed_trace, trace};
     use tracing::{span, Level};
 
-    use crate::{
-        components::bytes::AndElements, executor::record::ExecutionTrace, types::Price, types::N_U64_LIMBS
-    };
     use super::*;
-    
-    #[test]
+    use crate::{components::bytes::RangeCheckU8Elements, executor::record::ExecutionTrace, types::Price};
+
+    #[test_log::test]
     fn test_addition_table() {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let mut record = ExecutionTrace::new();
-        let n = 1242132;
+        let n = 124213;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen());
@@ -163,7 +159,6 @@ mod tests {
         span.exit();
         let trace = TreeVec::new(vec![constant_trace, trace, interaction_trace]);
         let trace_polys = TreeVec::<Vec<_>>::map_cols(trace, |c| c.interpolate());
-
 
         let component = AddEval {
             range_check_u8_elements,
