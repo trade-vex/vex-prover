@@ -8,7 +8,8 @@ pub enum IMTError {
     LeafNotFound,
     InvalidNode,
     OperationFailed(String),
-    InsufficientVolumeToFill(u64, u64)
+    InsufficientVolumeToFill(u64, u64),
+    InvalidU8Pair(u32, u32),
 }
 
 impl fmt::Display for IMTError {
@@ -20,7 +21,10 @@ impl fmt::Display for IMTError {
             IMTError::LowLeafNotFound => write!(f, "Low leaf not found"),
             IMTError::InvalidNode => write!(f, "Invalid node"),
             IMTError::OperationFailed(reason) => write!(f, "Operation failed: {}", reason),
-            IMTError::InsufficientVolumeToFill(volume, available) => write!(f, "Insufficient volume to fill: {} > {}", volume, available)
+            IMTError::InsufficientVolumeToFill(volume, available) => {
+                write!(f, "Insufficient volume to fill: {} > {}", volume, available)
+            }
+            IMTError::InvalidU8Pair(a, b) => write!(f, "Invalid u8 pair: {} {}", a, b),
         }
     }
 }

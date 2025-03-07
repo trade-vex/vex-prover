@@ -1,5 +1,15 @@
 use std::array;
 
+use super::instruction::{Opcode, N_INSTRUCTION_FELTS};
+use crate::{
+    components::{
+        bytes::ByteOperations,
+        less_than::{LessThanColumn, LessThanOperations},
+        poseidon::PoseidonOperations,
+    },
+    imt::{error::IMTError, LeafFelts},
+    types::N_U64_LIMBS,
+};
 use itertools::{chain, izip, Itertools};
 use num_traits::{One, Zero};
 use stwo_prover::core::{
@@ -7,16 +17,8 @@ use stwo_prover::core::{
     fields::m31::BaseField,
 };
 
-use super::instruction::{Instruction, Opcode};
-use crate::{
-    components::{
-        bytes::ByteOperations,
-        less_than::{LessThanColumn, LessThanOperations},
-        poseidon::PoseidonOperations,
-    },
-    imt::LeafFelts,
-    types::N_U64_LIMBS,
-};
+pub type Instructions<F> = Vec<[F; N_INSTRUCTION_FELTS]>;
+pub type InstructionFelts<F> = [F; N_INSTRUCTION_FELTS];
 
 /// ExecutionTrace contains Instructions executed by matching engine during the execution
 /// There are two types of events:
@@ -40,33 +42,35 @@ use crate::{
 pub struct ExecutionTrace<F> {
     /// Buy Side Instructions
     /// 1. Place Buy Order
-    pub buy_place_order: Vec<Instruction<F>>,
+    pub buy_insert_order: Instructions<F>,
     /// 2. Cancel Buy Order
-    pub buy_cancel_order: Vec<Instruction<F>>,
+    pub buy_delete_order: Instructions<F>,
     /// 3. Modify Buy Order
-    pub buy_modify_order: Vec<Instruction<F>>,
+    pub buy_modify_order: Instructions<F>,
     /// 4. Buy Order Matched
-    pub buy_order_match: Vec<Instruction<F>>,
+    pub buy_order_match: Instructions<F>,
     /// 5. Buy Order Cancelled
-    pub buy_order_partially_match: Vec<Instruction<F>>,
+    pub buy_order_partially_match: Instructions<F>,
     /// Sell Side Instructions
     /// 6. Place Sell Order
-    pub sell_place_order: Vec<Instruction<F>>,
+    pub sell_insert_order: Instructions<F>,
     /// 7. Cancel Sell Order
-    pub sell_cancel_order: Vec<Instruction<F>>,
+    pub sell_delete_order: Instructions<F>,
     /// 8. Modify Sell Order
-    pub sell_modify_order: Vec<Instruction<F>>,
+    pub sell_modify_order: Instructions<F>,
     /// 9. Sell Order Matched
-    pub sell_order_match: Vec<Instruction<F>>,
+    pub sell_order_match: Instructions<F>,
     /// 10. Sell Order Cancelled
-    pub sell_order_partially_match: Vec<Instruction<F>>,
+    pub sell_order_partially_match: Instructions<F>,
     /// All The Instructions sequentially ordered for the Main Trace
-    pub instructions: Vec<Instruction<F>>,
+    pub instructions: Instructions<F>,
     /// Auxillary Operations that are Looked up by the above instructions
     /// Add Operation for Field Representations of Price, Time
     pub add_operations: Vec<[F; 31]>,
     /// Less Than Operation. Compares Price pairs, comprising 8 Field Elements each
     pub less_than_operations: LessThanOperations,
+    /// strict less than operations
+    pub strict_less_than_operations: LessThanOperations,
     /// Comparison Operations. Compares two Price, Time pairs
     pub comparision_operations: Vec<[F; 53]>,
     /// Hash Operations For Merklelization.
@@ -85,19 +89,20 @@ impl ExecutionTrace<BaseField> {
     /// Creates a new Execution Trace
     pub fn new() -> Self {
         Self {
-            buy_place_order: Vec::new(),
-            buy_cancel_order: Vec::new(),
+            buy_insert_order: Vec::new(),
+            buy_delete_order: Vec::new(),
             buy_modify_order: Vec::new(),
             buy_order_match: Vec::new(),
             buy_order_partially_match: Vec::new(),
-            sell_place_order: Vec::new(),
-            sell_cancel_order: Vec::new(),
+            sell_insert_order: Vec::new(),
+            sell_delete_order: Vec::new(),
             sell_modify_order: Vec::new(),
             sell_order_match: Vec::new(),
             sell_order_partially_match: Vec::new(),
             instructions: Vec::new(),
             add_operations: Vec::new(),
             less_than_operations: Vec::new(),
+            strict_less_than_operations: Vec::new(),
             comparision_operations: Vec::new(),
             poseidon_operations: Vec::new(),
             byte_operations: array::from_fn(|_| unsafe { BaseColumn::uninitialized(1 << 16) }),
@@ -105,18 +110,18 @@ impl ExecutionTrace<BaseField> {
     }
 
     /// Adds an instruction to the Execution Trace
-    pub fn add_instruction(&mut self, instruction: Instruction<BaseField>) {
-        match instruction.opcode {
-            Opcode::PlaceBuyOrder => self.buy_place_order.push(instruction),
-            Opcode::CancelBuyOrder => self.buy_cancel_order.push(instruction),
+    pub fn add_instruction(&mut self, instruction: InstructionFelts<BaseField>) {
+        match Opcode::from_field(instruction[0]) {
+            Opcode::InsertBuyOrder => self.buy_insert_order.push(instruction),
+            Opcode::CancelBuyOrder => self.buy_delete_order.push(instruction),
             Opcode::UpdateBuyOrder => self.buy_modify_order.push(instruction),
-            Opcode::ExecuteBuyOrder => self.buy_order_match.push(instruction),
-            Opcode::PartialExecuteBuyOrder => self.buy_order_partially_match.push(instruction),
-            Opcode::PlaceSellOrder => self.sell_place_order.push(instruction),
-            Opcode::CancelSellOrder => self.sell_cancel_order.push(instruction),
+            Opcode::MatchBuyOrder => self.buy_order_match.push(instruction),
+            Opcode::PartialMatchBuyOrder => self.buy_order_partially_match.push(instruction),
+            Opcode::InsertSellOrder => self.sell_insert_order.push(instruction),
+            Opcode::CancelSellOrder => self.sell_insert_order.push(instruction),
             Opcode::UpdateSellOrder => self.sell_modify_order.push(instruction),
-            Opcode::ExecuteSellOrder => self.sell_order_match.push(instruction),
-            Opcode::PartialExecuteSellOrder => self.sell_order_partially_match.push(instruction),
+            Opcode::MatchSellOrder => self.sell_order_match.push(instruction),
+            Opcode::PartialMatchSellOrder => self.sell_order_partially_match.push(instruction),
         }
         self.instructions.push(instruction);
     }
@@ -129,46 +134,23 @@ impl ExecutionTrace<BaseField> {
     }
 
     /// Adds a Less Than Event by recording the corresponding Trace Row
+    /// Returns an error if any limb in a or b is greater than 255
+    pub fn add_strictly_less_than_event(
+        &mut self,
+        a: [BaseField; N_U64_LIMBS],
+        b: [BaseField; N_U64_LIMBS],
+    ) -> Result<(), IMTError> {
+        self.add_less_than_event_internal(a, b, true)
+    }
+
+    /// Adds a Less Than Event by recording the corresponding Trace Row
+    /// Returns an error if any limb in a or b is greater than 255
     pub fn add_less_than_event(
         &mut self,
         a: [BaseField; N_U64_LIMBS],
         b: [BaseField; N_U64_LIMBS],
-    ) {
-        let mut row = [BaseField::zero(); LessThanColumn::IS_REAL + 1];
-        row[LessThanColumn::A..LessThanColumn::B].copy_from_slice(&a);
-        row[LessThanColumn::B..LessThanColumn::C].copy_from_slice(&b);
-
-        let flags = &mut row[LessThanColumn::FLAGS..LessThanColumn::A_COMPARISON_BYTE];
-        let mut c = BaseField::zero();
-        let mut a_cmp = BaseField::zero();
-        let mut b_cmp = BaseField::zero();
-
-        for (a_byte, b_byte, flag) in izip!(a.iter().rev(), b.iter().rev(), flags.iter_mut().rev())
-        {
-            match a_byte.cmp(b_byte) {
-                std::cmp::Ordering::Less => {
-                    *flag = BaseField::one();
-                    a_cmp = *a_byte;
-                    b_cmp = *b_byte;
-                    c = BaseField::one();
-                    break;
-                }
-                std::cmp::Ordering::Greater => {
-                    *flag = BaseField::one();
-                    a_cmp = *a_byte;
-                    b_cmp = *b_byte;
-                    break;
-                }
-                _ => {}
-            }
-        }
-
-        row[LessThanColumn::C] = c;
-        row[LessThanColumn::A_COMPARISON_BYTE] = a_cmp;
-        row[LessThanColumn::B_COMPARISON_BYTE] = b_cmp;
-        row[LessThanColumn::IS_REAL] = BaseField::one();
-
-        self.less_than_operations.push(row);
+    ) -> Result<(), IMTError> {
+        self.add_less_than_event_internal(a, b, false)
     }
 
     /// Adds a Comparison Event by recording the corresponding Trace Row
@@ -191,29 +173,90 @@ impl ExecutionTrace<BaseField> {
     }
 
     /// Adds an And U8 Event by recording the corresponding Trace Row
-    /// # Panics
-    /// Panics if a or b is greater than 255
-    pub fn add_and_u8_event(&mut self, a: u32, b: u32) {
+    /// Returns an error if a or b is greater than 255
+    pub fn add_and_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
         assert!(a < 256 && b < 256, "Invalid U8 Pair");
         let offset = (a << 8) + b;
         self.byte_operations[0].as_mut_slice()[offset as usize].0 += 1;
+        Ok(())
     }
 
     /// Adds a Less Than U8 Event by recording the corresponding Trace Row
-    /// # Panics
-    /// Panics if a or b is greater than 255
-    pub fn add_less_than_u8_event(&mut self, a: u32, b: u32) {
+    /// Returns an error if a or b is greater than 255
+    pub fn add_less_than_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
         assert!(a < 256 && b < 256, "Invalid U8 Pair");
         let offset = (a << 8) + b;
         self.byte_operations[1].as_mut_slice()[offset as usize].0 += 1;
+        Ok(())
     }
 
     /// Adds a Range Check U8 Event by recording the corresponding Trace Row
-    /// # Panics
-    /// Panics if a or b is greater than 255
-    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) {
+    /// Returns an error if a or b is greater than 255
+    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
         assert!(a < 256 && b < 256, "Invalid U8 Pair");
         let offset = (a << 8) + b;
         self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
+        Ok(())
+    }
+
+    /// Adds a Less Than Event by recording the corresponding Trace Row
+    /// the strict flag is used to determine if the comparison is strict
+    /// # Returns
+    ///  - Ok(()) if the operation is successful
+    ///  - InvalidU8Pair(a, b) if a or b is greater than 255
+    fn add_less_than_event_internal(
+        &mut self,
+        a: [BaseField; N_U64_LIMBS],
+        b: [BaseField; N_U64_LIMBS],
+        is_strict: bool,
+    ) -> Result<(), IMTError> {
+        let mut row = [BaseField::zero(); LessThanColumn::IS_REAL + 1];
+        row[LessThanColumn::A..LessThanColumn::B].copy_from_slice(&a);
+        row[LessThanColumn::B..LessThanColumn::C].copy_from_slice(&b);
+
+        let flags = &mut row[LessThanColumn::FLAGS..LessThanColumn::A_COMPARISON_BYTE];
+        let mut c = BaseField::zero();
+        let mut a_cmp = BaseField::zero();
+        let mut b_cmp = BaseField::zero();
+
+        for (a_byte, b_byte, flag) in izip!(a.iter().rev(), b.iter().rev(), flags.iter_mut().rev())
+        {
+            if a_byte.0 > 255 || b_byte.0 > 255 {
+                return Err(IMTError::InvalidU8Pair(a_byte.0, b_byte.0));
+            }
+            match a_byte.cmp(b_byte) {
+                std::cmp::Ordering::Less => {
+                    *flag = BaseField::one();
+                    a_cmp = *a_byte;
+                    b_cmp = *b_byte;
+                    c = BaseField::one();
+                    break;
+                }
+                std::cmp::Ordering::Greater => {
+                    *flag = BaseField::one();
+                    a_cmp = *a_byte;
+                    b_cmp = *b_byte;
+                    break;
+                }
+                _ => {}
+            }
+        }
+
+        // less_than_u8 events for a_cmp and b_cmp bytes
+        self.add_less_than_u8_event(a_cmp.0, b_cmp.0)?;
+        row[LessThanColumn::A_COMPARISON_BYTE] = a_cmp;
+        row[LessThanColumn::B_COMPARISON_BYTE] = b_cmp;
+        row[LessThanColumn::IS_REAL] = BaseField::one();
+
+        if is_strict {
+            row[LessThanColumn::C] = c;
+            self.strict_less_than_operations.push(row);
+        } else {
+            // returns 1 as result if a = b, else returns c
+            row[LessThanColumn::C] = if a == b { BaseField::one() } else { c };
+            self.less_than_operations.push(row);
+        }
+
+        Ok(())
     }
 }

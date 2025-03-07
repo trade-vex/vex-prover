@@ -93,12 +93,12 @@ mod tests {
         for _ in 0..n {
             let a = rng.gen_range(0..256);
             let b = rng.gen_range(0..256);
-            record.add_and_u8_event(a, b);
+            record.add_and_u8_event(a, b).unwrap();
             if a != b {
                 let (min, max) = if a < b { (a, b) } else { (b, a) };
-                record.add_less_than_u8_event(min, max);
+                record.add_less_than_u8_event(min, max).unwrap();
             }
-            record.add_range_check_u8_event(a, b);
+            record.add_range_check_u8_event(a, b).unwrap();
         }
         span.exit();
         // Fiat Shamir Channel
