@@ -3,7 +3,6 @@ use crate::{
     types::N_U64_LIMBS,
 };
 use itertools::{chain, Itertools};
-use num_traits::Zero;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
@@ -43,7 +42,8 @@ pub fn trace(
     debug!("Log Size: {}", log_size);
     // pad less_than_operations to a power of 2
     for _ in 0..(1 << log_size) - less_than_operations.len() {
-        less_than_operations.push([BaseField::zero(); LessThanColumn::MAIN_COLS]);
+        // adding the first op as dummy op for padding
+        less_than_operations.push(less_than_operations[0]);
     }
     let mut trace = ComponentTrace::<{ LessThanColumn::MAIN_COLS }>::zeroed(log_size);
     // Each row of the trace is a LessThanOp field elements arranged as per the `LessThanColumn`
