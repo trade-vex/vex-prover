@@ -65,7 +65,8 @@ impl FrameworkEval for LessThanEval {
         // 1 if a is not equal to b
         eval.add_constraint(sum_flags.clone() * (E::F::one() - sum_flags.clone()));
 
-        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where a < b
+        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where
+        // a[i] is not equal to b[i] from the most significant byte
         let mut is_inequality_visited = E::F::zero();
         let mut a_comparison_byte = E::F::zero();
         let mut b_comparison_byte = E::F::zero();
