@@ -98,7 +98,7 @@ impl FrameworkEval for LessThanEval {
         eval.add_constraint((E::F::one() - sum_flags.clone()) * is_inequality_visited.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * a_comparison_byte.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * b_comparison_byte.clone());
-        eval.add_constraint((E::F::one() - sum_flags.clone()) * op.c.clone());
+        eval.add_constraint((E::F::one() - sum_flags) * op.c.clone());
 
         // c must be 1 if a_comparison_byte is less than b_comparison_byte
         // c must be 0 if a_comparison_byte is greater than b_comparison_byte
@@ -115,7 +115,7 @@ impl FrameworkEval for LessThanEval {
 
         eval.add_to_relation(RelationEntry::new(
             &self.less_than_elements,
-            -E::EF::from(op.is_real.clone()),
+            -E::EF::from(op.is_real),
             &values,
         ));
 
