@@ -1,11 +1,19 @@
 use crate::{
-    constants::EMPTY_HASHES, executor::record::ExecutionTrace, hash::compress, types::Volume,
+    constants::EMPTY_HASHES,
+    executor::{
+        flatten_single,
+        instruction::{IMTOperation, N_INSTRUCTION_FELTS},
+        record::ExecutionTrace,
+    },
+    flatten,
+    hash::compress,
+    types::Volume,
 };
 use error::IMTError;
 use leaf::{Leaf, PriceTime};
 use num_traits::{One, Zero};
 use order::Order;
-use side::{Buy, OrderSide, Sell};
+use side::{Buy, OrderSide, Sell, Side};
 use std::{array, collections::BTreeMap};
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -17,6 +25,7 @@ pub mod side;
 pub type MerkleProof<F> = [Hash<F>; MERKLE_HEIGHT];
 pub type MerklePath<F> = [Hash<F>; MERKLE_HEIGHT + 1];
 pub type LeafFelts<F> = [F; N_LEAF_FELTS];
+pub type IndexBits<F> = [F; MERKLE_HEIGHT];
 pub const MERKLE_HEIGHT: usize = 20;
 pub const MERKLE_WIDTH: usize = 1 << MERKLE_HEIGHT;
 pub const N_LEAF_FELTS: usize = 41;
@@ -180,6 +189,42 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
         // will not panic on unwrap, as a leaf is inserted on creation
         let low_index = self.find_low(&order.price_time)?;
         let low_leaf = self.leaves[low_index];
+        self.trace.add_strictly_less_than_event(
+            low_leaf.label.time().to_felts(),
+            order.price_time.time().to_felts(),
+        )?;
+        assert!(low_leaf.label.time() < order.price_time.time());
+        self.trace.add_strictly_less_than_event(
+            low_leaf.next.time().to_felts(),
+            order.price_time.time().to_felts(),
+        )?;
+        assert!(low_leaf.next.time() < order.price_time.time());
+        match S::SIDE {
+            Side::Buy => {
+                self.trace.add_less_than_event(
+                    order.price_time.price().to_felts(),
+                    low_leaf.label.price().to_felts(),
+                )?;
+                assert!(order.price_time.price() <= low_leaf.label.price());
+                self.trace.add_strictly_less_than_event(
+                    low_leaf.next.price().to_felts(),
+                    order.price_time.price().to_felts(),
+                )?;
+                assert!(low_leaf.next.price() < order.price_time.price());
+            }
+            Side::Sell => {
+                self.trace.add_less_than_event(
+                    low_leaf.label.price().to_felts(),
+                    order.price_time.price().to_felts(),
+                )?;
+                assert!(low_leaf.label.price() <= order.price_time.price());
+                self.trace.add_strictly_less_than_event(
+                    order.price_time.price().to_felts(),
+                    low_leaf.next.price().to_felts(),
+                )?;
+                assert!(order.price_time.price() < low_leaf.next.price());
+            }
+        }
         self.trace.add_leaf_hash_event(&low_leaf.to_felts());
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(low_index);
 
@@ -201,6 +246,22 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
         self.index_map.insert(order.price_time, inactive_index);
 
         let inactive_updated_path = self.finalize_insert(true);
+
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            S::op_code(IMTOperation::Insertion),
+            low_merkle_proof,
+            low_merkle_path,
+            low_merkle_updated_path,
+            Self::decompose_index(low_index),
+            low_leaf.to_felts(),
+            inactive_proof,
+            inactive_path,
+            inactive_updated_path,
+            Self::decompose_index(inactive_index),
+            self.leaves[inactive_index].to_felts(),
+            BaseField::one()
+        );
+        self.trace.add_instruction(instruction_felts);
         Ok(InsertionProof {
             initial_root,
             low_leaf,
@@ -482,6 +543,16 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
     /// Panics if the index is out of bounds
     pub fn leaf(&self, index: usize) -> Leaf<BaseField, S> {
         self.leaves[index]
+    }
+
+    /// decompose index to bits
+    fn decompose_index(mut index: usize) -> IndexBits<BaseField> {
+        let mut bits = array::from_fn(|_| BaseField::zero());
+        for i in 0..MERKLE_HEIGHT {
+            bits[i] = BaseField::from_u32_unchecked((index & 1) as u32);
+            index >>= 1;
+        }
+        bits
     }
 }
 
@@ -973,8 +1044,8 @@ mod tests {
         // Insert multiple orders with different price-time combinations
         let orders = [
             Order::new(1, 10, 1),
-            Order::new(1, 15, 1),
-            Order::new(1, 10, 2),
+            Order::new(1, 15, 2),
+            Order::new(1, 10, 3),
         ];
 
         let mut previous_root = imt.root();
@@ -1012,7 +1083,7 @@ mod tests {
         let orders = vec![
             Order::new(1, 15, 1), // index 1
             Order::new(1, 10, 2), // index 2
-            Order::new(1, 20, 1), // index 3
+            Order::new(1, 20, 3), // index 3
         ];
 
         for order in orders {
@@ -1074,8 +1145,8 @@ mod tests {
 
         // Insert some orders
         let order1 = Order::new(1, 10, 1);
-        let order2 = Order::new(1, 15, 1);
-        let order3 = Order::new(1, 10, 2);
+        let order2 = Order::new(1, 15, 2);
+        let order3 = Order::new(1, 10, 3);
         imt.insert(order1).unwrap();
         imt.insert(order2).unwrap();
         imt.insert(order3).unwrap();
@@ -1164,8 +1235,8 @@ mod tests {
         // Insert multiple orders with different price-time combinations
         let orders = [
             Order::new(1, 10, 1),
-            Order::new(1, 15, 1),
-            Order::new(1, 10, 2),
+            Order::new(1, 15, 2),
+            Order::new(1, 10, 3),
         ];
 
         let mut previous_root = imt.root();
@@ -1203,7 +1274,7 @@ mod tests {
         let orders = vec![
             Order::new(1, 15, 1), // index 1
             Order::new(1, 10, 2), // index 2
-            Order::new(1, 20, 1), // index 3
+            Order::new(1, 20, 3), // index 3
         ];
 
         for order in orders {
@@ -1266,8 +1337,8 @@ mod tests {
 
         // Insert some orders
         let order1 = Order::new(1, 10, 1);
-        let order2 = Order::new(1, 15, 1);
-        let order3 = Order::new(1, 10, 2);
+        let order2 = Order::new(1, 15, 2);
+        let order3 = Order::new(1, 10, 3);
         imt.insert(order1).unwrap();
         imt.insert(order2).unwrap();
         imt.insert(order3).unwrap();
