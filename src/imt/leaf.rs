@@ -13,6 +13,7 @@ use crate::{
     types::{Price, Time, Volume},
 };
 use num_traits::{One, Zero};
+use stwo_prover::constraint_framework::EvalAtRow;
 use stwo_prover::core::fields::m31::BaseField;
 
 #[derive(Clone, Debug)]
@@ -39,6 +40,20 @@ impl<F: Copy + Default, S> Default for Leaf<F, S> {
             next: PriceTime::default(),
         }
     }
+}
+
+pub struct LeafColumn;
+
+impl LeafColumn {
+    pub const ACTIVE: usize = 0;
+    pub const VOLUME: usize = Self::ACTIVE + 1;
+    pub const LABEL: usize = Self::VOLUME + N_U64_FELTS;
+    pub const NEXT: usize = Self::LABEL + 2 * N_U64_FELTS;
+
+    pub const PRICE: usize = Self::LABEL;
+    pub const TIME: usize = Self::PRICE + N_U64_FELTS;
+    pub const NEXT_PRICE: usize = Self::NEXT;
+    pub const NEXT_TIME: usize = Self::NEXT_PRICE + N_U64_FELTS;
 }
 
 impl<S: OrderSide> Leaf<BaseField, S> {
@@ -100,6 +115,25 @@ impl<S: OrderSide> Leaf<BaseField, S> {
         let mut input_state = array::from_fn(|_| BaseField::zero());
         input_state[..16].clone_from_slice(&felts[..16]);
         hash_leaf(input_state)
+    }
+}
+
+impl<F, S: OrderSide> Leaf<F, S> {
+    /// from_eval_felts returns a LessThanOp instance from a given EvalAtRow instance
+    pub fn from_eval_felts<E: EvalAtRow>(eval: &mut E) -> Leaf<E::F, S> {
+        let active = eval.next_trace_mask();
+        let volume = array::from_fn(|_| eval.next_trace_mask());
+        let price = array::from_fn(|_| eval.next_trace_mask());
+        let time = array::from_fn(|_| eval.next_trace_mask());
+        let next_price = array::from_fn(|_| eval.next_trace_mask());
+        let next_time = array::from_fn(|_| eval.next_trace_mask());
+
+        Leaf {
+            active,
+            volume: Volume::from_eval_felts(volume),
+            label: PriceTime::from_eval_felts(price, time),
+            next: PriceTime::from_eval_felts(next_price, next_time),
+        }
     }
 }
 
@@ -197,12 +231,12 @@ impl<S: OrderSide> PriceTime<BaseField, S> {
         match S::side() {
             Side::Buy => Self {
                 price: Price::from_u64(0),
-                time: Time::from_u64(u64::MAX),
+                time: Time::from_u64(0),
                 _marker: PhantomData,
             },
             Side::Sell => Self {
                 price: Price::from_u64(u64::MAX),
-                time: Time::from_u64(u64::MAX),
+                time: Time::from_u64(0),
                 _marker: PhantomData,
             },
         }
@@ -242,6 +276,16 @@ impl<S: OrderSide> PriceTime<BaseField, S> {
         felts[0..8].copy_from_slice(&self.price.to_felts());
         felts[8..16].copy_from_slice(&self.time.to_felts());
         felts
+    }
+}
+
+impl<F, S> PriceTime<F, S> {
+    pub fn from_eval_felts(price: [F; N_U64_FELTS], time: [F; N_U64_FELTS]) -> Self {
+        Self {
+            price: Price::from_eval_felts(price),
+            time: Time::from_eval_felts(time),
+            _marker: PhantomData,
+        }
     }
 }
 
