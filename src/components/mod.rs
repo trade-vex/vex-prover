@@ -14,6 +14,7 @@ use stwo_prover::core::{
 };
 
 pub mod bytes;
+pub mod insertions;
 pub mod less_than;
 pub mod poseidon;
 
