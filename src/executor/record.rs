@@ -30,6 +30,7 @@ pub type InstructionFelts<F> = [F; N_INSTRUCTION_FELTS];
 ///     - Order Matched: Two orders are matched
 ///     - Order Partial Matched: An order is cancelled
 ///
+///
 /// Each Event corresponds to a Tree Instruction in IndexedMerkleTree
 /// These events occur in Buy as well as Sell side, so there are total of 10 Instruction Types
 ///
@@ -72,7 +73,7 @@ pub struct ExecutionTrace<F> {
     /// strict less than operations
     pub strict_less_than_operations: LessThanOperations,
     /// Comparison Operations. Compares two Price, Time pairs
-    pub comparision_operations: Vec<[F; 53]>,
+    pub comparison_operations: Vec<[F; 53]>,
     /// Hash Operations For Merklelization.
     pub poseidon_operations: PoseidonOperations,
     /// Uint8 Operations
@@ -103,7 +104,7 @@ impl ExecutionTrace<BaseField> {
             add_operations: Vec::new(),
             less_than_operations: Vec::new(),
             strict_less_than_operations: Vec::new(),
-            comparision_operations: Vec::new(),
+            comparison_operations: Vec::new(),
             poseidon_operations: Vec::new(),
             byte_operations: array::from_fn(|_| unsafe { BaseColumn::uninitialized(1 << 16) }),
         }
@@ -155,7 +156,7 @@ impl ExecutionTrace<BaseField> {
 
     /// Adds a Comparison Event by recording the corresponding Trace Row
     pub fn add_comparison_event(&mut self, event: [BaseField; 53]) {
-        self.comparision_operations.push(event);
+        self.comparison_operations.push(event);
     }
 
     /// Adds a Poseidon Event by recording the corresponding Trace Row
