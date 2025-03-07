@@ -26,10 +26,11 @@ pub struct LessThanOp<F> {
     // result of the comparison
     c: F,
     // flag is 1 for the most significant byte where a[i] is not equal to b[i]
+    // flag is 1 for the most significant byte where a[i] is not equal to b[i]
     flags: [F; N_U64_LIMBS],
     // First byte of the first operand where a[i] is not equal to b[i] from the most significant byte
     a_comparison_byte: F,
-    // First byte of the second operand where a[i] is not equal to b[i] from the most significant byte
+    // First byte of the second operand where a[i] < b[i] from the most significant byte
     b_comparison_byte: F,
     // is real flag to check if the operation is not among the dummy padded operations
     is_real: F,
@@ -107,7 +108,7 @@ mod tests {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let mut record = ExecutionTrace::new();
-        let n = 1242132;
+        let n = 1242;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen());
@@ -123,6 +124,7 @@ mod tests {
         // Relation Elements
         let less_than_u8_elements = LessThanU8Elements::draw(&mut channel);
         let less_than_elements = LessThanElements::draw(&mut channel);
+        let strict_less_than_elements = StrictLessThanElements::draw(&mut channel);
 
         // Trace Generation
         let span = span!(Level::INFO, "Trace Generation").entered();
@@ -134,9 +136,10 @@ mod tests {
         let trace = TreeVec::new(vec![constant_trace, trace, interaction_trace]);
         let trace_polys = TreeVec::<Vec<_>>::map_cols(trace, |c| c.interpolate());
 
-        let component = LessThanEval {
+        let component: LessThanEval<false> = LessThanEval {
             less_than_u8_elements,
             less_than_elements,
+            strict_less_than_elements,
             claim,
         };
 

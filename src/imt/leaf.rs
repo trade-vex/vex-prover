@@ -14,7 +14,7 @@ use crate::{
 };
 use num_traits::{One, Zero};
 use stwo_prover::constraint_framework::EvalAtRow;
-use stwo_prover::core::fields::m31::BaseField;
+use stwo_prover::core::fields::m31::{BaseField, M31};
 
 #[derive(Clone, Debug)]
 pub struct Leaf<F, S> {
@@ -115,6 +115,11 @@ impl<S: OrderSide> Leaf<BaseField, S> {
         let mut input_state = array::from_fn(|_| BaseField::zero());
         input_state[..16].clone_from_slice(&felts[..16]);
         hash_leaf(input_state)
+    }
+
+    /// constant function that returns empty leaf felts
+    pub const fn empty_felts() -> [BaseField; N_LEAF_FELTS] {
+        [M31(0); N_LEAF_FELTS]
     }
 }
 

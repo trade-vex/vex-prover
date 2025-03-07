@@ -14,7 +14,7 @@ use leaf::{Leaf, PriceTime};
 use num_traits::{One, Zero};
 use order::Order;
 use side::{Buy, OrderSide, Sell, Side};
-use std::{array, collections::BTreeMap};
+use std::{array, cell::RefCell, collections::BTreeMap, rc::Rc};
 use stwo_prover::core::fields::m31::BaseField;
 
 pub mod error;
@@ -61,7 +61,7 @@ pub type Hash<F> = [F; 8];
 /// # References
 ///
 /// - [Section3, Transparency Dictionaries with Succinct Proofs of Correct Operation](https://eprint.iacr.org/2021/1263.pdf)
-pub struct IndexedMerkleTree<'a, S> {
+pub struct IndexedMerkleTree<S> {
     /// The root hash of the tree.
     root: Hash<BaseField>,
     /// raw data
@@ -72,17 +72,20 @@ pub struct IndexedMerkleTree<'a, S> {
     /// label to indices for quick lookups
     index_map: BTreeMap<PriceTime<BaseField, S>, usize>,
     /// trace records the operations on the tree
-    trace: &'a mut ExecutionTrace<BaseField>,
+    /// shared b/w both buy and sell imt's
+    trace: Rc<RefCell<ExecutionTrace<BaseField>>>,
 }
 
-pub type SellIMT<'a> = IndexedMerkleTree<'a, Sell>;
-pub type BuyIMT<'a> = IndexedMerkleTree<'a, Buy>;
+pub type SellIMT = IndexedMerkleTree<Sell>;
+pub type BuyIMT = IndexedMerkleTree<Buy>;
 
-impl<S: OrderSide> IndexedMerkleTree<'_, S> {
+impl<S: OrderSide> IndexedMerkleTree<S> {
     /// finalize the update at given index and returns the computed hash at each level
     #[inline]
     pub fn finalize_update(&mut self, mut index: usize) -> MerklePath<BaseField> {
+        let mut trace = self.trace.borrow_mut();
         let mut path = array::from_fn(|_| array::from_fn(|_| BaseField::zero()));
+        trace.add_leaf_hash_event(&self.leaves[index].to_felts());
         let leaf_hash = self.leaves[index].hash();
         self.raw[0][index] = leaf_hash;
         path[0] = leaf_hash;
@@ -103,7 +106,7 @@ impl<S: OrderSide> IndexedMerkleTree<'_, S> {
             } else {
                 self.raw[i][index]
             };
-            self.trace.add_merkle_hash_event(left, right);
+            trace.add_merkle_hash_event(left, right);
             let hash = compress(&[&left, &right]);
             self.raw[i + 1][parent_idx] = hash;
             path[i + 1] = hash;
@@ -115,9 +118,12 @@ impl<S: OrderSide> IndexedMerkleTree<'_, S> {
 
     /// finalize the insert at the end of the leaves list and returns the root
     #[inline]
-    pub fn finalize_insert(&mut self, record_trace: bool) -> MerklePath<BaseField> {
+    pub fn finalize_insert(&mut self) -> MerklePath<BaseField> {
+        let mut trace = self.trace.borrow_mut();
         // will not panic on unwrap, as a leaf is inserted on creation
-        let leaf_hash = self.leaves.last().unwrap().hash();
+        let leaf = self.leaves.last().unwrap();
+        trace.add_leaf_hash_event(&leaf.to_felts());
+        let leaf_hash = leaf.hash();
         let mut path = array::from_fn(|_| array::from_fn(|_| BaseField::zero()));
         self.raw[0].push(leaf_hash);
         path[0] = leaf_hash;
@@ -131,9 +137,7 @@ impl<S: OrderSide> IndexedMerkleTree<'_, S> {
             } else {
                 Self::get_empty_hash(i)
             };
-            if record_trace {
-                self.trace.add_merkle_hash_event(left, right);
-            }
+            trace.add_merkle_hash_event(left, right);
             if self.raw[i + 1].len() <= index {
                 let hash = compress(&[&left, &right]);
                 self.raw[i + 1].push(hash);
@@ -148,6 +152,20 @@ impl<S: OrderSide> IndexedMerkleTree<'_, S> {
         path
     }
 
+    #[inline]
+    fn finalize_first(&mut self) {
+        // safe to unwrap as a leaf is always inserted on creation.
+        let mut hash = self.leaves.last().unwrap().hash();
+        self.raw[0].push(hash);
+
+        for i in 0..MERKLE_HEIGHT {
+            let right = Self::get_empty_hash(i); // Always empty since only one leaf exists
+            hash = compress(&[&hash, &right]);
+            self.raw[i + 1].push(hash);
+        }
+        self.root = hash;
+    }
+
     /// Returns the hash of the node at the given level if the subtree contains only empty nodes.
     fn get_empty_hash(i: usize) -> Hash<BaseField> {
         array::from_fn(|j| {
@@ -158,9 +176,9 @@ impl<S: OrderSide> IndexedMerkleTree<'_, S> {
     }
 }
 
-impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
+impl<S: OrderSide> IndexedMerkleTree<S> {
     /// Creates a new IndexedMerkleTree.
-    pub fn new(trace: &'a mut ExecutionTrace<BaseField>) -> Self {
+    pub fn new(trace: Rc<RefCell<ExecutionTrace<BaseField>>>) -> Self {
         let raw = (0..=MERKLE_HEIGHT)
             .map(|level| Vec::with_capacity(MERKLE_WIDTH >> level))
             .collect::<Vec<_>>()
@@ -177,75 +195,72 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
             index_map,
             trace,
         };
-        imt.finalize_insert(false); // finalizes the first leaf and updates the root
+        imt.finalize_first(); // finalizes the first leaf and updates the root
         imt
     }
 
     /// Inserts an order into the IndexedMerkleTree at the end of the leaves list.
     #[inline]
     pub fn insert(&mut self, order: Order<BaseField, S>) -> Result<InsertionProof<S>, IMTError> {
+        let mut trace = self.trace.borrow_mut();
         // fetch initial root, low leaf parameters before insertion
         let initial_root = self.root;
         // will not panic on unwrap, as a leaf is inserted on creation
         let low_index = self.find_low(&order.price_time)?;
         let low_leaf = self.leaves[low_index];
-        self.trace.add_strictly_less_than_event(
+        trace.add_strictly_less_than_event(
             low_leaf.label.time().to_felts(),
             order.price_time.time().to_felts(),
         )?;
         assert!(low_leaf.label.time() < order.price_time.time());
-        self.trace.add_strictly_less_than_event(
+        trace.add_strictly_less_than_event(
             low_leaf.next.time().to_felts(),
             order.price_time.time().to_felts(),
         )?;
         assert!(low_leaf.next.time() < order.price_time.time());
         match S::SIDE {
             Side::Buy => {
-                self.trace.add_less_than_event(
+                trace.add_less_than_event(
                     order.price_time.price().to_felts(),
                     low_leaf.label.price().to_felts(),
                 )?;
                 assert!(order.price_time.price() <= low_leaf.label.price());
-                self.trace.add_strictly_less_than_event(
+                trace.add_strictly_less_than_event(
                     low_leaf.next.price().to_felts(),
                     order.price_time.price().to_felts(),
                 )?;
                 assert!(low_leaf.next.price() < order.price_time.price());
             }
             Side::Sell => {
-                self.trace.add_less_than_event(
+                trace.add_less_than_event(
                     low_leaf.label.price().to_felts(),
                     order.price_time.price().to_felts(),
                 )?;
                 assert!(low_leaf.label.price() <= order.price_time.price());
-                self.trace.add_strictly_less_than_event(
+                trace.add_strictly_less_than_event(
                     order.price_time.price().to_felts(),
                     low_leaf.next.price().to_felts(),
                 )?;
                 assert!(order.price_time.price() < low_leaf.next.price());
             }
         }
-        self.trace.add_leaf_hash_event(&low_leaf.to_felts());
+        // manually drop the trace to avoid borrow_mut() conflicts in get_merkle_proof and finalize operations.
+        drop(trace);
         let (low_merkle_proof, low_merkle_path) = self.get_merkle_proof(low_index);
 
         // update low_leaf.next to point to the new leaf & finalize the update
         self.leaves[low_index].next = order.price_time;
-        self.trace
-            .add_leaf_hash_event(&self.leaves[low_index].to_felts());
         let low_merkle_updated_path = self.finalize_update(low_index);
 
         // get inactivity proof
         let inactive_index = self.raw[0].len();
-        self.trace.add_leaf_hash_event(&low_leaf.to_felts());
         let (inactive_proof, inactive_path) = self.get_merkle_proof(inactive_index);
 
         // insert the new leaf & finalize the insert
         self.leaves.push(order.to_leaf(&low_leaf.next));
-        self.trace
-            .add_leaf_hash_event(&self.leaves[inactive_index].to_felts());
         self.index_map.insert(order.price_time, inactive_index);
 
-        let inactive_updated_path = self.finalize_insert(true);
+        let inactive_updated_path = self.finalize_insert();
 
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             S::op_code(IMTOperation::Insertion),
@@ -261,7 +276,7 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
             self.leaves[inactive_index].to_felts(),
             BaseField::one()
         );
-        self.trace.add_instruction(instruction_felts);
+        self.trace.borrow_mut().add_instruction(instruction_felts);
         Ok(InsertionProof {
             initial_root,
             low_leaf,
@@ -443,11 +458,14 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
         &mut self,
         mut index: usize,
     ) -> (MerkleProof<BaseField>, MerklePath<BaseField>) {
+        let mut trace = self.trace.borrow_mut();
         let mut proof = array::from_fn(|_| array::from_fn(|_| BaseField::zero()));
         let mut path = array::from_fn(|_| array::from_fn(|_| BaseField::zero()));
         path[0] = if index >= self.raw[0].len() {
+            trace.add_leaf_hash_event(&Leaf::<BaseField, S>::empty_felts());
             Self::get_empty_hash(0)
         } else {
+            trace.add_leaf_hash_event(&self.leaves[index].to_felts());
             self.raw[0][index]
         };
         for (i, sibling) in proof.iter_mut().enumerate().take(MERKLE_HEIGHT) {
@@ -460,9 +478,9 @@ impl<'a, S: OrderSide> IndexedMerkleTree<'a, S> {
                 panic!("Unexpected condition: index is odd and sibling index is out of bounds");
             };
             if index % 2 == 0 {
-                self.trace.add_merkle_hash_event(path[i], *sibling);
+                trace.add_merkle_hash_event(path[i], *sibling);
             } else {
-                self.trace.add_merkle_hash_event(*sibling, path[i]);
+                trace.add_merkle_hash_event(*sibling, path[i]);
             }
             index >>= 1;
             path[i + 1] = *self.raw[i + 1]
@@ -958,8 +976,8 @@ mod tests {
 
     #[test]
     fn test_sparse_imt() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = SellIMT::new(trace);
         assert_eq!(imt.leaves.len(), 1);
         for i in 0..=MERKLE_HEIGHT {
             assert_eq!(imt.raw[i].len(), 1);
@@ -972,7 +990,7 @@ mod tests {
         };
         imt.leaves.push(leaf);
         imt.index_map.insert(PriceTime::new(1, 1), 1);
-        imt.finalize_insert(true);
+        imt.finalize_insert();
         assert_eq!(imt.raw[0].len(), 2);
         for i in 1..MERKLE_HEIGHT {
             assert_eq!(imt.raw[i].len(), 1);
@@ -981,8 +999,8 @@ mod tests {
 
     #[test]
     fn test_new_tree_initialization() {
-        let mut trace = ExecutionTrace::new();
-        let imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let imt = SellIMT::new(trace);
 
         // Check initial state
         assert_eq!(imt.leaves.len(), 1, "Tree should start with one leaf");
@@ -1005,8 +1023,8 @@ mod tests {
 
     #[test]
     fn test_basic_insertion() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = SellIMT::new(trace);
         let initial_root = imt.root();
 
         // Insert first order
@@ -1030,7 +1048,7 @@ mod tests {
 
         // number of hashes in one insertion must be 4*MERKLE_HEIGHT + 4
         assert_eq!(
-            trace.poseidon_operations.len(),
+            imt.trace.borrow().poseidon_operations.len(),
             4 * MERKLE_HEIGHT + 4,
             "Number of hashes in one insertion must be 4*MERKLE_HEIGHT + 4"
         );
@@ -1038,8 +1056,8 @@ mod tests {
 
     #[test]
     fn test_multiple_insertions() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = SellIMT::new(trace);
 
         // Insert multiple orders with different price-time combinations
         let orders = [
@@ -1076,8 +1094,8 @@ mod tests {
 
     #[test]
     fn test_find_low() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = SellIMT::new(trace);
 
         // Insert orders in non-sequential order
         let orders = vec![
@@ -1111,8 +1129,8 @@ mod tests {
 
     #[test]
     fn test_merkle_proof_verification() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = SellIMT::new(trace);
 
         // Insert some orders
         let order = Order::new(1, 10, 1);
@@ -1140,8 +1158,8 @@ mod tests {
 
     #[test]
     fn test_update_volume() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = SellIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = SellIMT::new(trace);
 
         // Insert some orders
         let order1 = Order::new(1, 10, 1);
@@ -1178,8 +1196,8 @@ mod tests {
 
     #[test]
     fn test_buy_imt_initialization() {
-        let mut trace = ExecutionTrace::new();
-        let imt = BuyIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let imt = BuyIMT::new(trace);
 
         // Check initial state
         assert_eq!(imt.leaves.len(), 1, "Tree should start with one leaf");
@@ -1202,8 +1220,8 @@ mod tests {
 
     #[test]
     fn test_buy_imt_basic_insertion() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = BuyIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = BuyIMT::new(trace);
         let initial_root = imt.root();
 
         // Insert first order
@@ -1229,8 +1247,8 @@ mod tests {
 
     #[test]
     fn test_buy_imt_multiple_insertions() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = BuyIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = BuyIMT::new(trace);
 
         // Insert multiple orders with different price-time combinations
         let orders = [
@@ -1267,8 +1285,8 @@ mod tests {
 
     #[test]
     fn test_buy_imt_find_low() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = BuyIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = BuyIMT::new(trace);
 
         // Insert orders in non-sequential order
         let orders = vec![
@@ -1303,8 +1321,8 @@ mod tests {
 
     #[test]
     fn test_buy_imt_merkle_proof_verification() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = BuyIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = BuyIMT::new(trace);
 
         // Insert some orders
         let order = Order::new(1, 10, 1);
@@ -1332,8 +1350,8 @@ mod tests {
 
     #[test]
     fn test_buy_imt_update_volume() {
-        let mut trace = ExecutionTrace::new();
-        let mut imt = BuyIMT::new(&mut trace);
+        let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut imt = BuyIMT::new(trace);
 
         // Insert some orders
         let order1 = Order::new(1, 10, 1);
