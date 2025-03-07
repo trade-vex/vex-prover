@@ -70,8 +70,6 @@ relation!(RangeCheckU8Elements, 2);
 
 #[cfg(test)]
 mod tests {
-    use std::{cell::RefCell, rc::Rc};
-
     use constraints::BytesEval;
     use rand::Rng;
     use stwo_prover::{
@@ -89,18 +87,18 @@ mod tests {
     fn test_range_table() {
         // generate record with byte events
         let span = span!(Level::INFO, "Bytes: Generating Execution Record").entered();
-        let record = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut record = ExecutionTrace::new();
         let n = 1 << 15;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
             let a = rng.gen_range(0..256);
             let b = rng.gen_range(0..256);
-            record.borrow_mut().add_and_u8_event(a, b).unwrap();
+            record.add_and_u8_event(a, b).unwrap();
             if a != b {
                 let (min, max) = if a < b { (a, b) } else { (b, a) };
-                record.borrow_mut().add_less_than_u8_event(min, max).unwrap();
+                record.add_less_than_u8_event(min, max).unwrap();
             }
-            record.borrow_mut().add_range_check_u8_event(a, b).unwrap();
+            record.add_range_check_u8_event(a, b).unwrap();
         }
         span.exit();
         // Fiat Shamir Channel
@@ -114,9 +112,9 @@ mod tests {
         // Trace Generation
         let span = span!(Level::INFO, "Bytes: Trace Generation").entered();
         let constant_trace = preprocessed_trace();
-        let (trace, claim) = trace(record.borrow().byte_operations.clone());
+        let (trace, claim) = trace(record.byte_operations.clone());
         let (interaction_trace, interaction_claim) = interaction_trace(
-            record.borrow().byte_operations.clone(),
+            record.byte_operations,
             &and_elements,
             &less_than_u8_elements,
             &range_check_u8_elements,

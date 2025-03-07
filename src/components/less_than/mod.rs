@@ -167,7 +167,6 @@ mod tests {
         }
 
         let execution_trace = std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
-        let log_size = (execution_trace.less_than_operations.len() - 1).ilog2() + 1;
         span.exit();
 
         // Fiat Shamir Channel
@@ -212,7 +211,6 @@ mod tests {
             execution_trace.add_strictly_less_than_event(a, b).unwrap();
         }
 
-        let log_size = (execution_trace.less_than_operations.len() - 1).ilog2() + 1;
         span.exit();
 
         // Fiat Shamir Channel

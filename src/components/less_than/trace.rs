@@ -101,7 +101,7 @@ pub fn interaction_trace_eval<
         let mut c = c_col[vec_row];
         // LessThanElements Values, The Component using the value can ensure that a < b is c.
         let values1 = chain!(a.into_iter(), b.into_iter(), std::iter::once(c)).collect_vec();
-        
+
         if !STRICT {
             // this can be avoided by adding a strict and less than col in the preprocessed trace
             // the result of c "used" in the less_than_u8_elements returns 0 when a_comparison_byte = b_comparison_byte

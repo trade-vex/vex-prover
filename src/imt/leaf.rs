@@ -439,7 +439,6 @@ mod tests {
             .next_back()
             .map(|(_, &index)| index)
             .unwrap();
-        println!("Low: {:?}", low);
         map.insert(pt3, "third");
         map.insert(pt1, "first");
         map.insert(pt2, "second");

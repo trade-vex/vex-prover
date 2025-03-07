@@ -1226,7 +1226,6 @@ mod tests {
 
         // Insert first order
         let order1 = Order::new(1, 10, 1);
-        println!("{:?}", imt.leaves);
         imt.insert(order1).unwrap();
 
         assert_eq!(
