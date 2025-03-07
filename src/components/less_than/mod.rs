@@ -25,7 +25,7 @@ pub struct LessThanOp<F> {
     b: [F; N_U64_LIMBS],
     // result of the comparison
     c: F,
-    // flag is 1 for the most significant byte where a[i] < b[i]
+    // flag is 1 for the most significant byte where a[i] is not equal to b[i]
     flags: [F; N_U64_LIMBS],
     // First byte of the first operand where a[i] is not equal to b[i] from the most significant byte
     a_comparison_byte: F,
