@@ -65,8 +65,7 @@ impl<const STRICT: bool> FrameworkEval for LessThanEval<STRICT> {
         // 1 if a is not equal to b
         eval.add_constraint(sum_flags.clone() * (E::F::one() - sum_flags.clone()));
 
-        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where
-        // a[i] is not equal to b[i] from the most significant byte
+        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where a[i] is not equal to b[i]
         let mut is_inequality_visited = E::F::zero();
         let mut a_comparison_byte = E::F::zero();
         let mut b_comparison_byte = E::F::zero();
@@ -97,8 +96,13 @@ impl<const STRICT: bool> FrameworkEval for LessThanEval<STRICT> {
         eval.add_constraint((E::F::one() - sum_flags.clone()) * is_inequality_visited.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * a_comparison_byte.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * b_comparison_byte.clone());
-        eval.add_constraint((E::F::one() - sum_flags.clone()) * op.c.clone());
-
+        // if strict: the result must be 0 if a is equal to b
+        // if not strict: the result must be 1 if a is equal to b
+        if STRICT {
+            eval.add_constraint((E::F::one() - sum_flags.clone()) * op.c.clone());
+        } else {
+            eval.add_constraint((E::F::one() - sum_flags.clone()) * (E::F::one() - op.c.clone()));
+        }
         // c must be 1 if a_comparision_byte is less than b_comparison_byte
         // c must be 0 if a_comparision_byte is greater than b_comparison_byte
         // Look Up if the c has been set correctly and "use" the result of the comparison bytes
@@ -119,13 +123,19 @@ impl<const STRICT: bool> FrameworkEval for LessThanEval<STRICT> {
         // Yield the Results
         let values: Vec<E::F> =
             chain!(op.a.into_iter(), op.b.into_iter(), std::iter::once(op.c)).collect();
-
-        eval.add_to_relation(RelationEntry::new(
-            &self.less_than_elements,
-            -E::EF::from(op.is_real.clone()),
-            &values,
-        ));
-
+        if STRICT {
+            eval.add_to_relation(RelationEntry::new(
+                &self.strict_less_than_elements,
+                -E::EF::from(op.is_real.clone()),
+                &values,
+            ));
+        } else {
+            eval.add_to_relation(RelationEntry::new(
+                &self.less_than_elements,
+                -E::EF::from(op.is_real.clone()),
+                &values,
+            ));
+        }
         eval.finalize_logup_in_pairs();
         eval
     }
