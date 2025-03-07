@@ -96,7 +96,7 @@ pub fn interaction_trace(
         let b: [PackedBaseField; N_U64_LIMBS] = array::from_fn(|i| b_col[i][vec_row]);
         let c: PackedBaseField = c_col[vec_row];
 
-        // LessThanU8Elements Values, LookUp ensures that result is a_comparision_byte < b_comparison_byte is c.
+        // LessThanU8Elements Values, LookUp ensures that result is a_comparison_byte < b_comparison_byte is c.
         let values0 = [a_comparison_byte, b_comparison_byte, c];
         // LessThanElements Values, The Component using the value can ensure that a < b is c.
         let values1 = chain!(a.into_iter(), b.into_iter(), std::iter::once(c)).collect_vec();
