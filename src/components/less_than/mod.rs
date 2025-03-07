@@ -108,7 +108,7 @@ mod tests {
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen());
             let b: Price<BaseField> = Price::from_u64(rng.gen());
-            record.add_less_than_event(a.to_felts(), b.to_felts());
+            record.add_less_than_event(a.to_felts(), b.to_felts()).unwrap();
         }
         let log_size = (record.less_than_operations.len() - 1).ilog2() + 1;
         span.exit();
