@@ -19,12 +19,7 @@ pub type AddOperations = Vec<[BaseField; AddColumn::MAIN_COLS]>;
 
 /// AddOp represents a single addition operation between two unsigned integers,
 /// represented as N u8 limbs (where N is typically 8 for uint64_t).
-///
-/// The structure captures all the details needed to validate the addition:
-/// - Input operands (a and b)
-/// - Result of addition (c)
-/// - Carry bits for each byte (except the last byte)
-/// - A flag to distinguish real operations from padding
+
 #[derive(Debug)]
 pub struct AddOp<F> {
     /// First input operand, represented as an array of N limbs
@@ -40,21 +35,12 @@ pub struct AddOp<F> {
     /// Each carry represents whether the previous byte addition resulted in an overflow
     carry: [F; N_U64_LIMBS - 1],
 
-    /// Flag to indicate if this is a "real" operation or a padding operation
-    /// Helps distinguish between actual computations and dummy rows added for trace alignment
+    /// Flag to indicate if this is a "real" operation or a padding operation, helps distinguish between actual computations and dummy rows added for trace alignment
     is_real: F,
 }
 
 impl<F> AddOp<F> {
     /// Extracts an AddOp instance from an evaluation row.
-    ///
-    /// This method is used during constraint evaluation to retrieve the
-    /// field elements representing the addition operation.
-    ///
-    /// # Parameters
-    /// - `eval`: An evaluation context that allows sequential access to trace masks
-    ///
-    /// # Returns
     /// An AddOp struct with field elements extracted from the evaluation context
     fn from_eval<E: EvalAtRow>(eval: &mut E) -> AddOp<E::F> {
         // Extract field elements for each component of the addition operation
@@ -82,36 +68,31 @@ impl<F> AddOp<F> {
 pub struct AddColumn;
 
 impl AddColumn {
+
     /// Starting index for the first operand (a) columns
     pub const A: usize = 0;
-
     /// Starting index for the second operand (b) columns
     pub const B: usize = Self::A + N_U64_LIMBS;
-
     /// Starting index for the result (c) columns
     pub const C: usize = Self::B + N_U64_LIMBS;
-
     /// Starting index for carry bits
     pub const CARRY: usize = Self::C + N_U64_LIMBS;
-
     /// Index for the "is real" flag column
     pub const IS_REAL: usize = Self::CARRY + (N_U64_LIMBS - 1);
 }
 
-/// Implements the TraceSize trait to define the structure of the addition trace
 impl TraceSize for AddColumn {
-    /// Total number of main columns for the addition operation trace
-    /// Includes: a, b, c, carry, and is_real columns
+    // last field's index + offset
     const MAIN_COLS: usize = Self::IS_REAL + 1;
 
-    /// Number of interaction columns includes:
-    /// - 1 column for AddU8 element checks
-    /// - 1 column for yielding the result
+    // Number of interaction columns includes:
+    // - 1 column for AddU8 element checks
+    // - 1 column for yielding the result
     const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
 // Defines a relation for storing and verifying addition operation elements
-// The number 18 specifies the log size of the relation
+// The number 24 specifies the log size of the relation
 relation!(AddElements, 24);
 
 #[cfg(test)]

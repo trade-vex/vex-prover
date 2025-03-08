@@ -6,43 +6,20 @@ use super::{AddColumn, AddElements, AddOp};
 use crate::components::{bytes::RangeCheckU8Elements, Claim};
 use crate::types::N_U64_LIMBS;
 use stwo_prover::core::fields::m31::BaseField;
-/// AddEval implements the constraint evaluation logic for addition operations.
 
-/// Claim about the trace, including log size and other properties
-/// Relation for checking byte-wise addition correctness
-/// Relation for storing and verifying complete addition results
+/// AddEval implements the constraint evaluation logic for addition operations.
 #[derive(Clone)]
 pub struct AddEval {
+    /// Claim about the trace, including log size and other properties
     pub claim: Claim<AddColumn>,
+    /// Relation for checking byte-wise addition correctness
     pub range_check_u8_elements: RangeCheckU8Elements,
+    /// Relation for storing and verifying complete addition results
     pub add_elements: AddElements,
 }
 
-/// This implementation of the `FrameworkEval` trait for `AddEval` provides methods to evaluate
-/// constraints on addition operations. The primary purpose of this
-/// implementation is to evaluate specific constraints related to addition operations used by other components.
-///
-/// # Constraint Evaluation
-///
-/// - `evaluate<E: EvalAtRow>(&self, mut eval: E) -> E`:
-///   It retrieves the AddOp for a particular row, each row represents a single addition operation.
-/// Primary method for evaluating constraints on an addition operation
-///
-/// This method performs a comprehensive set of checks:
-/// 1. Validate the "is_real" flag
-/// 2. Check byte-wise addition with carry
-/// 3. Ensure carry bits are boolean
-/// 4. Perform U8 range checks
-/// 5. Generate interaction relations
-/// Implementation of constraint evaluation for addition operations.
-///
-/// This implementation provides methods to:
-/// 1. Check the integrity of addition operations
-/// 2. Validate carry propagation
-/// 3. Ensure byte-level constraints are met
-/// 4. Perform range checks on input and output bytes
-
 impl FrameworkEval for AddEval {
+    /// Returns the logarithmic size of the claim.
     fn log_size(&self) -> u32 {
         self.claim.log_size
     }
@@ -53,6 +30,14 @@ impl FrameworkEval for AddEval {
         self.claim.log_size + 1
     }
 
+    /// Evaluates constraints for an addition operation on a row.
+    /// 
+    /// Steps performed:
+    /// 1. Validate the `is_real` flag (boolean check).
+    /// 2. Ensure correct byte-wise addition with carry propagation.
+    /// 3. Ensure carry bits are boolean.
+    /// 4. Perform U8 range checks on inputs and outputs.
+    /// 5. Generate interaction relations for verification.
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Extract the addition operation details from the current row
         let op = AddOp::<E::F>::from_eval(&mut eval);
@@ -60,12 +45,11 @@ impl FrameworkEval for AddEval {
         // Base value for overflow check (256 in the field)
         let base = E::F::from(BaseField::from(256));
 
-        // CONSTRAINT 1: Validate "is_real" flag
-        // Ensure the flag is a boolean (0 or 1)
+
+        // CONSTRAINT 1: Ensure `is_real` is a boolean (0 or 1)
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
 
-        // CONSTRAINT 2: Byte-wise addition with carry constraints
-        // First byte addition (no incoming carry)
+        // CONSTRAINT 2: Enforce byte-wise addition with carry.
         let overflow_0 = op.a[0].clone() + op.b[0].clone() - op.c[0].clone();
 
         // Ensure overflow is either 0 or 256
@@ -108,7 +92,7 @@ impl FrameworkEval for AddEval {
         let values: Vec<E::F> =
             chain!(op.a.into_iter(), op.b.into_iter(), op.c.into_iter()).collect();
 
-        // 5. todo: add range checks for a[i], b[i], c[i]
+        // CONSTRAINT 6: Add range checks for each byte of a, b, and c.
         for i in (0..24).step_by(4) {
             eval.add_to_relation(RelationEntry::new(
                 &self.range_check_u8_elements,
@@ -123,7 +107,6 @@ impl FrameworkEval for AddEval {
         }
 
         // // CONSTRAINT 7: Yield the complete addition results
-        // Add a, b, c, and carry values in the same order as in interaction_trace.rs
         eval.add_to_relation(RelationEntry::new(
             &self.add_elements,
             -E::EF::from(op.is_real.clone()),

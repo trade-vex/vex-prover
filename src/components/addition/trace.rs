@@ -4,6 +4,7 @@ use crate::{
     components::{Claim, InteractionClaim, TraceSize},
     types::N_U64_LIMBS,
 };
+
 use num_traits::{One, Zero};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::array;
@@ -23,13 +24,16 @@ use stwo_prover::{
 };
 use tracing::{debug, span, Level};
 
+/// Generates the preprocessed trace with an "IsFirst" column.
+/// Ensures that the trace size is a power of 2.
 pub fn preprocessed_trace(
     log_size: u32,
 ) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
     vec![IsFirst::new(log_size).gen_column_simd()]
 }
 
-/// Trace for the Less Than Operations, each row consisting of a LessThanOp
+/// Generates the main trace for addition operations.
+/// Each row represents an `AddOp` and follows the `AddColumn` structure.
 pub fn trace(
     mut add_operations: AddOperations,
 ) -> (
@@ -37,15 +41,18 @@ pub fn trace(
     Claim<AddColumn>,
 ) {
     let _span = span!(Level::INFO, "Add: Main Trace").entered();
+
     // Calculate the log size, ensuring the trace size is a power of 2
     let log_size = (add_operations.len() - 1).ilog2() + 1;
     debug!("Log Size: {}", log_size);
+
     // Pad operations to ensure a power of 2 trace size
     for _ in 0..(1 << log_size) - add_operations.len() {
         add_operations.push([BaseField::zero(); AddColumn::MAIN_COLS]);
     }
     let mut trace = ComponentTrace::<{ AddColumn::MAIN_COLS }>::zeroed(log_size);
-    // Each row of the trace is a AddOp field elements arranged as per the `AddColumn`
+    
+    // Populate the trace using SIMD for parallel processing.`
     trace
         .par_iter_mut()
         .zip(
@@ -64,8 +71,9 @@ pub fn trace(
     (trace.to_evals().to_vec(), Claim::new(log_size))
 }
 
-// Interaction Trace, "use" the AddU8Elements for byte addition checks
-// and "yield" the AddElements for the actual addition results
+/// Generates the interaction trace.
+/// - Uses `AddU8Elements` for byte-wise addition checks.
+/// - Uses `AddElements` to store final addition results.
 pub fn interaction_trace(
     trace: &ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     range_check_u8_elements: &RangeCheckU8Elements,
@@ -83,6 +91,7 @@ pub fn interaction_trace(
         array::from_fn(|i| &trace[AddColumn::A + i].data);
     let is_real_col = &trace[AddColumn::IS_REAL].data;
 
+    // Process each byte-pair in groups of 4, applying range checks.
     for i in (0..24).step_by(4) {
         let mut col_gen = logup_gen.new_col();
         for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
@@ -97,6 +106,7 @@ pub fn interaction_trace(
         col_gen.finalize_col();
     }
 
+    // Process the final interaction trace with the addition elements.
     let mut col_gen = logup_gen.new_col();
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
         let values: [PackedBaseField; 3 * N_U64_LIMBS] = array::from_fn(|i| values[i][vec_row]);
