@@ -86,9 +86,9 @@ impl TraceSize for AddColumn {
     const MAIN_COLS: usize = Self::IS_REAL + 1;
 
     // Number of interaction columns includes:
-    // - 1 column for AddU8 element checks
+    // - 6 column for RangeCheckU8Elements
     // - 1 column for yielding the result
-    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
+    const INTERACTION_COLS: usize = 7 * SECURE_EXTENSION_DEGREE;
 }
 
 // Defines a relation for storing and verifying addition operation elements
@@ -117,8 +117,8 @@ mod tests {
         let n = 124213;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
-            let a: Price<BaseField> = Price::from_u64(rng.gen());
-            let b: Price<BaseField> = Price::from_u64(rng.gen());
+            let a: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX / 2));
+            let b: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX - a.to_u64()));
             record.add_add_event(a.to_felts(), b.to_felts());
         }
         let log_size = (record.add_operations.len() - 1).ilog2() + 1;
