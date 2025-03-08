@@ -119,7 +119,7 @@ mod tests {
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX / 2));
             let b: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX - a.to_u64()));
-            record.add_add_event(a.to_felts(), b.to_felts());
+            let _ = record.add_add_event(a.to_felts(), b.to_felts());
         }
         let log_size = (record.add_operations.len() - 1).ilog2() + 1;
         span.exit();
