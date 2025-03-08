@@ -135,8 +135,15 @@ impl ExecutionTrace<BaseField> {
     //     self.add_operations.push(event);
     // }
     /// Adds an Add Event to the Execution Trace
-    pub fn add_add_event(&mut self, a: [BaseField; N_U64_LIMBS], b: [BaseField; N_U64_LIMBS]) {
+    pub fn add_add_event(&mut self, a: [BaseField; N_U64_LIMBS], b: [BaseField; N_U64_LIMBS]) -> Result<(), String> {
         let mut row = [BaseField::zero(); AddColumn::MAIN_COLS];
+
+        // Ensure inputs are in the u8 range
+        for &val in a.iter().chain(b.iter()) {
+            if val > BaseField::from(255) {
+                return Err("Input limb value exceeds u8 range (0-255)".to_string());
+            }
+        }
 
         // Copy input operands a and b into the trace row
         row[AddColumn::A..AddColumn::B].copy_from_slice(&a);
@@ -163,11 +170,12 @@ impl ExecutionTrace<BaseField> {
                 carry[i] = BaseField::zero();
             }
         }
-        c[7] = if a[7] + b[7] + carry[6] > BaseField::from(255) {
-            a[7] + b[7] + carry[6] - BaseField::from(256)
-        } else {
-            a[7] + b[7] + carry[6]
-        };
+
+        let last_sum = a[7] + b[7] + carry[6];
+        if last_sum > BaseField::from(255) {
+            return Err("Final limb addition exceeds 256, causing overflow".to_string());
+        }
+        c[7] = last_sum;
 
         // Copy computed c and carry values into the row
         row[AddColumn::C..AddColumn::CARRY].copy_from_slice(&c);
@@ -177,6 +185,7 @@ impl ExecutionTrace<BaseField> {
         row[AddColumn::IS_REAL] = BaseField::one();
 
         self.add_operations.push(row);
+        Ok(())
     }
 
     /// Adds a Less Than Event by recording the corresponding Trace Row
