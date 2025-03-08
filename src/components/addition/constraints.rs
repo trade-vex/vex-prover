@@ -31,13 +31,6 @@ impl FrameworkEval for AddEval {
     }
 
     /// Evaluates constraints for an addition operation on a row.
-    /// 
-    /// Steps performed:
-    /// 1. Validate the `is_real` flag (boolean check).
-    /// 2. Ensure correct byte-wise addition with carry propagation.
-    /// 3. Ensure carry bits are boolean.
-    /// 4. Perform U8 range checks on inputs and outputs.
-    /// 5. Generate interaction relations for verification.
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Extract the addition operation details from the current row
         let op = AddOp::<E::F>::from_eval(&mut eval);
@@ -81,8 +74,8 @@ impl FrameworkEval for AddEval {
             op.a[last_index].clone() + op.b[last_index].clone() + op.carry[last_index - 1].clone()
                 - op.c[last_index].clone();
 
-        // Ensure last byte overflow is either 0 or 256
-        eval.add_constraint(overflow_last.clone() * (overflow_last - base));
+        // Ensure last byte overflow is either 0
+        eval.add_constraint(overflow_last.clone());
 
         // CONSTRAINT 5: Ensure all carry bits are boolean (0 or 1)
         for i in 0..N_U64_LIMBS - 1 {
@@ -109,7 +102,7 @@ impl FrameworkEval for AddEval {
         // // CONSTRAINT 7: Yield the complete addition results
         eval.add_to_relation(RelationEntry::new(
             &self.add_elements,
-            -E::EF::from(op.is_real.clone()),
+            -E::EF::from(op.is_real),
             &values,
         ));
         // Finalize the logup (logarithmic lookup) in pairs
