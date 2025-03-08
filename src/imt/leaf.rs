@@ -59,19 +59,11 @@ impl LeafColumn {
 impl<S: OrderSide> Leaf<BaseField, S> {
     /// Return The first leaf of the IMT
     pub fn first() -> Self {
-        match S::side() {
-            Side::Buy => Self {
-                active: BaseField::one(),
-                volume: Volume::default(),
-                label: PriceTime::first(),
-                next: PriceTime::last(),
-            },
-            Side::Sell => Self {
-                active: BaseField::one(),
-                volume: Volume::default(),
-                label: PriceTime::first(),
-                next: PriceTime::last(),
-            },
+        Self {
+            active: BaseField::one(),
+            volume: Volume::default(),
+            label: PriceTime::first(),
+            next: PriceTime::last(),
         }
     }
 
@@ -439,6 +431,7 @@ mod tests {
             .next_back()
             .map(|(_, &index)| index)
             .unwrap();
+        assert!(low == "zero");
         map.insert(pt3, "third");
         map.insert(pt1, "first");
         map.insert(pt2, "second");

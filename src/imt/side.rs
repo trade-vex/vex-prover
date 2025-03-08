@@ -1,6 +1,6 @@
-use stwo_prover::core::fields::m31::BaseField;
-
 use crate::{executor::instruction::IMTOperation, types::Price};
+use std::fmt::Debug;
+use stwo_prover::core::fields::m31::BaseField;
 
 /// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
@@ -15,7 +15,7 @@ pub enum Side {
 }
 
 /// Order side marker trait with compile-time constants
-pub trait OrderSide: 'static + Copy + Send + Sync + Clone {
+pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Copy + Debug {
     /// Associated constant for side name
     const NAME: &'static str;
     /// Associated constant for side variant
