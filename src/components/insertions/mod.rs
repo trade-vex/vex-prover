@@ -43,7 +43,7 @@ mod tests {
             less_than::{LessThanElements, StrictLessThanElements},
             poseidon::PoseidonElements,
         },
-        executor::record::ExecutionTrace,
+        executor::{instruction::InstructionElements, record::ExecutionTrace},
         imt::{
             order::Order,
             side::{Buy, OrderSide, Sell},
@@ -58,6 +58,7 @@ mod tests {
         poseidon_elements: &PoseidonElements,
         less_than_elements: &LessThanElements,
         strict_less_than_elements: &StrictLessThanElements,
+        instruction_elements: &InstructionElements,
     ) {
         let log_size = (insertions.len() - 1).ilog2() + 1;
         let constant_trace = preprocessed_trace(log_size);
@@ -67,6 +68,7 @@ mod tests {
             poseidon_elements,
             less_than_elements,
             strict_less_than_elements,
+            instruction_elements,
         );
 
         let trace = TreeVec::new(vec![constant_trace, trace, interaction_trace]);
@@ -76,6 +78,7 @@ mod tests {
             less_than_elements: less_than_elements.clone(),
             poseidon_elements: poseidon_elements.clone(),
             strict_less_than_elements: strict_less_than_elements.clone(),
+            instruction_elements: instruction_elements.clone(),
             _side: PhantomData,
             claim,
         };
@@ -119,6 +122,7 @@ mod tests {
         let poseidon_elements = PoseidonElements::draw(&mut channel);
         let less_than_elements = LessThanElements::draw(&mut channel);
         let strict_less_than_elements = StrictLessThanElements::draw(&mut channel);
+        let instruction_elements = InstructionElements::draw(&mut channel);
 
         // Evaluations Buy IMT
         evaluate_trace::<Buy>(
@@ -126,6 +130,7 @@ mod tests {
             &poseidon_elements,
             &less_than_elements,
             &strict_less_than_elements,
+            &instruction_elements,
         );
 
         // Evaluations Sell IMT
@@ -134,6 +139,7 @@ mod tests {
             &poseidon_elements,
             &less_than_elements,
             &strict_less_than_elements,
+            &instruction_elements,
         );
     }
 }

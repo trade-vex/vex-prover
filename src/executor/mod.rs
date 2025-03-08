@@ -31,21 +31,21 @@ pub trait Flatten<F> {
 }
 
 // Flattening for F
-impl<F: Copy> Flatten<F> for F {
+impl<F: Clone> Flatten<F> for F {
     fn flatten(&self, acc: &mut Vec<F>) {
-        acc.push(*self);
+        acc.push(self.clone());
     }
 }
 
-// Flattening for [F; const N: usize]
-impl<F: Copy, const N: usize> Flatten<F> for [F; N] {
+// Flattening for [F; N]
+impl<F: Clone, const N: usize> Flatten<F> for [F; N] {
     fn flatten(&self, acc: &mut Vec<F>) {
         acc.extend_from_slice(self);
     }
 }
 
-// Flattening for [[F; const N: usize]; const M: usize]
-impl<F: Copy, const HEIGHT: usize, const WIDTH: usize> Flatten<F> for [[F; WIDTH]; HEIGHT] {
+// Flattening for [[F; WIDTH]; HEIGHT]
+impl<F: Clone, const HEIGHT: usize, const WIDTH: usize> Flatten<F> for [[F; WIDTH]; HEIGHT] {
     fn flatten(&self, acc: &mut Vec<F>) {
         for row in self.iter() {
             acc.extend_from_slice(row);

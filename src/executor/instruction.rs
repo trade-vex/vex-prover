@@ -101,7 +101,7 @@ impl InstructionColumn {
 // InstructionElements are used in the processor component
 // and yielded by the specific insutruction's component
 // the number of elements used/yielded is equal to the number of columns in the instruction
-relation!(InstrctionElements, {
+relation!(InstructionElements, {
     InstructionColumn::N_INSTRUCTION_FELTS
 });
 

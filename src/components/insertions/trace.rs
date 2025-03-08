@@ -1,6 +1,7 @@
 use crate::components::less_than::{LessThanElements, StrictLessThanElements};
 use crate::components::poseidon::PoseidonElements;
 use crate::executor::flatten_single;
+use crate::executor::instruction::InstructionElements;
 use crate::hash::N_ELEMENTS;
 use crate::imt::leaf::LeafColumn;
 use crate::imt::side::Side;
@@ -82,6 +83,7 @@ pub fn interaction_trace<S: OrderSide>(
     poseidon_elements: &PoseidonElements,
     less_than_elements: &LessThanElements,
     strict_less_than_elements: &StrictLessThanElements,
+    instruction_elements: &InstructionElements,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     InteractionClaim<InsertionsColumn>,
@@ -232,6 +234,7 @@ pub fn interaction_trace<S: OrderSide>(
                 is_real,
                 log_size,
                 poseidon_elements,
+                PackedSecureField::one(),
             );
             let mut curr = leaf_hash;
             for (i, (sibling, hash)) in proof.iter().zip(path.iter().skip(1)).enumerate() {
@@ -249,6 +252,15 @@ pub fn interaction_trace<S: OrderSide>(
             }
         }
     }
+    let values = trace.iter().map(|c| &c.data).collect_vec();
+    add_interaction_col(
+        &mut logup_gen,
+        &values,
+        is_real,
+        log_size,
+        instruction_elements,
+        -PackedSecureField::one(),
+    );
     let (trace, claimed_sum) = logup_gen.finalize_last();
     (trace, InteractionClaim::new(claimed_sum))
 }
@@ -259,12 +271,13 @@ fn add_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
     is_real: &Vec<PackedBaseField>,
     log_size: u32,
     lookup_elements: &X,
+    mult: PackedSecureField,
 ) {
     let mut col_gen = logup_gen.new_col();
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
         let values1: Vec<PackedBaseField> = col1.iter().map(|col| col[vec_row]).collect();
         let p1 = lookup_elements.combine(&values1);
-        col_gen.write_frac(vec_row, PackedSecureField::one() * is_real[vec_row], p1);
+        col_gen.write_frac(vec_row, mult * is_real[vec_row], p1);
     }
     col_gen.finalize_col();
 }

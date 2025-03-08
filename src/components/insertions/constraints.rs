@@ -1,3 +1,4 @@
+use crate::executor::flatten_single;
 use std::{array, marker::PhantomData};
 
 use itertools::{chain, Itertools};
@@ -10,7 +11,8 @@ use crate::{
         poseidon::PoseidonElements,
         Claim,
     },
-    executor::instruction::Instruction,
+    executor::instruction::{Instruction, InstructionElements},
+    flatten,
     hash::{N_HASH, N_STATE},
     imt::{
         leaf::LeafColumn,
@@ -27,6 +29,7 @@ pub struct InsertionsEval<S> {
     pub poseidon_elements: PoseidonElements,
     pub less_than_elements: LessThanElements,
     pub strict_less_than_elements: StrictLessThanElements,
+    pub instruction_elements: InstructionElements,
     pub _side: PhantomData<S>,
 }
 
@@ -76,7 +79,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // is_real must be a boolean
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
 
-        let mult = E::EF::from(op.is_real);
+        let mult = E::EF::from(op.is_real.clone());
 
         // low_leaf must be active
         eval.add_constraint(E::F::one() - op.low_leaf[0].clone());
@@ -170,21 +173,21 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         eval_merkle_proof(
             &mut eval,
             op.low_merkle_proof.clone(),
-            op.low_merkle_path,
+            op.low_merkle_path.clone(),
             op.low_leaf.clone(),
             op.low_index.clone(),
             &self.poseidon_elements,
             mult.clone(),
         );
-        let mut updated_low_leaf = op.low_leaf;
+        let mut updated_low_leaf = op.low_leaf.clone();
         updated_low_leaf[25..41].clone_from_slice(&op.leaf[9..25]);
         // eval updated low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.low_merkle_proof,
+            op.low_merkle_proof.clone(),
             op.updated_low_merkle_path.clone(),
             updated_low_leaf,
-            op.low_index,
+            op.low_index.clone(),
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -213,13 +216,33 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval updated leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof,
-            op.updated_merkle_path,
+            op.merkle_proof.clone(),
+            op.updated_merkle_path.clone(),
             op.leaf.clone(),
             op.index.clone(),
             &self.poseidon_elements,
-            mult,
+            mult.clone(),
         );
+        let values: Vec<E::F> = flatten!(
+            op.opcode,
+            op.low_merkle_proof,
+            op.low_merkle_path,
+            op.updated_low_merkle_path,
+            op.low_index,
+            op.low_leaf,
+            op.merkle_proof,
+            op.merkle_path,
+            op.updated_merkle_path,
+            op.index,
+            op.leaf,
+            op.is_real
+        );
+        // yield the results
+        eval.add_to_relation(RelationEntry::new(
+            &self.instruction_elements,
+            -mult,
+            &values,
+        ));
         eval.finalize_logup();
         eval
     }
