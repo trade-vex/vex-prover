@@ -1,6 +1,6 @@
 use std::array;
 
-use stwo_prover::constraint_framework::EvalAtRow;
+use stwo_prover::{constraint_framework::EvalAtRow, relation};
 
 use crate::{
     hash::N_HASH,
@@ -27,6 +27,11 @@ pub struct State<F> {
     /// the order which should be matched first in the Sell IMT
     pub sell_imt_priority: PriceTimeFelts<F>,
 }
+
+// StateElements are used and yielded in the processor component
+// At each row, the processor uses the StateElements yielded by the previous row
+// the number of elements used/yielded is equal to the number of columns in the State
+relation!(StateElements, N_STATE_FELTS);
 
 impl<F> State<F> {
     /// Creates a new State.

@@ -17,6 +17,8 @@ pub mod bytes;
 pub mod insertions;
 pub mod less_than;
 pub mod poseidon;
+pub mod processor;
+pub(crate) mod trace_utils;
 
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {
