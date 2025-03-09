@@ -42,13 +42,15 @@ use tracing::{debug, span, Level};
 
 use super::{Insertions, InsertionsColumn};
 
+/// Preprocessed Trace for Insertions, each row consisting of a single field element
+/// First row is M31(1), rest are M31(0)
 pub fn preprocessed_trace(
     log_size: u32,
 ) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
     vec![IsFirst::new(log_size).gen_column_simd()]
 }
 
-/// Trace for the Insertion Operations, each row consisting of a [BaseField; InsertionsColumn::MAIN_COLS]
+/// Trace for the Insertion Operations, each row consisting of a [BaseField; InstructionColumn::MAIN_COLS]
 pub fn trace<S: OrderSide>(
     mut insertions: Insertions,
 ) -> (
@@ -60,11 +62,12 @@ pub fn trace<S: OrderSide>(
     let log_size = (insertions.len() - 1).ilog2() + 1;
     debug!("Log Size: {}", log_size);
     // pad insertions to a power of 2
+    let mut dummy = insertions[0];
+    dummy[InstructionColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - insertions.len() {
         insertions.push(insertions[0]);
     }
     let mut trace = ComponentTrace::<{ InsertionsColumn::MAIN_COLS }>::zeroed(log_size);
-    // Each row of the trace is a LessThanOp field elements arranged as per the `LessThanColumn`
     trace
         .par_iter_mut()
         .zip(insertions.par_chunks_exact(N_LANES))
@@ -148,6 +151,8 @@ pub fn interaction_trace<S: OrderSide>(
     let next_time: [&Vec<PackedBaseField>; N_U64_FELTS] =
         array::from_fn(|i| low_leaf[LeafColumn::NEXT_TIME + i]);
 
+    // Constraint 3 in constraints.rs
+    // low_time < inserted_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &low_time,
@@ -157,6 +162,8 @@ pub fn interaction_trace<S: OrderSide>(
         strict_less_than_elements,
     );
 
+    // Constraint 3 in constraints.rs
+    // low_time < next_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &next_time,
@@ -166,8 +173,10 @@ pub fn interaction_trace<S: OrderSide>(
         strict_less_than_elements,
     );
 
+    // Constraint 4 in constraints.rs
     match S::side() {
         Side::Buy => {
+            // inserted_price <= low_price
             add_less_than_interaction_col(
                 &mut logup_gen,
                 &inserted_price,
@@ -176,6 +185,7 @@ pub fn interaction_trace<S: OrderSide>(
                 log_size,
                 less_than_elements,
             );
+            // next_price < inserted_price
             add_less_than_interaction_col(
                 &mut logup_gen,
                 &next_price,
@@ -186,6 +196,7 @@ pub fn interaction_trace<S: OrderSide>(
             );
         }
         Side::Sell => {
+            // low_price <= inserted_price
             add_less_than_interaction_col(
                 &mut logup_gen,
                 &low_price,
@@ -194,6 +205,7 @@ pub fn interaction_trace<S: OrderSide>(
                 log_size,
                 less_than_elements,
             );
+            // inserted_price < next_price
             add_less_than_interaction_col(
                 &mut logup_gen,
                 &inserted_price,
@@ -205,6 +217,10 @@ pub fn interaction_trace<S: OrderSide>(
         }
     }
 
+    // A Total of 2 leaf updates are performed
+    // for each update
+    //   - Verify the Merkle Prooof, leaf hash + Merkle Proof -> Merkle Path
+    //   - Update the leaf, merkle path ==> updated merkle path, proof remains the same
     for (index, leaf, updated_leaf, proof, path, updated_path) in [
         (
             low_index,
@@ -228,6 +244,7 @@ pub fn interaction_trace<S: OrderSide>(
             let leaf_state: [&Vec<PackedBaseField>; N_STATE] = leaf[0..N_STATE].try_into().unwrap();
             let leaf_hash = path[0];
             let elements: [&Vec<PackedBaseField>; N_ELEMENTS] = flatten!(leaf_state, leaf_hash);
+            // add the leaf hash interaction
             add_interaction_col(
                 &mut logup_gen,
                 &elements,
@@ -237,6 +254,7 @@ pub fn interaction_trace<S: OrderSide>(
                 PackedSecureField::one(),
             );
             let mut curr = leaf_hash;
+            // add the merkle path interaction
             for (i, (sibling, hash)) in proof.iter().zip(path.iter().skip(1)).enumerate() {
                 add_merkle_interaction_col(
                     &mut logup_gen,
@@ -253,6 +271,7 @@ pub fn interaction_trace<S: OrderSide>(
         }
     }
     let values = trace.iter().map(|c| &c.data).collect_vec();
+    // add the instruction interaction, that yields the final state
     add_interaction_col(
         &mut logup_gen,
         &values,
@@ -265,9 +284,10 @@ pub fn interaction_trace<S: OrderSide>(
     (trace, InteractionClaim::new(claimed_sum))
 }
 
+/// add_interaction_col adds an interaction column to the logup generator for the given lookup elements in the given columns
 fn add_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
     logup_gen: &mut LogupTraceGenerator,
-    col1: &[&Vec<PackedBaseField>],
+    cols: &[&Vec<PackedBaseField>],
     is_real: &Vec<PackedBaseField>,
     log_size: u32,
     lookup_elements: &X,
@@ -275,20 +295,23 @@ fn add_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
 ) {
     let mut col_gen = logup_gen.new_col();
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
-        let values1: Vec<PackedBaseField> = col1.iter().map(|col| col[vec_row]).collect();
+        let values1: Vec<PackedBaseField> = cols.iter().map(|col| col[vec_row]).collect();
         let p1 = lookup_elements.combine(&values1);
         col_gen.write_frac(vec_row, mult * is_real[vec_row], p1);
     }
     col_gen.finalize_col();
 }
 
-fn add_less_than_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
+/// add_less_than_interaction_col adds an interaction column to the logup generator for the given a and b columns
+/// for strict less than comparison lookup elements must be StrictLessThanElements
+/// for less than comparison lookup elements must be LessThanElements
+fn add_less_than_interaction_col<R: Relation<PackedBaseField, PackedSecureField>>(
     logup_gen: &mut LogupTraceGenerator,
     col_a: &[&Vec<PackedBaseField>],
     col_b: &[&Vec<PackedBaseField>],
     is_real: &Vec<PackedBaseField>,
     log_size: u32,
-    lookup_elements: &X,
+    lookup_elements: &R,
 ) {
     let mut col_gen = logup_gen.new_col();
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
@@ -302,6 +325,9 @@ fn add_less_than_interaction_col<X: Relation<PackedBaseField, PackedSecureField>
     col_gen.finalize_col();
 }
 
+/// add_merkle_interaction_col adds an interaction column to the logup generator for the current and sibling columns
+/// the left and right values are determined by the index column
+/// [left, right, hash] -> lookup_elements
 fn add_merkle_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
     logup_gen: &mut LogupTraceGenerator,
     curr: &[&Vec<PackedBaseField>],

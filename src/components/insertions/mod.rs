@@ -1,6 +1,6 @@
 use stwo_prover::core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE};
 
-use crate::executor::instruction::N_INSTRUCTION_FELTS;
+use crate::{executor::instruction::N_INSTRUCTION_FELTS, imt::MERKLE_HEIGHT};
 
 use super::TraceSize;
 
@@ -22,7 +22,20 @@ pub struct InsertionsColumn;
 
 impl TraceSize for InsertionsColumn {
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
-    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
+    /// number of poseidon hashes: 4 times for leaf hashes
+    ///     - 1 for low_merkle_proof
+    ///     - 1 for updated low_leaf
+    ///     - 1 for merkle_proof for inserted leaf
+    ///     - 1 for updated leaf
+    /// 4*MERKLE_HEIGHT for merkle paths verification
+    /// Total Poseidon Interactions: 4 + 4*MERKLE_HEIGHT
+    /// inserted time < low_time, low.next_time => 2 strict less than checks
+    /// inserted price checks for low and next => 1 strict and 1 non-strict less than checks
+    /// Total Strict Less Than Interactions: 3
+    /// Total Non Strict Less Than Interactions: 1
+    /// 1 column for yielding the final result
+    /// Total Columns: 4 + 4*MERKLE_HEIGHT + 3 + 1 + 1 = 4*MERKLE_HEIGHT + 9
+    const INTERACTION_COLS: usize = (4 * MERKLE_HEIGHT + 9) * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]
@@ -32,7 +45,9 @@ mod tests {
     use constraints::InsertionsEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
+        constraint_framework::{
+            assert_constraints, FrameworkEval,
+        },
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -43,11 +58,12 @@ mod tests {
             less_than::{LessThanElements, StrictLessThanElements},
             poseidon::PoseidonElements,
         },
-        executor::{instruction::InstructionElements, record::ExecutionTrace},
+        executor::{
+            instruction::InstructionElements, order_book::OrderBook, record::ExecutionTrace,
+        },
         imt::{
             order::Order,
             side::{Buy, OrderSide, Sell},
-            BuyIMT, SellIMT,
         },
     };
 
@@ -61,6 +77,7 @@ mod tests {
         instruction_elements: &InstructionElements,
     ) {
         let log_size = (insertions.len() - 1).ilog2() + 1;
+        let span = span!(Level::INFO, "Trace Generation", log_size).entered();
         let constant_trace = preprocessed_trace(log_size);
         let (trace, claim) = trace::<S>(insertions);
         let (interaction_trace, interaction_claim) = interaction_trace::<S>(
@@ -70,7 +87,9 @@ mod tests {
             strict_less_than_elements,
             instruction_elements,
         );
+        span.exit();
 
+        let _span = span!(Level::INFO, "Evaluating Constraints", log_size).entered();
         let trace = TreeVec::new(vec![constant_trace, trace, interaction_trace]);
         let trace_polys = TreeVec::<Vec<_>>::map_cols(trace, |c| c.interpolate());
 
@@ -83,6 +102,8 @@ mod tests {
             claim,
         };
 
+
+        // panics if the constraints are not satisfied
         assert_constraints(
             &trace_polys,
             CanonicCoset::new(log_size),
@@ -98,18 +119,17 @@ mod tests {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let record = Rc::new(RefCell::new(ExecutionTrace::new()));
-        let mut buy_imt = BuyIMT::new(Rc::clone(&record));
-        let mut sell_imt = SellIMT::new(Rc::clone(&record));
+        let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 48;
+        let n = 16;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
-            let buy_order = Order::new(rng.gen(), rng.gen(), time);
-            let sell_order = Order::new(rng.gen(), rng.gen(), time);
-            buy_imt.insert(buy_order).unwrap();
-            sell_imt.insert(sell_order).unwrap();
+            let buy_order = Order::new(rng.gen_range(1..=50), rng.gen_range(51..=100), time);
+            let sell_order = Order::new(rng.gen_range(101..=150), rng.gen_range(151..=200), time);
+            order_book.place_buy_order(buy_order).unwrap();
+            order_book.place_sell_order(sell_order).unwrap();
         }
 
         let execution_trace = std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());

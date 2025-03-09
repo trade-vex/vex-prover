@@ -1,4 +1,10 @@
-use crate::executor::flatten_single;
+use crate::{
+    executor::flatten_single,
+    imt::{
+        leaf::Leaf,
+        side::{Buy, Sell},
+    },
+};
 use std::{array, marker::PhantomData};
 
 use itertools::{chain, Itertools};
@@ -48,24 +54,37 @@ pub struct InsertionsEval<S> {
 ///   The method follows these steps:
 ///   1. Retrieve Instruction for the row
 ///   2. IsReal must be a boolean. it is true if the operation is from non-padded row.
-///   3. Assert that the inserted leaf's priority lies b/w the low leaf and low leaf's next.
-///      - The priority is calculated by the first 16 bytes of the leaf.
-///   4. The Low leaf is part of the Merkle Tree by verifying the Merkle Proof.
+///   3. Assert that the inserted leaf's time is strictly greater than the low leaf's time and low leaf's next time.
+///      - [low_time, inserted_time, 1] must be in the strict_less_than_elements relation.
+///      - [next_time, inserted_time, 1] must be in the strict_less_than_elements relation.
+///   5. Assert that the prices are checked according to the side of the order.
+///      - Buy: => general priority is low_price >= inserted_price > next_price
+///          - [inserted_price, low_price, 1] must be in the less_than_elements relation.
+///          - [next_price, inserted_price, 1] must be in the strict_less_than_elements relation.
+///      - Sell: => general priority is low_price <= inserted_price < next_price
+///          - [low_price, inserted_price, 1] must be in the less_than_elements relation.
+///          - [inserted_price, next_price, 1] must be in the strict_less_than_elements relation.
+///   6. Assert that the initial root hash of the initial state is equal to the root hash in the merkle path of the low leaf.
+///   7. Assert that low leaf's next value is equal to the inserted leaf's next value before the insertion.
+///   8. The Low leaf is part of the Merkle Tree by verifying the Merkle Proof.
 ///      - The Merkle Proof is a list of sibling hashes from the leaf to the root.
 ///      - The Merkle Path is a list of hashes from the leaf to the root.
 ///      - IndexBits is the binary representation of the index of the leaf.
-///   5. Update the Low Leaf's next value by replacing the "next" value with the "label" of the leaf being inserted
-///   6. Ensure that the resultant root hash from updating the low leaf is equal to the root contained in inactive leaf's merkle path.
-///   7. Verify the Merkle Proof of the Inactive Leaf.
-///   8. Update the Inactive Leaf's value to the leaf in the trace.
-///   9. Yield the Results by adding the values to the ProcessorLookupElements.   
+///   9. Update the Low Leaf's next value by replacing the "next" value with the "label" of the leaf being inserted
+///   10. Ensure that the resultant root hash from updating the low leaf is equal to the root contained in inactive leaf's merkle path.
+///   11. Verify the Merkle Proof of the Inactive Leaf.
+///   12. Update the Inactive Leaf's value to the inserted leaf using the updated_merkle_path.
+///   13. Ensure that the final state's count is equal to the initial state's count minus 1.
+///   14. Verify that the final root hash of the final state is equal to the root hash in the merkle path of the updated leaf.
+///   15. The Priority must be updated only if the low leaf is the first leaf in the tree.
+///       - The priority of the leaf will change only if the low leaf is the first leaf in the tree.
+///           (verifying the priority i.e label of the leaf to the state.priority)
+///       - the updated priority must be equal to the inserted leaf's (price, time) pair.
+///   16. Yield the Results by adding the values to the ProcessorLookupElements.   
 ///        - Multiplicity of the relation is positive of is_real flag.
 ///        - Values is the entire row of the trace table.
-///   10. Finalize the evaluation by calling `eval.finalize_logup_in_pairs()`.
+///   17. Finalize the evaluation by calling `eval.finalize_logup_in_pairs()`.
 ///
-///
-///
-/// Note: Add leaf's next constraint!
 impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
     fn log_size(&self) -> u32 {
         self.claim.log_size
@@ -141,6 +160,14 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     )
                     .collect_vec(),
                 ));
+
+                // initial state's buy root hash must be equal to the root hash of the merkle tree
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.initial_state.buy_root_hash[i].clone()
+                            - op.low_merkle_path[MERKLE_HEIGHT][i].clone(),
+                    );
+                }
             }
             Side::Sell => {
                 // price of low leaf must less than price of inserted leaf
@@ -166,7 +193,22 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     )
                     .collect_vec(),
                 ));
+
+                // initial state's sell root hash must be equal to the root hash of the merkle tree
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.initial_state.sell_root_hash[i].clone()
+                            - op.low_merkle_path[MERKLE_HEIGHT][i].clone(),
+                    );
+                }
             }
+        }
+
+        // the low leafs next value must be equal to the inserted leaf's next before the insertion
+        for i in 0..2 * N_U64_FELTS {
+            eval.add_constraint(
+                op.low_leaf[LeafColumn::NEXT + i].clone() - op.leaf[LeafColumn::NEXT + i].clone(),
+            );
         }
 
         // eval low leaf's merkle proof
@@ -180,7 +222,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             mult.clone(),
         );
         let mut updated_low_leaf = op.low_leaf.clone();
-        updated_low_leaf[25..41].clone_from_slice(&op.leaf[9..25]);
+        updated_low_leaf[LeafColumn::NEXT..].clone_from_slice(&op.leaf[9..25]);
         // eval updated low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
@@ -223,7 +265,90 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             &self.poseidon_elements,
             mult.clone(),
         );
+
+        // ensure that the state count is updated correctly
+        eval.add_constraint(op.final_state.n.clone() - op.initial_state.n.clone() - E::F::one());
+        match S::side() {
+            Side::Buy => {
+                // final state's buy root hash must be equal to the root in the inserted leaf's merkle path
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.buy_root_hash[i].clone()
+                            - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
+                    );
+                }
+
+                // the initial priority for sell IMT must be equal to the final priority
+                for i in 0..2 * N_U64_FELTS {
+                    eval.add_constraint(
+                        op.initial_state.sell_imt_priority[i].clone()
+                            - op.final_state.sell_imt_priority[i].clone(),
+                    );
+                }
+
+                // the initial priority for buy IMT must change only if the low leaf is the first leaf in the buy imt
+                // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time
+                let first_leaf_price_time = Leaf::<E::F, Buy>::first_price_time_felts();
+                for i in 0..2 * N_U64_FELTS {
+                    eval.add_constraint(
+                        (op.final_state.buy_imt_priority[i].clone()
+                            - op.initial_state.buy_imt_priority[i].clone())
+                            * (op.low_leaf[LeafColumn::PRICE + i].clone()
+                                - first_leaf_price_time[i].clone()),
+                    );
+
+                    eval.add_constraint(
+                        (op.final_state.buy_imt_priority[i].clone()
+                            - op.initial_state.buy_imt_priority[i].clone())
+                            * (op.final_state.buy_imt_priority[i].clone()
+                                - op.leaf[LeafColumn::PRICE + i].clone()),
+                    );
+                }
+            }
+            Side::Sell => {
+                // initial state's sell root hash must be equal to the root in the inserted leaf's merkle path
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.sell_root_hash[i].clone()
+                            - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
+                    );
+                }
+
+                // the initial priority for buy IMT must be equal to the final priority
+                for i in 0..2 * N_U64_FELTS {
+                    eval.add_constraint(
+                        op.initial_state.buy_imt_priority[i].clone()
+                            - op.final_state.buy_imt_priority[i].clone(),
+                    );
+                }
+
+                // the initial priority for sell IMT must change only if the low leaf is the first leaf in the sell IMT
+                // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time
+                let first_leaf_price_time = Leaf::<E::F, Sell>::first_price_time_felts();
+                for i in 0..2 * N_U64_FELTS {
+                    eval.add_constraint(
+                        (op.final_state.sell_imt_priority[i].clone()
+                            - op.initial_state.sell_imt_priority[i].clone())
+                            * (op.low_leaf[LeafColumn::PRICE + i].clone()
+                                - first_leaf_price_time[i].clone()),
+                    );
+
+                    eval.add_constraint(
+                        (op.final_state.sell_imt_priority[i].clone()
+                            - op.initial_state.sell_imt_priority[i].clone())
+                            * (op.final_state.sell_imt_priority[i].clone()
+                                - op.leaf[LeafColumn::PRICE + i].clone()),
+                    );
+                }
+            }
+        }
+
         let values: Vec<E::F> = flatten!(
+            op.initial_state.n,
+            op.initial_state.buy_root_hash,
+            op.initial_state.buy_imt_priority,
+            op.initial_state.sell_root_hash,
+            op.initial_state.sell_imt_priority,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -235,6 +360,11 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             op.updated_merkle_path,
             op.index,
             op.leaf,
+            op.final_state.n,
+            op.final_state.buy_root_hash,
+            op.final_state.buy_imt_priority,
+            op.final_state.sell_root_hash,
+            op.final_state.sell_imt_priority,
             op.is_real
         );
         // yield the results
