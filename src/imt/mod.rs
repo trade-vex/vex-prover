@@ -455,7 +455,11 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
     }
 
     /// get leaf based on PriceTime
-    pub fn get_leaf_by_price_time(&self, price: u64, time: u64) -> Result<Leaf<BaseField, S>, IMTError> {
+    pub fn get_leaf_by_price_time(
+        &self,
+        price: u64,
+        time: u64,
+    ) -> Result<Leaf<BaseField, S>, IMTError> {
         let key = PriceTime::new(price, time);
         let index = self.find(&key);
         match index {
@@ -1048,7 +1052,6 @@ mod tests {
             "Should contain last PriceTime<BaseField>"
         );
 
-
         // Check raw vectors initialization
         assert_eq!(imt.raw[0].len(), 2); // first and last are set at index 0 and 1
         for i in 1..=MERKLE_HEIGHT {
@@ -1071,11 +1074,7 @@ mod tests {
         let order1 = Order::new(1, 10, 1);
         imt.insert(order1).unwrap();
 
-        assert_eq!(
-            imt.leaves.len(),
-            3,
-            "Should have 3 leaves after insertion"
-        );
+        assert_eq!(imt.leaves.len(), 3, "Should have 3 leaves after insertion");
         assert_ne!(
             imt.root(),
             initial_root,
@@ -1250,7 +1249,6 @@ mod tests {
             imt.index_map.contains_key(&PriceTime::last()),
             "Should contain last PriceTime<BaseField>"
         );
-
 
         // Check raw vectors initialization
         assert_eq!(

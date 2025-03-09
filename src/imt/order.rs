@@ -47,7 +47,9 @@ impl<S: OrderSide> Order<BaseField, S> {
 
     /// returns true if the order is invalid
     pub fn is_invalid(&self) -> bool {
-        self.volume == Volume::zero() || self.price() == Price::zero() || self.time() == Time::zero()
+        self.volume == Volume::zero()
+            || self.price() == Price::zero()
+            || self.time() == Time::zero()
     }
 
     pub fn price(&self) -> Price<BaseField> {

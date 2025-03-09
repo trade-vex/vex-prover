@@ -6,7 +6,6 @@ use std::rc::Rc;
 use vex_prover::executor::order_book::OrderBook;
 use vex_prover::executor::record::ExecutionTrace;
 use vex_prover::imt::order::Order;
-use vex_prover::imt::{BuyIMT, SellIMT};
 
 fn insert_batch(n: u64) {
     let record = Rc::new(RefCell::new(ExecutionTrace::new()));

@@ -45,9 +45,7 @@ mod tests {
     use constraints::InsertionsEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{
-            assert_constraints, FrameworkEval,
-        },
+        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -101,7 +99,6 @@ mod tests {
             _side: PhantomData,
             claim,
         };
-
 
         // panics if the constraints are not satisfied
         assert_constraints(

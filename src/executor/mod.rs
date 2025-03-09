@@ -1,7 +1,7 @@
 pub mod instruction;
+pub mod order_book;
 pub mod record;
 pub mod state;
-pub mod order_book;
 
 /// Flattens a list containing combinations of
 ///  - F (single element)
