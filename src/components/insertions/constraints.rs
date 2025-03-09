@@ -1,5 +1,5 @@
 use crate::{
-    executor::{flatten_single, instruction::IMTOperation},
+    executor::flatten_single,
     imt::{
         leaf::Leaf,
         side::{Buy, Sell},
@@ -54,8 +54,7 @@ pub struct InsertionsEval<S> {
 ///   The method follows these steps:
 ///   1. Retrieve Instruction for the row
 ///   2. IsReal must be a boolean. it is true if the operation is from non-padded row.
-///   3. Assert that the opcode is equal to the opcode in the instruction.
-///   4. Assert that the inserted leaf's time is strictly greater than the low leaf's time and low leaf's next time.
+///   3. Assert that the inserted leaf's time is strictly greater than the low leaf's time and low leaf's next time.
 ///      - [low_time, inserted_time, 1] must be in the strict_less_than_elements relation.
 ///      - [next_time, inserted_time, 1] must be in the strict_less_than_elements relation.
 ///   5. Assert that the prices are checked according to the side of the order.
@@ -98,9 +97,6 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
 
         // is_real must be a boolean
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
-
-        // op code must be equal to the opcode in the instruction
-        eval.add_constraint(op.opcode.clone() - E::F::from(S::op_code(IMTOperation::Insertion)));
 
         let mult = E::EF::from(op.is_real.clone());
 
