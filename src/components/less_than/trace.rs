@@ -42,9 +42,11 @@ pub fn trace_eval<const STRICT: bool>(
     let log_size = (less_than_operations.len() - 1).ilog2() + 1;
     debug!("Log Size: {}", log_size);
     // pad less_than_operations to a power of 2
+    let mut dummy = less_than_operations[0];
+    dummy[LessThanColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - less_than_operations.len() {
         // adding the first op as dummy op for padding
-        less_than_operations.push(less_than_operations[0]);
+        less_than_operations.push(dummy);
     }
     let mut trace = ComponentTrace::<{ LessThanColumn::MAIN_COLS }>::zeroed(log_size);
     // Each row of the trace is a LessThanOp field elements arranged as per the `LessThanColumn`
