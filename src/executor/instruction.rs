@@ -7,18 +7,17 @@ use crate::{
     imt::{IndexBits, LeafFelts, MerklePath, MerkleProof, MERKLE_HEIGHT, N_LEAF_FELTS},
 };
 
-pub const N_INSTRUCTION_FELTS: usize = 1 // opcode
-    + 2 * MERKLE_HEIGHT * N_HASH // 2 * merkle proofs
-    + 4 * (MERKLE_HEIGHT + 1) * N_HASH // 4 * merkle paths
-    + 2 * N_LEAF_FELTS // 2 * leafs
-    + 2 * MERKLE_HEIGHT // 2 * indexes
-    + 1; // is_real
+use super::state::{State, N_STATE_FELTS};
+
+pub const N_INSTRUCTION_FELTS: usize = InstructionColumn::N_INSTRUCTION_FELTS;
 
 /// Instruction represents a single instruction in the program
 /// Represents an instruction with its opcode, Merkle proof, and Merkle path.
 /// Every Row in the main trace corresponds to an instruction
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Instruction<F> {
+    /// initial state before the instruction is applied
+    pub initial_state: State<F>,
     /// The opcode of the instruction
     pub opcode: F,
     /// Low Leafs Merkle Proof to which the instruction applies
@@ -43,6 +42,8 @@ pub struct Instruction<F> {
     pub index: IndexBits<F>,
     /// Leaf to which the instruction applies
     pub leaf: LeafFelts<F>,
+    /// final state after the instruction is applied
+    pub final_state: State<F>,
     /// is_real flag to check if the operation is not among the dummy padded operations
     pub is_real: F,
 }
@@ -50,6 +51,7 @@ pub struct Instruction<F> {
 impl<F> Instruction<F> {
     /// from_eval returns a LessThanOp instance from a given EvalAtRow instance
     pub fn from_eval<E: EvalAtRow>(eval: &mut E) -> Instruction<E::F> {
+        let initial_state = State::<E::F>::from_eval(eval);
         let opcode = eval.next_trace_mask();
         let low_merkle_proof = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
         let low_merkle_path = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
@@ -62,8 +64,10 @@ impl<F> Instruction<F> {
         let updated_merkle_path = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
         let index = array::from_fn(|_| eval.next_trace_mask());
         let leaf = array::from_fn(|_| eval.next_trace_mask());
+        let final_state = State::<E::F>::from_eval(eval);
         let is_real = eval.next_trace_mask();
         Instruction {
+            initial_state,
             opcode,
             low_merkle_proof,
             low_merkle_path,
@@ -75,6 +79,7 @@ impl<F> Instruction<F> {
             updated_merkle_path,
             index,
             leaf,
+            final_state,
             is_real,
         }
     }
@@ -83,7 +88,8 @@ impl<F> Instruction<F> {
 pub struct InstructionColumn;
 
 impl InstructionColumn {
-    pub const OPCODE: usize = 0;
+    pub const INITIAL_STATE: usize = 0;
+    pub const OPCODE: usize = Self::INITIAL_STATE + N_STATE_FELTS;
     pub const LOW_MERKLE_PROOF: usize = Self::OPCODE + 1;
     pub const LOW_MERKLE_PATH: usize = Self::LOW_MERKLE_PROOF + MERKLE_HEIGHT * N_HASH;
     pub const UPDATED_LOW_MERKLE_PATH: usize = Self::LOW_MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
@@ -94,7 +100,8 @@ impl InstructionColumn {
     pub const UPDATED_MERKLE_PATH: usize = Self::MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
     pub const INDEX: usize = Self::UPDATED_MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
     pub const LEAF: usize = Self::INDEX + MERKLE_HEIGHT;
-    pub const IS_REAL: usize = Self::LEAF + N_LEAF_FELTS;
+    pub const FINAL_STATE: usize = Self::LEAF + N_LEAF_FELTS;
+    pub const IS_REAL: usize = Self::FINAL_STATE + N_STATE_FELTS;
     pub const N_INSTRUCTION_FELTS: usize = Self::IS_REAL + 1;
 }
 

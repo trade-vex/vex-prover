@@ -1,6 +1,6 @@
 use std::array;
 
-use super::instruction::{Opcode, N_INSTRUCTION_FELTS};
+use super::instruction::{InstructionColumn, Opcode, N_INSTRUCTION_FELTS};
 use crate::{
     components::{
         bytes::ByteOperations,
@@ -112,7 +112,7 @@ impl ExecutionTrace<BaseField> {
 
     /// Adds an instruction to the Execution Trace
     pub fn add_instruction(&mut self, instruction: InstructionFelts<BaseField>) {
-        match Opcode::from_field(instruction[0]) {
+        match Opcode::from_field(instruction[InstructionColumn::OPCODE]) {
             Opcode::InsertBuyOrder => self.buy_insert_order.push(instruction),
             Opcode::CancelBuyOrder => self.buy_delete_order.push(instruction),
             Opcode::UpdateBuyOrder => self.buy_modify_order.push(instruction),
