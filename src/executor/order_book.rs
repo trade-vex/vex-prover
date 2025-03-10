@@ -47,6 +47,7 @@ impl OrderBook {
             sell_imt.root(),
             PriceTime::<BaseField, Sell>::last().to_felts(),
         );
+        trace.borrow_mut().initial_state = state.to_felts();
         OrderBook {
             buy_imt,
             sell_imt,
@@ -97,6 +98,10 @@ impl OrderBook {
         self.trace.borrow_mut().add_instruction(instruction_felts);
         self.match_buy(order)?;
         Ok(())
+    }
+
+    pub fn state(&self) -> State<BaseField> {
+        self.state
     }
 
     /// Place a sell order in the order book
