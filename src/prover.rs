@@ -9,7 +9,7 @@ use stwo_prover::{
         fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
         poly::circle::{CanonicCoset, PolyOps},
-        prover::{self, verify, ProvingError, VerificationError},
+        prover::{self, verify, ProvingError},
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
     },
 };
@@ -20,6 +20,7 @@ use crate::{
         bytes, insertions, is_first, less_than, poseidon, processor, VexComponent, VexComponents,
         VexInteractionElements,
     },
+    error::VexVerificationError,
     executor::record::ExecutionTrace,
     imt::side::{Buy, Sell},
     VexClaim, VexInteractionClaim, VexProof,
@@ -65,9 +66,8 @@ pub fn prove_vex(
     let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
     let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations);
     let (strict_less_than_trace, strict_less_than_claim) =
-        less_than::trace_eval::<true>(trace.strict_less_than_operations);
-    let (less_than_trace, less_than_claim) =
-        less_than::trace_eval::<false>(trace.less_than_operations);
+        less_than::trace::<true>(trace.strict_less_than_operations);
+    let (less_than_trace, less_than_claim) = less_than::trace::<false>(trace.less_than_operations);
     let (processor_trace, processor_claim) = processor::trace(trace.instructions);
     let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
     let (sell_insert_trace, sell_insert_claim) = insertions::trace::<Sell>(trace.sell_insert_order);
@@ -120,13 +120,13 @@ pub fn prove_vex(
         &interaction_elements.instruction_elements,
     );
     let (strict_less_than_interaction_trace, strict_less_than_interaction_claim) =
-        less_than::interaction_trace_eval::<true, _>(
+        less_than::interaction_trace::<true, _>(
             &strict_less_than_trace,
             &interaction_elements.less_than_u8_elements,
             &interaction_elements.strict_less_than_elements,
         );
     let (less_than_interaction_trace, less_than_interaction_claim) =
-        less_than::interaction_trace_eval::<false, _>(
+        less_than::interaction_trace::<false, _>(
             &less_than_trace,
             &interaction_elements.less_than_u8_elements,
             &interaction_elements.less_than_elements,
@@ -193,7 +193,7 @@ pub fn verify_vex(
         interaction_claim,
         stark_proof,
     }: VexProof<Blake2sMerkleHasher>,
-) -> Result<(), VerificationError> {
+) -> Result<(), VexVerificationError> {
     let _span = span!(Level::INFO, "Verify").entered();
 
     // default config
@@ -226,11 +226,11 @@ pub fn verify_vex(
     let final_state_comb: SecureField = interaction_elements
         .state_elements
         .combine(&claim.final_state);
-    // Check that the lookup sum is valid, otherwise throw
+    // Check that the lookup sum is valid
     if !(interaction_claim.logup_sum() + final_state_comb.inverse() - initial_state_comb.inverse())
         .is_zero()
     {
-        return Err(VerificationError::ProofOfWork);
+        return Err(VexVerificationError::InvalidLogupSum);
     };
     interaction_claim.mix_into(channel);
     commitment_scheme_verifier.commit(
@@ -249,6 +249,7 @@ pub fn verify_vex(
         commitment_scheme_verifier,
         stark_proof,
     )
+    .map_err(VexVerificationError::Stark)
 }
 
 #[cfg(test)]

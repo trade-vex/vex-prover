@@ -11,7 +11,7 @@ mod constraints;
 mod trace;
 
 pub use constraints::LessThanEval;
-pub use trace::{interaction_trace_eval, preprocessed_trace, trace_eval};
+pub use trace::{interaction_trace, preprocessed_trace, trace};
 
 /// LessThanComponent represents the LessThan component
 pub type StrictLessThanComponent = FrameworkComponent<LessThanEval<true>>;
@@ -103,7 +103,7 @@ mod tests {
         constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
-    use trace::{interaction_trace_eval, preprocessed_trace, trace_eval};
+    use trace::{interaction_trace, preprocessed_trace, trace};
     use tracing::{span, Level};
 
     use crate::{
@@ -123,15 +123,11 @@ mod tests {
     ) {
         let log_size = (less_than_operations.len() - 1).ilog2() + 1;
         let constant_trace = preprocessed_trace(log_size);
-        let (trace, claim) = trace_eval::<STRICT>(less_than_operations);
+        let (trace, claim) = trace::<STRICT>(less_than_operations);
         let (interaction_trace, interaction_claim) = if STRICT {
-            interaction_trace_eval::<STRICT, _>(
-                &trace,
-                less_than_u8_elements,
-                strict_less_than_elements,
-            )
+            interaction_trace::<STRICT, _>(&trace, less_than_u8_elements, strict_less_than_elements)
         } else {
-            interaction_trace_eval::<STRICT, _>(&trace, less_than_u8_elements, less_than_elements)
+            interaction_trace::<STRICT, _>(&trace, less_than_u8_elements, less_than_elements)
         };
 
         let trace = TreeVec::new(vec![constant_trace, trace, interaction_trace]);

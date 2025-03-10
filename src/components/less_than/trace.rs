@@ -31,7 +31,7 @@ pub fn preprocessed_trace(
 }
 
 /// Trace for the Less Than Operations, each row consisting of a LessThanOp
-pub fn trace_eval<const STRICT: bool>(
+pub fn trace<const STRICT: bool>(
     mut less_than_operations: LessThanOperations,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
@@ -69,10 +69,7 @@ pub fn trace_eval<const STRICT: bool>(
 
 // Interaction Trace, "use" the LessThanU8Elements for comparison_bytes
 // and "yield" the LessThanElements for the actual comparison results
-pub fn interaction_trace_eval<
-    const STRICT: bool,
-    R: Relation<PackedBaseField, PackedSecureField>,
->(
+pub fn interaction_trace<const STRICT: bool, R: Relation<PackedBaseField, PackedSecureField>>(
     trace: &ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     less_than_u8_elements: &LessThanU8Elements,
     less_than_elements: &R,
