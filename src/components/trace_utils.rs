@@ -64,6 +64,7 @@ pub fn add_merkle_interaction_col<X: Relation<PackedBaseField, PackedSecureField
     is_real: &Vec<PackedBaseField>,
     log_size: u32,
     lookup_elements: &X,
+    mult: PackedSecureField,
 ) {
     let mut col_gen = logup_gen.new_col();
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
@@ -98,7 +99,7 @@ pub fn add_merkle_interaction_col<X: Relation<PackedBaseField, PackedSecureField
         left.extend(right);
         left.extend(hash);
         let p1 = lookup_elements.combine(&left);
-        col_gen.write_frac(vec_row, PackedSecureField::one() * is_real[vec_row], p1);
+        col_gen.write_frac(vec_row, mult * is_real[vec_row], p1);
     }
     col_gen.finalize_col();
 }

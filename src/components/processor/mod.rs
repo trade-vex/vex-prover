@@ -1,4 +1,6 @@
-use stwo_prover::core::fields::secure_column::SECURE_EXTENSION_DEGREE;
+use stwo_prover::{
+    constraint_framework::FrameworkComponent, core::fields::secure_column::SECURE_EXTENSION_DEGREE,
+};
 
 use crate::executor::instruction::N_INSTRUCTION_FELTS;
 
@@ -7,7 +9,10 @@ use super::TraceSize;
 mod constraints;
 mod trace;
 
+pub use constraints::ProcessorEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
+
+pub type ProcessorComponent = FrameworkComponent<ProcessorEval>;
 
 /// Processor Column
 /// Each row of the trace is a Instruction field elements arranged as per the `InstructionColumn`
@@ -16,6 +21,7 @@ pub use trace::{interaction_trace, preprocessed_trace, trace};
 pub struct ProcessorColumn;
 
 impl TraceSize for ProcessorColumn {
+    const PREPROCESSED_COLS: usize = 1;
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
     /// 1st Column:"use initial state" and "yield final state" logups are batched
     /// 2nd Column: "use instruction elements"

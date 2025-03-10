@@ -1,7 +1,7 @@
 use crate::types::N_U64_LIMBS;
 use std::array;
 use stwo_prover::{
-    constraint_framework::EvalAtRow,
+    constraint_framework::{EvalAtRow, FrameworkComponent},
     core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
     relation,
 };
@@ -10,7 +10,12 @@ use super::TraceSize;
 mod constraints;
 mod trace;
 
+pub use constraints::LessThanEval;
 pub use trace::{interaction_trace_eval, preprocessed_trace, trace_eval};
+
+/// LessThanComponent represents the LessThan component
+pub type StrictLessThanComponent = FrameworkComponent<LessThanEval<true>>;
+pub type LessThanComponent = FrameworkComponent<LessThanEval<false>>;
 
 /// Less Than Operations
 pub type LessThanOperations = Vec<[BaseField; LessThanColumn::MAIN_COLS]>;
@@ -73,11 +78,13 @@ impl LessThanColumn {
 }
 
 impl TraceSize for LessThanColumn {
+    // is_first column
+    const PREPROCESSED_COLS: usize = 1;
     // last field's index + offset
     const MAIN_COLS: usize = Self::IS_REAL + 1;
     // 1 Interaction Column for LessThanU8 check
     // 1 Interaction Column for yielding the result
-    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
+    const INTERACTION_COLS: usize = SECURE_EXTENSION_DEGREE;
 }
 
 // A Total of 17 elements are "used" or "yielded" for the less than operation

@@ -1,8 +1,8 @@
 use itertools::{chain, Itertools};
 use num_traits::{One, Zero};
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-};
+// use rayon::iter::{
+//     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+// };
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
@@ -165,13 +165,8 @@ pub fn trace(
     let mut trace = ComponentTrace::<{ PoseidonColumn::MAIN_COLS - 1 }>::zeroed(log_size);
 
     trace
-        .par_iter_mut()
-        .zip(
-            poseidon_operations
-                .par_iter()
-                .chunks(N_LANES * N_INSTANCES_PER_ROW)
-                .into_par_iter(),
-        )
+        .iter_mut()
+        .zip(poseidon_operations.chunks_exact(N_INSTANCES_PER_ROW * N_LANES))
         .for_each(|(mut row, data)| {
             let mut col_index = 0;
             for rep_i in 0..N_INSTANCES_PER_ROW {
@@ -272,8 +267,13 @@ pub fn interaction_trace(
 pub struct PoseidonColumn;
 
 impl TraceSize for PoseidonColumn {
+    // is_first column
+    const PREPROCESSED_COLS: usize = 1;
+    // initial state + state transitions for each round + final state + is_real
     const MAIN_COLS: usize = N_COLUMNS;
-    const INTERACTION_COLS: usize = N_INSTANCES_PER_ROW * N_ELEMENTS * SECURE_EXTENSION_DEGREE;
+    // initial state + final hash is combined in 1 interaction column for 1 instance
+    // per row => N_INSTANCES_PER_ROW interaction columns
+    const INTERACTION_COLS: usize = N_INSTANCES_PER_ROW * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]
