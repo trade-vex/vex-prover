@@ -40,6 +40,8 @@ pub mod poseidon;
 pub mod processor;
 pub(crate) mod trace_utils;
 
+pub use trace_utils::is_first;
+
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {
     /// Number of columns in preprocessed trace table

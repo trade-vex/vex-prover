@@ -235,8 +235,8 @@ impl ExecutionTrace<BaseField> {
         log_size
     }
 
-    /// Returns the log size for a given Opcode
-    pub fn log_size_for_component(&self, component: VexComponent) -> u32 {
+    /// Returns the log size for a given Component
+    pub fn log_size(&self, component: VexComponent) -> u32 {
         let len = match component {
             VexComponent::InsertBuyOrder => self.buy_insert_order.len(),
             VexComponent::CancelBuyOrder => self.buy_delete_order.len(),
