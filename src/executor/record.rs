@@ -1,6 +1,6 @@
 use super::{
     instruction::{InstructionColumn, Opcode, N_INSTRUCTION_FELTS},
-    state::N_STATE_FELTS,
+    state::StateFelts,
 };
 use crate::{
     components::{
@@ -82,9 +82,9 @@ pub struct ExecutionTrace<F> {
     /// Uint8 Operations
     pub byte_operations: ByteOperations,
     /// Initial State of the Execution Trace
-    pub initial_state: [F; N_STATE_FELTS],
+    pub initial_state: StateFelts<F>,
     /// Final State
-    pub final_state: [F; N_STATE_FELTS],
+    pub final_state: StateFelts<F>,
 }
 
 impl Default for ExecutionTrace<BaseField> {

@@ -9,6 +9,8 @@ use crate::{
     imt::{Hash, PriceTimeFelts, N_U64_FELTS},
 };
 
+pub type StateFelts<F> = [F; N_STATE_FELTS];
+
 pub const N_STATE_FELTS: usize = 1 // n
     + N_HASH // buy_root_hash
     + 2 * N_U64_FELTS // buy_imt_priority
