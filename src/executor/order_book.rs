@@ -13,8 +13,9 @@ use crate::{
         error::IMTError,
         leaf::PriceTime,
         order::Order,
-        side::{Buy, Sell},
-        BuyIMT, SellIMT,
+        side::{Buy, OrderSide, Sell, Side},
+        BuyIMT, IndexBits, MatchProof, MerklePath, PartialMatchProof, SellIMT, N_LEAF_FELTS,
+        N_U64_FELTS,
     },
     types::Volume,
 };
@@ -26,7 +27,7 @@ use super::{record::ExecutionTrace, state::State};
 /// The State consists of the current root hashes and the best price time for buy and sell orders
 /// OrderBook Records the Execution Trace of the IMT Instructions every time there is a state transition
 pub struct OrderBook {
-    /// Buy IMT
+    /// Buy Re
     buy_imt: BuyIMT,
     /// Sell IMT
     sell_imt: SellIMT,
@@ -65,7 +66,7 @@ impl OrderBook {
         }
         let initial_state = self.state.clone();
         let proof = self.buy_imt.insert(order)?;
-        assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
         final_state.buy_root_hash = self.buy_imt.root();
@@ -113,7 +114,7 @@ impl OrderBook {
         }
         let initial_state = self.state.clone();
         let proof = self.sell_imt.insert(order)?;
-        assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
         final_state.sell_root_hash = self.sell_imt.root();
@@ -148,48 +149,55 @@ impl OrderBook {
         Ok(())
     }
 
-    // @todo: state transition
     fn match_buy(&mut self, mut order: Order<BaseField, Buy>) -> Result<(), IMTError> {
         let price = order.price();
         // debug!("best sell price: {:?}", self.sell_imt.best_price());
         // debug!("best buy price: {:?}", self.buy_imt.best_price());
         while order.volume > Volume::zero() && price >= self.sell_imt.best_price() {
-            debug!("best sell price: {:?}", self.sell_imt.best_price());
             let mut match_leaf = self.sell_imt.best_price_leaf();
-            debug!("Match leaf: {:?}", match_leaf);
             let volume = if order.volume < match_leaf.volume {
                 order.volume
             } else {
                 match_leaf.volume
             };
-            debug!("Filled volume: {:?}", volume.to_u64());
             order.volume -= volume;
             match_leaf.volume -= volume;
-
+            let initial_state = self.state;
+            // buy is aggressive here
+            // additional checks for the invariant
+            // best(buy) >= best(sell)
+            self.trace
+                .borrow_mut()
+                .add_less_than_event(order.price().to_felts(), match_leaf.price().to_felts())?;
             if order.volume == Volume::zero() {
-                self.buy_imt.match_order()?;
+                let proof = self.buy_imt.match_order()?;
+                self.finalize_match(proof, true)?;
             } else {
-                self.buy_imt.match_partially(volume)?;
+                let proof = self.buy_imt.match_partially(volume)?;
+                assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+                self.finalize_partial_match(proof, true)?;
             }
 
+            let initial_state = self.state;
             if match_leaf.volume == Volume::zero() {
-                self.sell_imt.match_order()?;
+                let proof = self.sell_imt.match_order()?;
+                assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+                self.finalize_match(proof, false)?;
             } else {
-                self.sell_imt.match_partially(volume)?;
+                let proof = self.sell_imt.match_partially(volume)?;
+                assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+                self.finalize_partial_match(proof, false)?;
             }
         }
         Ok(())
     }
 
-    // @todo: state transition
     fn match_sell(&mut self, mut order: Order<BaseField, Sell>) -> Result<(), IMTError> {
         let price = order.price();
         // debug!("best buy price: {:?}", self.buy_imt.best_price());
         // debug!("best sell price: {:?}", self.sell_imt.best_price());
         while order.volume > Volume::zero() && price <= self.buy_imt.best_price() {
-            debug!("best buy price: {:?}", self.buy_imt.best_price());
             let mut match_leaf = self.buy_imt.best_price_leaf();
-            debug!("Match leaf: {:?}", match_leaf);
             let volume = if order.volume < match_leaf.volume {
                 order.volume
             } else {
@@ -197,20 +205,146 @@ impl OrderBook {
             };
             order.volume -= volume;
             match_leaf.volume -= volume;
-            debug!("Filled volume: {:?}", volume.to_u64());
+
+            self.trace
+                .borrow_mut()
+                .add_less_than_event(match_leaf.price().to_felts(), order.price().to_felts())?;
             if order.volume == Volume::zero() {
-                self.sell_imt.match_order()?;
+                let proof = self.sell_imt.match_order()?;
+                self.finalize_match(proof, true)?;
             } else {
-                self.sell_imt.match_partially(volume)?;
+                let proof = self.sell_imt.match_partially(volume)?;
+                self.finalize_partial_match(proof, true)?;
             }
-            debug!("Filled volume1: {:?}", volume.to_u64());
+
             if match_leaf.volume == Volume::zero() {
-                self.buy_imt.match_order()?;
+                let proof = self.buy_imt.match_order()?;
+                self.finalize_match(proof, false)?;
             } else {
-                self.buy_imt.match_partially(volume)?;
+                let proof = self.buy_imt.match_partially(volume)?;
+                self.finalize_partial_match(proof, false)?;
             }
-            debug!("Filled volume2: {:?}", volume.to_u64());
         }
+        Ok(())
+    }
+
+    fn finalize_match<S: OrderSide>(
+        &mut self,
+        proof: MatchProof<S>,
+        is_aggresive: bool,
+    ) -> Result<(), IMTError> {
+        let initial_state = self.state;
+        let mut final_state = initial_state;
+        let opcode = match S::SIDE {
+            Side::Buy => {
+                debug_assert_eq!(proof.initial_root, initial_state.buy_root_hash);
+                final_state.buy_root_hash = self.buy_imt.root();
+                final_state.buy_imt_priority = self.buy_imt.best_price_time();
+                if is_aggresive {
+                    Opcode::MatchAggressiveBuy
+                } else {
+                    Opcode::MatchPassiveBuy
+                }
+            }
+            Side::Sell => {
+                debug_assert_eq!(proof.initial_root, initial_state.sell_root_hash);
+                final_state.sell_root_hash = self.sell_imt.root();
+                final_state.sell_imt_priority = self.sell_imt.best_price_time();
+                if is_aggresive {
+                    Opcode::MatchAggressiveSell
+                } else {
+                    Opcode::MatchPassiveSell
+                }
+            }
+        };
+        final_state.n += BaseField::one();
+        self.state = final_state;
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            initial_state.n,
+            initial_state.buy_root_hash,
+            initial_state.buy_imt_priority,
+            initial_state.sell_root_hash,
+            initial_state.sell_imt_priority,
+            opcode.to_field(),
+            proof.low_merkle_proof,
+            proof.low_merkle_path,
+            proof.low_merkle_updated_path,
+            IndexBits::<BaseField>::default(),
+            proof.low_leaf.to_felts(),
+            proof.match_leaf_proof,
+            proof.match_leaf_path,
+            proof.match_leaf_updated_path,
+            proof.match_leaf_index,
+            proof.match_leaf.to_felts(),
+            final_state.n,
+            final_state.buy_root_hash,
+            final_state.buy_imt_priority,
+            final_state.sell_root_hash,
+            final_state.sell_imt_priority,
+            BaseField::one()
+        );
+        self.trace.borrow_mut().add_instruction(instruction_felts);
+        Ok(())
+    }
+
+    fn finalize_partial_match<S: OrderSide>(
+        &mut self,
+        proof: PartialMatchProof<S>,
+        is_aggresive: bool,
+    ) -> Result<(), IMTError> {
+        let initial_state = self.state;
+        let mut final_state = initial_state;
+        let opcode = match S::SIDE {
+            Side::Buy => {
+                debug_assert_eq!(proof.initial_root, initial_state.buy_root_hash);
+                final_state.buy_root_hash = self.buy_imt.root();
+                final_state.buy_imt_priority = self.buy_imt.best_price_time();
+                if is_aggresive {
+                    Opcode::PartialMatchAggressiveBuy
+                } else {
+                    Opcode::PartialMatchPassiveBuy
+                }
+            }
+            Side::Sell => {
+                debug_assert_eq!(proof.initial_root, initial_state.sell_root_hash);
+                final_state.sell_root_hash = self.sell_imt.root();
+                final_state.sell_imt_priority = self.sell_imt.best_price_time();
+                if is_aggresive {
+                    Opcode::PartialMatchAggressiveSell
+                } else {
+                    Opcode::PartialMatchPassiveSell
+                }
+            }
+        };
+        final_state.n += BaseField::one();
+        self.state = final_state;
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            initial_state.n,
+            initial_state.buy_root_hash,
+            initial_state.buy_imt_priority,
+            initial_state.sell_root_hash,
+            initial_state.sell_imt_priority,
+            opcode.to_field(),
+            proof.low_merkle_proof,
+            proof.low_merkle_path,
+            MerklePath::<BaseField>::default(),
+            IndexBits::<BaseField>::default(),
+            proof.filled_volume.to_felts(),
+            proof.remaining_volume.to_felts(),
+            [BaseField::zero(); N_LEAF_FELTS - 2 * N_U64_FELTS],
+            proof.match_leaf_proof,
+            proof.match_leaf_path,
+            proof.match_leaf_updated_path,
+            proof.match_leaf_index,
+            proof.match_leaf.to_felts(),
+            final_state.n,
+            final_state.buy_root_hash,
+            final_state.buy_imt_priority,
+            final_state.sell_root_hash,
+            final_state.sell_imt_priority,
+            BaseField::one()
+        );
+        self.trace.borrow_mut().add_instruction(instruction_felts);
         Ok(())
     }
 }
@@ -375,10 +509,10 @@ mod test {
     fn generate_random_order<S: OrderSide>(time: u64, base_price: u64) -> Order<BaseField, S> {
         let mut rng = rand::thread_rng();
         let price = match S::side() {
-            Side::Buy => rng.gen_range(1..=50),
-            Side::Sell => rng.gen_range(101..=150),
+            Side::Buy => rng.gen_range(100..110),
+            Side::Sell => rng.gen_range(100..=110),
         };
-        let volume = rng.gen_range(1..100);
+        let volume = 100;
         Order::new(volume, base_price + price, time)
     }
 
@@ -414,5 +548,41 @@ mod test {
 
             time += 2;
         }
+        let trace = std::mem::replace(&mut *trace.borrow_mut(), ExecutionTrace::new());
+        debug!("Number of buy orders: {}", trace.buy_insert_order.len());
+        debug!("Number of sell orders: {}", trace.sell_insert_order.len());
+        debug!(
+            "Number of aggressive buy matches: {}",
+            trace.buy_aggressive_match.len()
+        );
+        debug!(
+            "Number of passive buy matches: {}",
+            trace.buy_passive_match.len()
+        );
+        debug!(
+            "Number of aggressive sell matches: {}",
+            trace.sell_aggressive_match.len()
+        );
+        debug!(
+            "Number of passive sell matches: {}",
+            trace.sell_passive_match.len()
+        );
+        debug!(
+            "Number of Aggressive partial buy matches: {}",
+            trace.buy_aggressive_partial_match.len()
+        );
+        debug!(
+            "Number of Passive partial buy matches: {}",
+            trace.buy_passive_partial_match.len()
+        );
+        debug!(
+            "Number of Aggressive partial sell matches: {}",
+            trace.sell_aggressive_partial_match.len()
+        );
+        debug!(
+            "Number of Passive partial sell matches: {}",
+            trace.sell_passive_partial_match.len()
+        );
+        debug!("Total number of instructions: {}", trace.instructions.len());
     }
 }

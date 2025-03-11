@@ -139,14 +139,18 @@ impl ExecutionTrace<BaseField> {
             Opcode::UpdateBuyOrder => self.buy_modify_order.push(instruction),
             Opcode::MatchAggressiveBuy => self.buy_aggressive_match.push(instruction),
             Opcode::MatchPassiveBuy => self.buy_passive_match.push(instruction),
-            Opcode::PartialMatchAggressiveBuy => self.buy_aggressive_partial_match.push(instruction),
+            Opcode::PartialMatchAggressiveBuy => {
+                self.buy_aggressive_partial_match.push(instruction)
+            }
             Opcode::PartialMatchPassiveBuy => self.buy_passive_partial_match.push(instruction),
             Opcode::InsertSellOrder => self.sell_insert_order.push(instruction),
             Opcode::CancelSellOrder => self.sell_delete_order.push(instruction),
             Opcode::UpdateSellOrder => self.sell_modify_order.push(instruction),
             Opcode::MatchAggressiveSell => self.sell_aggressive_match.push(instruction),
             Opcode::MatchPassiveSell => self.sell_passive_match.push(instruction),
-            Opcode::PartialMatchAggressiveSell => self.sell_aggressive_partial_match.push(instruction),
+            Opcode::PartialMatchAggressiveSell => {
+                self.sell_aggressive_partial_match.push(instruction)
+            }
             Opcode::PartialMatchPassiveSell => self.sell_passive_partial_match.push(instruction),
         }
         self.instructions.push(instruction);

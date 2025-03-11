@@ -30,7 +30,14 @@ pub struct Instruction<F> {
     pub updated_low_merkle_path: MerklePath<F>,
     /// Low Leafs Index in the IMT
     pub low_index: IndexBits<F>,
-    /// Low Leaf
+    // @todo:rename this field
+    /// Additional Data for Instruction
+    /// Insertions: Contains Actual Low Leaf 
+    /// Updates: First N_U64_FELTS contain new Volume, rest zero
+    /// PartialMatch: First N_U64_FELTS contain Filled Volume,
+    ///               Next N_U64_FELTS contain Remaining Volume,
+    /// this is because we dont need low leaf when verifying constraints
+    /// the low leaf can be constructed from side and leaf.
     pub low_leaf: LeafFelts<F>,
     /// Merkle Proof of the leaf to which the instruction applies
     pub merkle_proof: MerkleProof<F>,
@@ -113,7 +120,7 @@ relation!(InstructionElements, {
 });
 
 /// The Higher Level Operation to be performed in both the IMTs
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub enum Opcode {
     InsertBuyOrder,
     InsertSellOrder,
