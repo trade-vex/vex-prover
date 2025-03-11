@@ -6,6 +6,7 @@ use stwo_prover::core::{
 };
 
 pub mod bytes;
+pub mod less_than;
 
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {
