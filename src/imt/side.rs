@@ -8,6 +8,40 @@ pub struct Buy;
 #[derive(Debug, Clone, Copy)]
 pub struct Sell;
 
+/// Type markers for Buy and Sell sides
+#[derive(Debug, Clone, Copy)]
+pub struct Aggressive;
+#[derive(Debug, Clone, Copy)]
+pub struct Passive;
+
+pub enum Type {
+    Aggressive,
+    Passive,
+}
+
+pub trait MatchType: 'static + Copy + Send + Sync + Clone + Copy + Debug {
+    const NAME: &'static str;
+    const TYPE: Type;
+    fn name() -> &'static str {
+        match Self::TYPE {
+            Type::Aggressive => "Aggressive",
+            Type::Passive => "Passive",
+        }
+    }
+    fn type_() -> Type {
+        Self::TYPE
+    }
+}
+
+impl MatchType for Aggressive {
+    const NAME: &'static str = "Aggressive";
+    const TYPE: Type = Type::Aggressive;
+}
+impl MatchType for Passive {
+    const NAME: &'static str = "Passive";
+    const TYPE: Type = Type::Passive;
+}
+
 /// IMT side marker
 pub enum Side {
     Buy,
