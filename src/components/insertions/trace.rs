@@ -66,7 +66,7 @@ pub fn trace<S: OrderSide>(
     let mut dummy = insertions[0];
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - insertions.len() {
-        insertions.push(insertions[0]);
+        insertions.push(dummy);
     }
     let mut trace = ComponentTrace::<{ InsertionsColumn::MAIN_COLS }>::zeroed(log_size);
     trace
