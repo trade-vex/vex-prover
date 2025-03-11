@@ -121,10 +121,14 @@ pub enum Opcode {
     UpdateSellOrder,
     CancelBuyOrder,
     CancelSellOrder,
-    MatchBuyOrder,
-    MatchSellOrder,
-    PartialMatchBuyOrder,
-    PartialMatchSellOrder,
+    MatchAggressiveBuy,
+    MatchPassiveBuy,
+    MatchAggressiveSell,
+    MatchPassiveSell,
+    PartialMatchAggressiveBuy,
+    PartialMatchPassiveBuy,
+    PartialMatchAggressiveSell,
+    PartialMatchPassiveSell,
 }
 
 impl Opcode {
@@ -137,10 +141,14 @@ impl Opcode {
             3 => Opcode::UpdateSellOrder,
             4 => Opcode::CancelBuyOrder,
             5 => Opcode::CancelSellOrder,
-            6 => Opcode::MatchBuyOrder,
-            7 => Opcode::MatchSellOrder,
-            8 => Opcode::PartialMatchBuyOrder,
-            9 => Opcode::PartialMatchSellOrder,
+            6 => Opcode::MatchAggressiveBuy,
+            7 => Opcode::MatchPassiveBuy,
+            8 => Opcode::MatchAggressiveSell,
+            9 => Opcode::MatchPassiveSell,
+            10 => Opcode::PartialMatchAggressiveBuy,
+            11 => Opcode::PartialMatchPassiveBuy,
+            12 => Opcode::PartialMatchAggressiveSell,
+            13 => Opcode::PartialMatchPassiveSell,
             _ => panic!("Invalid Opcode"),
         }
     }
@@ -154,10 +162,14 @@ impl Opcode {
             Opcode::UpdateSellOrder => BaseField::from_u32_unchecked(3),
             Opcode::CancelBuyOrder => BaseField::from_u32_unchecked(4),
             Opcode::CancelSellOrder => BaseField::from_u32_unchecked(5),
-            Opcode::MatchBuyOrder => BaseField::from_u32_unchecked(6),
-            Opcode::MatchSellOrder => BaseField::from_u32_unchecked(7),
-            Opcode::PartialMatchBuyOrder => BaseField::from_u32_unchecked(8),
-            Opcode::PartialMatchSellOrder => BaseField::from_u32_unchecked(9),
+            Opcode::MatchAggressiveBuy => BaseField::from_u32_unchecked(6),
+            Opcode::MatchPassiveBuy => BaseField::from_u32_unchecked(7),
+            Opcode::MatchAggressiveSell => BaseField::from_u32_unchecked(8),
+            Opcode::MatchPassiveSell => BaseField::from_u32_unchecked(9),
+            Opcode::PartialMatchAggressiveBuy => BaseField::from_u32_unchecked(10),
+            Opcode::PartialMatchPassiveBuy => BaseField::from_u32_unchecked(11),
+            Opcode::PartialMatchAggressiveSell => BaseField::from_u32_unchecked(12),
+            Opcode::PartialMatchPassiveSell => BaseField::from_u32_unchecked(13),
         }
     }
 }

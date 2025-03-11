@@ -51,21 +51,29 @@ pub struct ExecutionTrace<F> {
     pub buy_delete_order: Instructions<F>,
     /// 3. Modify Buy Order
     pub buy_modify_order: Instructions<F>,
-    /// 4. Buy Order Matched
-    pub buy_order_match: Instructions<F>,
-    /// 5. Buy Order Cancelled
-    pub buy_order_partially_match: Instructions<F>,
+    /// 4. Buy Aggressive Match
+    pub buy_aggressive_match: Instructions<F>,
+    /// 5. Buy Passive Match
+    pub buy_passive_match: Instructions<F>,
+    /// 6. Buy Order Aggressively Matched
+    pub buy_aggressive_partial_match: Instructions<F>,
+    /// 7. Buy Order Passive Matched
+    pub buy_passive_partial_match: Instructions<F>,
     /// Sell Side Instructions
-    /// 6. Place Sell Order
+    /// 8. Place Sell Order
     pub sell_insert_order: Instructions<F>,
-    /// 7. Cancel Sell Order
+    /// 9. Cancel Sell Order
     pub sell_delete_order: Instructions<F>,
-    /// 8. Modify Sell Order
+    /// 10. Modify Sell Order
     pub sell_modify_order: Instructions<F>,
-    /// 9. Sell Order Matched
-    pub sell_order_match: Instructions<F>,
-    /// 10. Sell Order Cancelled
-    pub sell_order_partially_match: Instructions<F>,
+    /// 11. Sell Aggressive Matche
+    pub sell_aggressive_match: Instructions<F>,
+    /// 12. Sell Passive Match
+    pub sell_passive_match: Instructions<F>,
+    /// 13. Sell Aggressive Partially Match
+    pub sell_aggressive_partial_match: Instructions<F>,
+    /// 14. Sell Passive Partially Match
+    pub sell_passive_partial_match: Instructions<F>,
     /// All The Instructions sequentially ordered for the Main Trace
     pub instructions: Instructions<F>,
     /// Auxillary Operations that are Looked up by the above instructions
@@ -100,13 +108,17 @@ impl ExecutionTrace<BaseField> {
             buy_insert_order: Vec::new(),
             buy_delete_order: Vec::new(),
             buy_modify_order: Vec::new(),
-            buy_order_match: Vec::new(),
-            buy_order_partially_match: Vec::new(),
+            buy_aggressive_match: Vec::new(),
+            buy_passive_match: Vec::new(),
+            buy_aggressive_partial_match: Vec::new(),
+            buy_passive_partial_match: Vec::new(),
             sell_insert_order: Vec::new(),
             sell_delete_order: Vec::new(),
             sell_modify_order: Vec::new(),
-            sell_order_match: Vec::new(),
-            sell_order_partially_match: Vec::new(),
+            sell_aggressive_match: Vec::new(),
+            sell_passive_match: Vec::new(),
+            sell_aggressive_partial_match: Vec::new(),
+            sell_passive_partial_match: Vec::new(),
             instructions: Vec::new(),
             add_operations: Vec::new(),
             less_than_operations: Vec::new(),
@@ -125,13 +137,17 @@ impl ExecutionTrace<BaseField> {
             Opcode::InsertBuyOrder => self.buy_insert_order.push(instruction),
             Opcode::CancelBuyOrder => self.buy_delete_order.push(instruction),
             Opcode::UpdateBuyOrder => self.buy_modify_order.push(instruction),
-            Opcode::MatchBuyOrder => self.buy_order_match.push(instruction),
-            Opcode::PartialMatchBuyOrder => self.buy_order_partially_match.push(instruction),
+            Opcode::MatchAggressiveBuy => self.buy_aggressive_match.push(instruction),
+            Opcode::MatchPassiveBuy => self.buy_passive_match.push(instruction),
+            Opcode::PartialMatchAggressiveBuy => self.buy_aggressive_partial_match.push(instruction),
+            Opcode::PartialMatchPassiveBuy => self.buy_passive_partial_match.push(instruction),
             Opcode::InsertSellOrder => self.sell_insert_order.push(instruction),
-            Opcode::CancelSellOrder => self.sell_insert_order.push(instruction),
+            Opcode::CancelSellOrder => self.sell_delete_order.push(instruction),
             Opcode::UpdateSellOrder => self.sell_modify_order.push(instruction),
-            Opcode::MatchSellOrder => self.sell_order_match.push(instruction),
-            Opcode::PartialMatchSellOrder => self.sell_order_partially_match.push(instruction),
+            Opcode::MatchAggressiveSell => self.sell_aggressive_match.push(instruction),
+            Opcode::MatchPassiveSell => self.sell_passive_match.push(instruction),
+            Opcode::PartialMatchAggressiveSell => self.sell_aggressive_partial_match.push(instruction),
+            Opcode::PartialMatchPassiveSell => self.sell_passive_partial_match.push(instruction),
         }
         self.instructions.push(instruction);
     }
@@ -215,13 +231,17 @@ impl ExecutionTrace<BaseField> {
             self.buy_insert_order.len(),
             self.buy_delete_order.len(),
             self.buy_modify_order.len(),
-            self.buy_order_match.len(),
-            self.buy_order_partially_match.len(),
+            self.buy_aggressive_match.len(),
+            self.buy_passive_match.len(),
+            self.buy_aggressive_partial_match.len(),
+            self.buy_passive_partial_match.len(),
             self.sell_insert_order.len(),
             self.sell_delete_order.len(),
             self.sell_modify_order.len(),
-            self.sell_order_match.len(),
-            self.sell_order_partially_match.len(),
+            self.sell_aggressive_match.len(),
+            self.sell_passive_match.len(),
+            self.sell_aggressive_partial_match.len(),
+            self.sell_passive_partial_match.len(),
             self.instructions.len(),
             self.add_operations.len(),
             self.less_than_operations.len(),
@@ -241,13 +261,17 @@ impl ExecutionTrace<BaseField> {
             VexComponent::InsertBuyOrder => self.buy_insert_order.len(),
             VexComponent::CancelBuyOrder => self.buy_delete_order.len(),
             VexComponent::UpdateBuyOrder => self.buy_modify_order.len(),
-            VexComponent::MatchBuyOrder => self.buy_order_match.len(),
-            VexComponent::PartialMatchBuyOrder => self.buy_order_partially_match.len(),
+            VexComponent::MatchAggressiveBuy => self.buy_aggressive_match.len(),
+            VexComponent::MatchPassiveBuy => self.buy_passive_match.len(),
+            VexComponent::PartialMatchAggressiveBuy => self.buy_aggressive_partial_match.len(),
+            VexComponent::PartialMatchPassiveBuy => self.buy_passive_partial_match.len(),
             VexComponent::InsertSellOrder => self.sell_insert_order.len(),
             VexComponent::CancelSellOrder => self.sell_delete_order.len(),
             VexComponent::UpdateSellOrder => self.sell_modify_order.len(),
-            VexComponent::MatchSellOrder => self.sell_order_match.len(),
-            VexComponent::PartialMatchSellOrder => self.sell_order_partially_match.len(),
+            VexComponent::MatchAggressiveSell => self.sell_aggressive_match.len(),
+            VexComponent::MatchPassiveSell => self.sell_passive_match.len(),
+            VexComponent::PartialMatchAggressiveSell => self.sell_aggressive_partial_match.len(),
+            VexComponent::PartialMatchPassiveSell => self.sell_passive_partial_match.len(),
             VexComponent::Processor => self.instructions.len(),
             VexComponent::Addition => self.add_operations.len(),
             VexComponent::LessThan => self.less_than_operations.len(),
