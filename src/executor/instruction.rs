@@ -1,4 +1,4 @@
-use crate::imt::{leaf::Leaf, MerklePath, MerkleProof};
+use crate::imt::{LeafFelts, MerklePath, MerkleProof};
 
 /// Instruction represents a single instruction in the program
 /// Represents an instruction with its opcode, Merkle proof, and Merkle path.
@@ -18,7 +18,7 @@ pub struct Instruction<F> {
     /// Low Leafs Index in the IMT
     pub low_index: F,
     /// Low Leaf
-    pub low_leaf: Leaf<F>,
+    pub low_leaf: LeafFelts<F>,
     /// Merkle Proof of the leaf to which the instruction applies
     pub merkle_proof: MerkleProof<F>,
     /// Merkle Path of the leaf to which the instruction applies
@@ -28,7 +28,7 @@ pub struct Instruction<F> {
     /// Index of the leaf in the IMT
     pub index: F,
     /// Leaf to which the instruction applies
-    pub leaf: Leaf<F>,
+    pub leaf: LeafFelts<F>,
 }
 
 #[derive(Clone, Copy)]

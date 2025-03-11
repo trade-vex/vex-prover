@@ -2,18 +2,21 @@ use crate::{imt::N_ORDER_FELTS, types::Volume};
 use num_traits::One;
 use stwo_prover::core::fields::m31::BaseField;
 
-use super::leaf::{Leaf, PriceTime};
+use super::{
+    leaf::{Leaf, PriceTime},
+    side::{Buy, OrderSide, Sell},
+};
 
 /// Order struct - generic in field BaseField
 #[derive(Debug, Clone, Copy)]
-pub struct Order<F> {
+pub struct Order<F, S> {
     /// volume of the order
     pub volume: Volume<F>,
     /// price of the order
-    pub price_time: PriceTime<F>,
+    pub price_time: PriceTime<F, S>,
 }
 
-impl Order<BaseField> {
+impl<S: OrderSide> Order<BaseField, S> {
     /// Creates a new Order.
     pub fn new(volume: u64, price: u64, time: u64) -> Self {
         Self {
@@ -22,7 +25,7 @@ impl Order<BaseField> {
         }
     }
     /// converts the order to a leaf
-    pub fn to_leaf(&self, next: &PriceTime<BaseField>) -> Leaf<BaseField> {
+    pub fn to_leaf(&self, next: &PriceTime<BaseField, S>) -> Leaf<BaseField, S> {
         Leaf {
             active: BaseField::one(),
             volume: self.volume,
@@ -37,5 +40,13 @@ impl Order<BaseField> {
         felts[0..8].copy_from_slice(&self.volume.to_felts());
         felts[8..24].copy_from_slice(&self.price_time.to_felts());
         felts
+    }
+
+    pub fn new_buy(volume: u64, price: u64, time: u64) -> Order<BaseField, Buy> {
+        Order::<BaseField, Buy>::new(volume, price, time)
+    }
+
+    pub fn new_sell(volume: u64, price: u64, time: u64) -> Order<BaseField, Sell> {
+        Order::<BaseField, Sell>::new(volume, price, time)
     }
 }
