@@ -319,10 +319,14 @@ pub enum VexComponent {
     UpdateSellOrder,
     CancelBuyOrder,
     CancelSellOrder,
-    MatchBuyOrder,
-    MatchSellOrder,
-    PartialMatchBuyOrder,
-    PartialMatchSellOrder,
+    MatchAggressiveBuy,
+    MatchPassiveBuy,
+    MatchAggressiveSell,
+    MatchPassiveSell,
+    PartialMatchAggressiveBuy,
+    PartialMatchPassiveBuy,
+    PartialMatchAggressiveSell,
+    PartialMatchPassiveSell,
 
     /// Sub Operations Components
     LessThan,
