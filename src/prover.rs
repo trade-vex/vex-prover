@@ -26,6 +26,9 @@ use crate::{
     VexClaim, VexInteractionClaim, VexProof,
 };
 
+#[cfg(feature = "relation-tracker")]
+use crate::relation_tracker::track_vex_relations;
+
 /// Prove the Vex Execution Trace
 pub fn prove_vex(
     trace: ExecutionTrace<BaseField>,
@@ -99,6 +102,9 @@ pub fn prove_vex(
     // Commit the main trace.
     tree_builder.commit(channel);
     span.exit();
+
+    #[cfg(feature = "relation-tracker")]
+    track_vex_relations(&commitment_scheme, &claim);
 
     let span = span!(Level::INFO, "Interaction Trace").entered();
 

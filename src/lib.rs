@@ -23,6 +23,8 @@ pub mod hash;
 pub mod imt;
 pub mod prover;
 pub mod types;
+#[cfg(feature = "relation-tracker")]
+pub mod relation_tracker;
 
 #[derive(Debug)]
 pub struct VexProof<H: MerkleHasher> {
