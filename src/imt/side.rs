@@ -14,32 +14,44 @@ pub struct Aggressive;
 #[derive(Debug, Clone, Copy)]
 pub struct Passive;
 
-pub enum Type {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchType {
     Aggressive,
     Passive,
 }
 
-pub trait MatchType: 'static + Copy + Send + Sync + Clone + Copy + Debug {
+/// Order match type marker trait with compile-time constants
+pub trait OrderMatchType: 'static + Copy + Send + Sync + Clone + Copy + Debug {
+    /// Associated constant for match type name
     const NAME: &'static str;
-    const TYPE: Type;
+    /// Associated constant for match type variant
+    /// Match Invariant is only checked for Aggressive Side
+    /// The Match Elements are yielded for Aggressive Side and used for Passive Side
+    const MATCHTYPE: MatchType;
+    /// Indicates number of LessThan interaction columns
+    const LESSTHANCOL: usize;
+    /// get the name of the match type
     fn name() -> &'static str {
-        match Self::TYPE {
-            Type::Aggressive => "Aggressive",
-            Type::Passive => "Passive",
+        match Self::MATCHTYPE {
+            MatchType::Aggressive => "Aggressive",
+            MatchType::Passive => "Passive",
         }
     }
-    fn type_() -> Type {
-        Self::TYPE
+    /// get the type of the match
+    fn match_type() -> MatchType {
+        Self::MATCHTYPE
     }
 }
 
-impl MatchType for Aggressive {
+impl OrderMatchType for Aggressive {
     const NAME: &'static str = "Aggressive";
-    const TYPE: Type = Type::Aggressive;
+    const MATCHTYPE: MatchType = MatchType::Aggressive;
+    const LESSTHANCOL: usize = 1;
 }
-impl MatchType for Passive {
+impl OrderMatchType for Passive {
     const NAME: &'static str = "Passive";
-    const TYPE: Type = Type::Passive;
+    const MATCHTYPE: MatchType = MatchType::Passive;
+    const LESSTHANCOL: usize = 0;
 }
 
 /// IMT side marker
@@ -84,8 +96,10 @@ impl OrderSide for Buy {
             IMTOperation::Insertion => BaseField::from_u32_unchecked(0),
             IMTOperation::Deletion => BaseField::from_u32_unchecked(2),
             IMTOperation::Update => BaseField::from_u32_unchecked(4),
-            IMTOperation::Match => BaseField::from_u32_unchecked(6),
-            IMTOperation::PartialMatch => BaseField::from_u32_unchecked(8),
+            IMTOperation::MatchAggressive => BaseField::from_u32_unchecked(6),
+            IMTOperation::MatchPassive => BaseField::from_u32_unchecked(8),
+            IMTOperation::PartialMatchAggressive => BaseField::from_u32_unchecked(10),
+            IMTOperation::PartialMatchPassive => BaseField::from_u32_unchecked(12),
         }
     }
 }
@@ -102,8 +116,10 @@ impl OrderSide for Sell {
             IMTOperation::Insertion => BaseField::from_u32_unchecked(1),
             IMTOperation::Deletion => BaseField::from_u32_unchecked(3),
             IMTOperation::Update => BaseField::from_u32_unchecked(5),
-            IMTOperation::Match => BaseField::from_u32_unchecked(7),
-            IMTOperation::PartialMatch => BaseField::from_u32_unchecked(9),
+            IMTOperation::MatchAggressive => BaseField::from_u32_unchecked(7),
+            IMTOperation::MatchPassive => BaseField::from_u32_unchecked(9),
+            IMTOperation::PartialMatchAggressive => BaseField::from_u32_unchecked(11),
+            IMTOperation::PartialMatchPassive => BaseField::from_u32_unchecked(13),
         }
     }
 }

@@ -83,3 +83,14 @@ impl<F: Clone + Debug + Copy> State<F> {
         )
     }
 }
+
+pub struct StateColumn;
+
+impl StateColumn {
+    pub const N: usize = 0;
+    pub const BUY_ROOT_HASH: usize = Self::N + 1;
+    pub const BUY_IMT_PRIORITY: usize = Self::BUY_ROOT_HASH + N_HASH;
+    pub const SELL_ROOT_HASH: usize = Self::BUY_IMT_PRIORITY + 2 * N_U64_FELTS;
+    pub const SELL_IMT_PRIORITY: usize = Self::SELL_ROOT_HASH + N_HASH;
+    pub const N_STATE_FELTS: usize = Self::SELL_IMT_PRIORITY + 2 * N_U64_FELTS;
+}
