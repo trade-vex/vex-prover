@@ -283,7 +283,7 @@ impl ExecutionTrace<BaseField> {
             VexComponent::Poseidon => self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
             VexComponent::Bytes => 1 << N_U64_FELTS, // 2^8 * 2^8 combinations
         };
-        (len.max(1) - 1).ilog2() + 1
+        (len.max(16) - 1).ilog2() + 1
     }
 
     /// Adds a Less Than Event by recording the corresponding Trace Row
@@ -345,5 +345,48 @@ impl ExecutionTrace<BaseField> {
         }
 
         Ok(())
+    }
+
+    /// Returns the shape of the Execution Trace
+    pub fn shape(&self) -> std::collections::HashMap<&'static str, u32> {
+        let mut shape = std::collections::HashMap::new();
+        shape.insert(
+            "buy_insert_order",
+            (self.buy_insert_order.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "buy_aggressive_match",
+            (self.buy_aggressive_match.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "buy_passive_match",
+            (self.buy_passive_match.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "sell_insert_order",
+            (self.sell_insert_order.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "sell_aggressive_match",
+            (self.sell_aggressive_match.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "sell_passive_match",
+            (self.sell_passive_match.len() - 1).ilog2() + 1,
+        );
+        shape.insert("instructions", (self.instructions.len() - 1).ilog2() + 1);
+        shape.insert(
+            "less_than_operations",
+            (self.less_than_operations.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "strict_less_than_operations",
+            (self.strict_less_than_operations.len() - 1).ilog2() + 1,
+        );
+        shape.insert(
+            "poseidon_operations",
+            (self.poseidon_operations.len() - 1).ilog2() + 1,
+        );
+        shape
     }
 }
