@@ -104,7 +104,7 @@ impl ExecutionTrace<BaseField> {
             less_than_operations: Vec::new(),
             comparison_operations: Vec::new(),
             poseidon_operations: Vec::new(),
-            byte_operations: array::from_fn(|_| unsafe { BaseColumn::uninitialized(1 << 16) }),
+            byte_operations: array::from_fn(|_| BaseColumn::zeros(1 << 16)),
         }
     }
 
