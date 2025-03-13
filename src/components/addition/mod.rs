@@ -93,6 +93,7 @@ impl TraceSize for AddColumn {
 
 // Defines a relation for storing and verifying addition operation elements
 // The number 24 specifies the log size of the relation
+// As we yield a, b, c that is 8*3 elements
 relation!(AddElements, 24);
 
 #[cfg(test)]
