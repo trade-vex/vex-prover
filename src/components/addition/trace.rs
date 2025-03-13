@@ -51,7 +51,7 @@ pub fn trace(
         add_operations.push([BaseField::zero(); AddColumn::MAIN_COLS]);
     }
     let mut trace = ComponentTrace::<{ AddColumn::MAIN_COLS }>::zeroed(log_size);
-    
+
     // Populate the trace using SIMD for parallel processing.`
     trace
         .par_iter_mut()

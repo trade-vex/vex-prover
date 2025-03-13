@@ -68,7 +68,6 @@ impl<F> AddOp<F> {
 pub struct AddColumn;
 
 impl AddColumn {
-
     /// Starting index for the first operand (a) columns
     pub const A: usize = 0;
     /// Starting index for the second operand (b) columns
@@ -108,7 +107,9 @@ mod tests {
     use tracing::{span, Level};
 
     use super::*;
-    use crate::{components::bytes::RangeCheckU8Elements, executor::record::ExecutionTrace, types::Price};
+    use crate::{
+        components::bytes::RangeCheckU8Elements, executor::record::ExecutionTrace, types::Price,
+    };
 
     #[test_log::test]
     fn test_addition_table() {
