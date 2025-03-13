@@ -174,8 +174,8 @@ impl ExecutionTrace<BaseField> {
 
         // Add range checks for each byte of a, b and c
         for i in (0..24).step_by(4) {
-            let _ = self.add_range_check_u8_event(values[i].0, values[i + 1].0);
-            let _ = self.add_range_check_u8_event(values[i + 2].0, values[i + 3].0);
+            self.add_range_check_u8_event(values[i].0, values[i + 1].0)?;
+            self.add_range_check_u8_event(values[i + 2].0, values[i + 3].0)?;
         }
         // Copy input operands a and b ,computed c and carry values into the row
         row[AddColumn::A..AddColumn::B].copy_from_slice(&a);
