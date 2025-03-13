@@ -131,12 +131,8 @@ impl ExecutionTrace<BaseField> {
         self.instructions.push(instruction);
     }
 
-    //@todo: the following methods will take input as an event
-    // and compute the corresponding Trace Row For constraint evaluations
-    /// Adds an Add Event to the Execution Trace
-    // pub fn add_add_event(&mut self, event: [BaseField; 31]) {
-    //     self.add_operations.push(event);
-    // }
+    /// The following methods will take input as an event
+    /// and compute the corresponding Trace Row For constraint evaluations
     /// Adds an Add Event to the Execution Trace
     pub fn add_add_event(
         &mut self,
