@@ -177,7 +177,9 @@ pub fn trace(
             for rep_i in 0..N_INSTANCES_PER_ROW {
                 // Initial state.
                 let mut state: [PackedBaseField; N_STATE] = array::from_fn(|j| {
-                    PackedBaseField::from_array(array::from_fn(|i| data[N_LANES * rep_i + i][j]))
+                    PackedBaseField::from_array(array::from_fn(|i| {
+                        data[N_INSTANCES_PER_ROW * i + rep_i][j]
+                    }))
                 });
 
                 state.iter().copied().for_each(|s| {
