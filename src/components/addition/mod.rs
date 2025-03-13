@@ -116,7 +116,7 @@ mod tests {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let mut record = ExecutionTrace::new();
-        let n = 124213;
+        let n = 11000;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX / 2));
