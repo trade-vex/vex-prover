@@ -4,7 +4,7 @@ use stwo_prover::core::fields::m31::BaseField;
 
 use super::{
     leaf::{Leaf, PriceTime},
-    side::OrderSide,
+    side::{Buy, OrderSide, Sell},
 };
 
 /// Order struct - generic in field BaseField
@@ -40,5 +40,13 @@ impl<S: OrderSide> Order<BaseField, S> {
         felts[0..8].copy_from_slice(&self.volume.to_felts());
         felts[8..24].copy_from_slice(&self.price_time.to_felts());
         felts
+    }
+
+    pub fn new_buy(volume: u64, price: u64, time: u64) -> Order<BaseField, Buy> {
+        Order::<BaseField, Buy>::new(volume, price, time)
+    }
+
+    pub fn new_sell(volume: u64, price: u64, time: u64) -> Order<BaseField, Sell> {
+        Order::<BaseField, Sell>::new(volume, price, time)
     }
 }

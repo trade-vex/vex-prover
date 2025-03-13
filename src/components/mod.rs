@@ -12,7 +12,7 @@ use stwo_prover::core::{
     fields::{m31::BaseField, qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
     pcs::TreeVec,
 };
-
+pub mod addition;
 pub mod bytes;
 pub mod less_than;
 pub mod poseidon;

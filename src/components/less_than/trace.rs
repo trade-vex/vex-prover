@@ -42,8 +42,11 @@ pub fn trace(
     let log_size = (less_than_operations.len() - 1).ilog2() + 1;
     debug!("Log Size: {}", log_size);
     // pad less_than_operations to a power of 2
+    let mut dummy = less_than_operations[0];
+    dummy[LessThanColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - less_than_operations.len() {
-        less_than_operations.push([BaseField::zero(); LessThanColumn::MAIN_COLS]);
+        // adding the first op as dummy op for padding
+        less_than_operations.push(dummy);
     }
     let mut trace = ComponentTrace::<{ LessThanColumn::MAIN_COLS }>::zeroed(log_size);
     // Each row of the trace is a LessThanOp field elements arranged as per the `LessThanColumn`
@@ -96,7 +99,7 @@ pub fn interaction_trace(
         let b: [PackedBaseField; N_U64_LIMBS] = array::from_fn(|i| b_col[i][vec_row]);
         let c: PackedBaseField = c_col[vec_row];
 
-        // LessThanU8Elements Values, LookUp ensures that result is a_comparision_byte < b_comparison_byte is c.
+        // LessThanU8Elements Values, LookUp ensures that result is a_comparison_byte < b_comparison_byte is c.
         let values0 = [a_comparison_byte, b_comparison_byte, c];
         // LessThanElements Values, The Component using the value can ensure that a < b is c.
         let values1 = chain!(a.into_iter(), b.into_iter(), std::iter::once(c)).collect_vec();

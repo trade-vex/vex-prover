@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use crate::types::Price;
 
 /// Type markers for Buy and Sell sides
@@ -13,7 +15,7 @@ pub enum Side {
 }
 
 /// Trait for defining order comparison logic
-pub trait OrderSide: Clone {
+pub trait OrderSide: Clone + Copy + Debug {
     /// Compare prices according to this side's priority rules
     fn compare_prices<F: Ord + Copy>(a: &Price<F>, b: &Price<F>) -> std::cmp::Ordering;
     /// side marker

@@ -17,7 +17,7 @@ pub struct LessThanEval {
 /// constraints on less than operations. The primary purpose of this
 /// implementation is to evaluate specific constraints related to less than operations used by other components.
 ///
-/// # Constaint Evaluation
+/// # Constraint Evaluation
 ///
 /// - `evaluate<E: EvalAtRow>(&self, mut eval: E) -> E`:
 ///   It retrieves the LessThanOp for a particular row, each row represents a single less than operation.
@@ -32,11 +32,11 @@ pub struct LessThanEval {
 ///        if inequality is not visited yet then a_byte must be equal to b_byte and record the first byte where a is not equal to b.
 ///   6. Add constraints for a_comparison_byte and b_comparison_byte.
 ///   7. The Result of the Operation op.c must be a boolean.
-///   8. The Result of the Operation op.c must be 1 if a_comparision_byte is less than b_comparison_byte
+///   8. The Result of the Operation op.c must be 1 if a_comparison_byte is less than b_comparison_byte
 ///      which is checked by looking up the result of the comparison bytes from the less_than_u8_elements
 ///      from the PreProcessedBytes Table.
 ///        - Multiplicity of the relation is the is_real flag.
-///        - Values are a_comparision_byte, b_comparison_byte, and c.
+///        - Values are a_comparison_byte, b_comparison_byte, and c.
 ///   9. Yield the Results by adding the values to the less_than_elements.   
 ///        - Multiplicity of the relation is the negation of is_real flag.
 ///        - Values are a, b, and c.
@@ -65,7 +65,8 @@ impl FrameworkEval for LessThanEval {
         // 1 if a is not equal to b
         eval.add_constraint(sum_flags.clone() * (E::F::one() - sum_flags.clone()));
 
-        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where a < b
+        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where
+        // a[i] is not equal to b[i] from the most significant byte
         let mut is_inequality_visited = E::F::zero();
         let mut a_comparison_byte = E::F::zero();
         let mut b_comparison_byte = E::F::zero();
@@ -97,10 +98,10 @@ impl FrameworkEval for LessThanEval {
         eval.add_constraint((E::F::one() - sum_flags.clone()) * is_inequality_visited.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * a_comparison_byte.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * b_comparison_byte.clone());
-        eval.add_constraint((E::F::one() - sum_flags.clone()) * op.c.clone());
+        eval.add_constraint((E::F::one() - sum_flags) * op.c.clone());
 
-        // c must be 1 if a_comparision_byte is less than b_comparison_byte
-        // c must be 0 if a_comparision_byte is greater than b_comparison_byte
+        // c must be 1 if a_comparison_byte is less than b_comparison_byte
+        // c must be 0 if a_comparison_byte is greater than b_comparison_byte
         // Look Up if the c has been set correctly and "use" the result of the comparison bytes
         eval.add_to_relation(RelationEntry::new(
             &self.less_than_u8_elements,
@@ -114,7 +115,7 @@ impl FrameworkEval for LessThanEval {
 
         eval.add_to_relation(RelationEntry::new(
             &self.less_than_elements,
-            -E::EF::from(op.is_real.clone()),
+            -E::EF::from(op.is_real),
             &values,
         ));
 

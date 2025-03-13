@@ -25,11 +25,11 @@ pub struct LessThanOp<F> {
     b: [F; N_U64_LIMBS],
     // result of the comparison
     c: F,
-    // flag is 1 for the most significant byte where a[i] < b[i]
+    // flag is 1 for the most significant byte where a[i] is not equal to b[i]
     flags: [F; N_U64_LIMBS],
-    // First byte of the first operand where a[i] < b[i] from the most significant byte
+    // First byte of the first operand where a[i] is not equal to b[i] from the most significant byte
     a_comparison_byte: F,
-    // First byte of the second operand where a[i] < b[i] from the most significant byte
+    // First byte of the second operand where a[i] is not equal to b[i] from the most significant byte
     b_comparison_byte: F,
     // is real flag to check if the operation is not among the dummy padded operations
     is_real: F,
@@ -79,7 +79,11 @@ impl TraceSize for LessThanColumn {
     const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
-relation!(LessThanElements, 18);
+// A Total of 17 elements are "used" or "yielded" for the less than operation
+// a - 8 limbs corresponding to the first operand(u64)
+// b - 8 limbs corresponding to the second operand(u64)
+// c - 1 limb corresponding to the result of the comparison
+relation!(LessThanElements, 17);
 
 #[cfg(test)]
 mod tests {

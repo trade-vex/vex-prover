@@ -98,7 +98,7 @@ mod tests {
                 let (min, max) = if a < b { (a, b) } else { (b, a) };
                 record.add_less_than_u8_event(min, max);
             }
-            record.add_range_check_u8_event(a, b);
+            let _ = record.add_range_check_u8_event(a, b);
         }
         span.exit();
         // Fiat Shamir Channel

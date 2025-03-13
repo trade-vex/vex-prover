@@ -14,15 +14,19 @@ pub mod leaf;
 pub mod order;
 pub mod side;
 
+/// A Merkle proof consisting of the sibling hashes for each level from the leaf to the root.
 pub type MerkleProof<F> = [Hash<F>; MERKLE_HEIGHT];
+/// A Merkle path consisting of the resulting hash at each level from the leaf to the root.
 pub type MerklePath<F> = [Hash<F>; MERKLE_HEIGHT + 1];
+/// LeafFelts is an array of felts representing the leaf node.
 pub type LeafFelts<F> = [F; N_LEAF_FELTS];
-pub const MERKLE_HEIGHT: usize = 20;
-pub const MERKLE_WIDTH: usize = 1 << MERKLE_HEIGHT;
-pub const N_LEAF_FELTS: usize = 41;
-pub const N_U64_FELTS: usize = 8;
-pub const N_ORDER_FELTS: usize = 3 * N_U64_FELTS;
+/// Hash contain 8 BaseField elements.
 pub type Hash<F> = [F; 8];
+pub const MERKLE_HEIGHT: usize = 20;
+pub const MERKLE_WIDTH: usize = 1 << MERKLE_HEIGHT; // number of leaves at the bottom of the tree
+pub const N_LEAF_FELTS: usize = 41; // number of felts in a leaf
+pub const N_U64_FELTS: usize = 8; // number of felts in a u64
+pub const N_ORDER_FELTS: usize = 3 * N_U64_FELTS; // order contains Price(8Felts), Volume(8Felts), Time(8Felts)
 
 /// A structure representing an Indexed Merkle Tree for order books.
 ///
