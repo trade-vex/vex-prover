@@ -152,8 +152,6 @@ impl ExecutionTrace<BaseField> {
             if limb_value > 255 {
                 return Err(AddOperationError::InputLimbExceedsRange);
             }
-            // Add range check for each limb of a
-            self.add_range_check_u8_event(limb_value, 0); // Using 0 as a dummy second parameter
         }
 
         for &limb_b in b.iter() {
@@ -161,8 +159,6 @@ impl ExecutionTrace<BaseField> {
             if limb_value > 255 {
                 return Err(AddOperationError::InputLimbExceedsRange);
             }
-            // Add range check for each limb of b
-            self.add_range_check_u8_event(limb_value, 0); // Using 0 as a dummy second parameter
         }
 
         // Copy input operands a and b into the trace row
@@ -188,9 +184,6 @@ impl ExecutionTrace<BaseField> {
                 c[i] = sum;
                 carry[i] = BaseField::zero();
             }
-
-            // Add range check for each output limb
-            self.add_range_check_u8_event(c[i].0, 0);
         }
 
         let last_sum = a[7] + b[7] + carry[6];
@@ -198,9 +191,6 @@ impl ExecutionTrace<BaseField> {
             return Err(AddOperationError::FinalLimbOverflow);
         }
         c[7] = last_sum;
-
-        // Add range check for the final output limb
-        self.add_range_check_u8_event(c[7].0, 0);
 
         // Copy computed c and carry values into the row
         row[AddColumn::C..AddColumn::CARRY].copy_from_slice(&c);
@@ -293,7 +283,6 @@ impl ExecutionTrace<BaseField> {
             eprintln!("Error: {:?}", RangeCheckError::InputLimbExceedsRange);
             return; // Simply exit without modifying data
         }
-    
         let offset = (a << 8) + b;
         self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
     }
