@@ -1,5 +1,5 @@
 use crate::components::TraceSize;
-use itertools::{izip, chain};
+use itertools::{chain, izip};
 use num_traits::{One, Zero};
 use std::array;
 use stwo_prover::core::{
@@ -8,8 +8,8 @@ use stwo_prover::core::{
 };
 
 use super::{
+    error::RangeCheckError,
     instruction::{Instruction, Opcode},
-    error::{AddOperationError, RangeCheckError},
 };
 use crate::{
     components::{
@@ -138,7 +138,11 @@ impl ExecutionTrace<BaseField> {
     //     self.add_operations.push(event);
     // }
     /// Adds an Add Event to the Execution Trace
-    pub fn add_add_event(&mut self, a: [BaseField; N_U64_LIMBS], b: [BaseField; N_U64_LIMBS]) -> Result<(), AddOperationError> {
+    pub fn add_add_event(
+        &mut self,
+        a: [BaseField; N_U64_LIMBS],
+        b: [BaseField; N_U64_LIMBS],
+    ) -> Result<(), RangeCheckError> {
         let mut row = [BaseField::zero(); AddColumn::MAIN_COLS];
 
         let mut carry = [BaseField::zero(); N_U64_LIMBS - 1];
@@ -170,8 +174,8 @@ impl ExecutionTrace<BaseField> {
 
         // Add range checks for each byte of a, b and c
         for i in (0..24).step_by(4) {
-            self.add_range_check_u8_event(values[i].0, values[i + 1].0);
-            self.add_range_check_u8_event(values[i + 2].0, values[i + 3].0);
+            let _ = self.add_range_check_u8_event(values[i].0, values[i + 1].0);
+            let _ = self.add_range_check_u8_event(values[i + 2].0, values[i + 3].0);
         }
         // Copy input operands a and b ,computed c and carry values into the row
         row[AddColumn::A..AddColumn::B].copy_from_slice(&a);
@@ -258,19 +262,15 @@ impl ExecutionTrace<BaseField> {
     }
 
     /// Adds a Range Check U8 Event by recording the corresponding Trace Row.
-    /// 
+    ///
     /// # Errors
     /// Returns a `RangeCheckError::InputLimbExceedsRange` if `a` or `b` is greater than 255.
-    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) {
+    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), RangeCheckError> {
         if a >= 256 || b >= 256 {
-            eprintln!("Error: {:?}", RangeCheckError::InputLimbExceedsRange);
-            return; // Simply exit without modifying data
+            return Err(RangeCheckError::InputLimbExceedsRange);
         }
         let offset = (a << 8) + b;
         self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
+        Ok(())
     }
-    
-    
-
-    
 }
