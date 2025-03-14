@@ -1,9 +1,11 @@
-use stwo_prover::core::prover::VerificationError;
+use stwo_prover::core::prover::{ProvingError, VerificationError};
 
 use crate::imt::error::IMTError;
-use std::fmt;
+use std::{
+    error::Error,
+    fmt::{self, Debug, Display},
+};
 
-#[derive(Debug)]
 pub enum GenericError {
     IMT(IMTError),
     InvalidSliceLength(usize, usize),
@@ -12,7 +14,7 @@ pub enum GenericError {
     Stark(VerificationError),
 }
 
-impl fmt::Display for GenericError {
+impl Debug for GenericError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GenericError::IMT(err) => write!(f, "IMT error: {}", err),
@@ -35,7 +37,13 @@ impl fmt::Display for GenericError {
     }
 }
 
-impl std::error::Error for GenericError {
+impl Display for GenericError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+impl Error for GenericError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             GenericError::IMT(err) => Some(err),
@@ -44,13 +52,12 @@ impl std::error::Error for GenericError {
     }
 }
 
-#[derive(Debug)]
 pub enum VexVerificationError {
     InvalidLogupSum,
     Stark(VerificationError),
 }
 
-impl fmt::Display for VexVerificationError {
+impl Debug for VexVerificationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             VexVerificationError::InvalidLogupSum => {
@@ -63,10 +70,49 @@ impl fmt::Display for VexVerificationError {
     }
 }
 
-impl std::error::Error for VexVerificationError {
+impl Display for VexVerificationError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+impl Error for VexVerificationError {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             VexVerificationError::Stark(err) => Some(err),
+            _ => Some(self),
+        }
+    }
+}
+
+pub enum VexProvingError {
+    InvalidLogupSum,
+    Stark(ProvingError),
+}
+
+impl Debug for VexProvingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            VexProvingError::InvalidLogupSum => {
+                write!(f, "Total Lookup sum must be zero")
+            }
+            VexProvingError::Stark(err) => {
+                write!(f, "Stark error: {}", err)
+            }
+        }
+    }
+}
+
+impl Display for VexProvingError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        Debug::fmt(self, f)
+    }
+}
+
+impl Error for VexProvingError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            VexProvingError::Stark(err) => Some(err),
             _ => Some(self),
         }
     }
