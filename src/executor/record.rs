@@ -346,47 +346,91 @@ impl ExecutionTrace<BaseField> {
 
         Ok(())
     }
+}
 
-    /// Returns the shape of the Execution Trace
-    pub fn shape(&self) -> std::collections::HashMap<&'static str, u32> {
-        let mut shape = std::collections::HashMap::new();
-        shape.insert(
-            "buy_insert_order",
-            (self.buy_insert_order.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "buy_aggressive_match",
-            (self.buy_aggressive_match.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "buy_passive_match",
-            (self.buy_passive_match.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "sell_insert_order",
-            (self.sell_insert_order.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "sell_aggressive_match",
-            (self.sell_aggressive_match.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "sell_passive_match",
-            (self.sell_passive_match.len() - 1).ilog2() + 1,
-        );
-        shape.insert("instructions", (self.instructions.len() - 1).ilog2() + 1);
-        shape.insert(
-            "less_than_operations",
-            (self.less_than_operations.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "strict_less_than_operations",
-            (self.strict_less_than_operations.len() - 1).ilog2() + 1,
-        );
-        shape.insert(
-            "poseidon_operations",
-            (self.poseidon_operations.len() - 1).ilog2() + 1,
-        );
-        shape
+/// Execution Trace Shape
+/// Used For Debugging and Logging
+/// Can be created from Execution Trace
+/// Can contain log sizes or sizes
+/// Example:
+/// ```
+/// let trace = ExecutionTrace::new();
+/// let shape = trace.sizes();
+/// let log_shape = trace.log_sizes();
+/// ```
+#[derive(Debug)]
+pub struct ExecutionTraceShape<T: Copy> {
+    pub buy_insert_order: T,
+    pub buy_delete_order: T,
+    pub buy_modify_order: T,
+    pub buy_aggressive_match: T,
+    pub buy_passive_match: T,
+    pub buy_aggressive_partial_match: T,
+    pub buy_passive_partial_match: T,
+    pub sell_insert_order: T,
+    pub sell_delete_order: T,
+    pub sell_modify_order: T,
+    pub sell_aggressive_match: T,
+    pub sell_passive_match: T,
+    pub sell_aggressive_partial_match: T,
+    pub sell_passive_partial_match: T,
+    pub instructions: T,
+    pub add_operations: T,
+    pub less_than_operations: T,
+    pub strict_less_than_operations: T,
+    pub comparison_operations: T,
+    pub poseidon_operations: T,
+}
+
+impl<F> ExecutionTrace<F> {
+    pub fn sizes(&self) -> ExecutionTraceShape<usize> {
+        ExecutionTraceShape {
+            buy_insert_order: self.buy_insert_order.len(),
+            buy_delete_order: self.buy_delete_order.len(),
+            buy_modify_order: self.buy_modify_order.len(),
+            buy_aggressive_match: self.buy_aggressive_match.len(),
+            buy_passive_match: self.buy_passive_match.len(),
+            buy_aggressive_partial_match: self.buy_aggressive_partial_match.len(),
+            buy_passive_partial_match: self.buy_passive_partial_match.len(),
+            sell_insert_order: self.sell_insert_order.len(),
+            sell_delete_order: self.sell_delete_order.len(),
+            sell_modify_order: self.sell_modify_order.len(),
+            sell_aggressive_match: self.sell_aggressive_match.len(),
+            sell_passive_match: self.sell_passive_match.len(),
+            sell_aggressive_partial_match: self.sell_aggressive_partial_match.len(),
+            sell_passive_partial_match: self.sell_passive_partial_match.len(),
+            instructions: self.instructions.len(),
+            add_operations: self.add_operations.len(),
+            less_than_operations: self.less_than_operations.len(),
+            strict_less_than_operations: self.strict_less_than_operations.len(),
+            comparison_operations: self.comparison_operations.len(),
+            poseidon_operations: self.poseidon_operations.len(),
+        }
+    }
+
+    pub fn log_sizes(&self) -> ExecutionTraceShape<u32> {
+        ExecutionTraceShape {
+            buy_insert_order: (self.buy_insert_order.len() - 1).ilog2() + 1,
+            buy_delete_order: (self.buy_delete_order.len() - 1).ilog2() + 1,
+            buy_modify_order: (self.buy_modify_order.len() - 1).ilog2() + 1,
+            buy_aggressive_match: (self.buy_aggressive_match.len() - 1).ilog2() + 1,
+            buy_passive_match: (self.buy_passive_match.len() - 1).ilog2() + 1,
+            buy_aggressive_partial_match: (self.buy_aggressive_partial_match.len() - 1).ilog2() + 1,
+            buy_passive_partial_match: (self.buy_passive_partial_match.len() - 1).ilog2() + 1,
+            sell_insert_order: (self.sell_insert_order.len() - 1).ilog2() + 1,
+            sell_delete_order: (self.sell_delete_order.len() - 1).ilog2() + 1,
+            sell_modify_order: (self.sell_modify_order.len() - 1).ilog2() + 1,
+            sell_aggressive_match: (self.sell_aggressive_match.len() - 1).ilog2() + 1,
+            sell_passive_match: (self.sell_passive_match.len() - 1).ilog2() + 1,
+            sell_aggressive_partial_match: (self.sell_aggressive_partial_match.len() - 1).ilog2()
+                + 1,
+            sell_passive_partial_match: (self.sell_passive_partial_match.len() - 1).ilog2() + 1,
+            instructions: (self.instructions.len() - 1).ilog2() + 1,
+            add_operations: (self.add_operations.len() - 1).ilog2() + 1,
+            less_than_operations: (self.less_than_operations.len() - 1).ilog2() + 1,
+            strict_less_than_operations: (self.strict_less_than_operations.len() - 1).ilog2() + 1,
+            comparison_operations: (self.comparison_operations.len() - 1).ilog2() + 1,
+            poseidon_operations: (self.poseidon_operations.len() - 1).ilog2() + 1,
+        }
     }
 }
