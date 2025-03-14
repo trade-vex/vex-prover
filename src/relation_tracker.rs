@@ -15,11 +15,12 @@ use tracing::info;
 use crate::components::bytes::{AndElements, BytesEval, LessThanU8Elements, RangeCheckU8Elements};
 use crate::components::insertions::InsertionsEval;
 use crate::components::less_than::{LessThanElements, LessThanEval, StrictLessThanElements};
+use crate::components::order_match::{MatchElements, MatchEval};
 use crate::components::poseidon::{PoseidonElements, PoseidonEval};
 use crate::components::processor::ProcessorEval;
 use crate::executor::instruction::InstructionElements;
 use crate::executor::state::StateElements;
-use crate::imt::side::{Buy, Sell};
+use crate::imt::side::{Aggressive, Buy, Passive, Sell};
 use crate::VexClaim;
 
 pub fn track_vex_relations<MC: MerkleChannel>(
@@ -135,6 +136,74 @@ pub fn track_vex_relations<MC: MerkleChannel>(
                 _side: PhantomData::<Sell>,
             },
             1 << claim.sell_insert_claim.log_size,
+        )
+        .entries(trace),
+    );
+
+    entries.extend(
+        RelationTrackerComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.buy_aggressive_match_claim.clone(),
+                poseidon_elements: PoseidonElements::dummy(),
+                less_than_elements: LessThanElements::dummy(),
+                match_elements: MatchElements::dummy(),
+                instruction_elements: InstructionElements::dummy(),
+                _side: PhantomData::<Buy>,
+                _type: PhantomData::<Aggressive>,
+            },
+            1 << claim.buy_aggressive_match_claim.log_size,
+        )
+        .entries(trace),
+    );
+
+    entries.extend(
+        RelationTrackerComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.sell_aggressive_match_claim.clone(),
+                poseidon_elements: PoseidonElements::dummy(),
+                less_than_elements: LessThanElements::dummy(),
+                match_elements: MatchElements::dummy(),
+                instruction_elements: InstructionElements::dummy(),
+                _side: PhantomData::<Sell>,
+                _type: PhantomData::<Aggressive>,
+            },
+            1 << claim.sell_aggressive_match_claim.log_size,
+        )
+        .entries(trace),
+    );
+
+    entries.extend(
+        RelationTrackerComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.buy_passive_match_claim.clone(),
+                poseidon_elements: PoseidonElements::dummy(),
+                less_than_elements: LessThanElements::dummy(),
+                match_elements: MatchElements::dummy(),
+                instruction_elements: InstructionElements::dummy(),
+                _side: PhantomData::<Buy>,
+                _type: PhantomData::<Passive>,
+            },
+            1 << claim.buy_passive_match_claim.log_size,
+        )
+        .entries(trace),
+    );
+
+    entries.extend(
+        RelationTrackerComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.sell_passive_match_claim.clone(),
+                poseidon_elements: PoseidonElements::dummy(),
+                less_than_elements: LessThanElements::dummy(),
+                match_elements: MatchElements::dummy(),
+                instruction_elements: InstructionElements::dummy(),
+                _side: PhantomData::<Sell>,
+                _type: PhantomData::<Passive>,
+            },
+            1 << claim.sell_passive_match_claim.log_size,
         )
         .entries(trace),
     );

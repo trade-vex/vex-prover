@@ -4,15 +4,21 @@
 use crate::executor::state::StateFelts;
 use components::{
     bytes::BytesPreProcessedColumn, insertions::InsertionsColumn, less_than::LessThanColumn,
-    poseidon::PoseidonColumn, processor::ProcessorColumn, Claim, InteractionClaim,
+    order_match::MatchColumn, poseidon::PoseidonColumn, processor::ProcessorColumn, Claim,
+    InteractionClaim,
 };
+use executor::state::StateElements;
+use imt::side::{Aggressive, Passive};
 use num_traits::Zero;
-use stwo_prover::core::{
-    channel::Channel,
-    fields::{m31::BaseField, qm31::SecureField},
-    pcs::TreeVec,
-    prover::StarkProof,
-    vcs::ops::MerkleHasher,
+use stwo_prover::{
+    constraint_framework::Relation,
+    core::{
+        channel::Channel,
+        fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
+        pcs::TreeVec,
+        prover::StarkProof,
+        vcs::ops::MerkleHasher,
+    },
 };
 
 pub mod components;
@@ -22,9 +28,9 @@ pub mod executor;
 pub mod hash;
 pub mod imt;
 pub mod prover;
-pub mod types;
 #[cfg(feature = "relation-tracker")]
 pub mod relation_tracker;
+pub mod types;
 
 #[derive(Debug)]
 pub struct VexProof<H: MerkleHasher> {
@@ -55,18 +61,30 @@ pub struct VexClaim {
     pub less_than_claim: Claim<LessThanColumn>,
     /// bytes component claim
     pub bytes_claim: Claim<BytesPreProcessedColumn>,
+    /// Buy Aggressive Match Claim
+    pub buy_aggressive_match_claim: Claim<MatchColumn<Aggressive>>,
+    /// Sell Aggressive Match Claim
+    pub sell_aggressive_match_claim: Claim<MatchColumn<Aggressive>>,
+    /// Buy Passive Match Claim
+    pub buy_passive_match_claim: Claim<MatchColumn<Passive>>,
+    /// Sell Passive Match Claim
+    pub sell_passive_match_claim: Claim<MatchColumn<Passive>>,
 }
 
 impl VexClaim {
     /// mix all components log sizes and public inputs into the channel
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.bytes_claim.mix_into(channel);
-        self.poseidon_claim.mix_into(channel);
-        self.strict_less_than_claim.mix_into(channel);
-        self.less_than_claim.mix_into(channel);
-        self.processor_claim.mix_into(channel);
-        self.buy_insert_claim.mix_into(channel);
-        self.sell_insert_claim.mix_into(channel);
+        self.bytes_claim.mix_into(channel); //16
+        self.poseidon_claim.mix_into(channel); //16
+        self.strict_less_than_claim.mix_into(channel); // 10
+        self.less_than_claim.mix_into(channel); // 9
+        self.processor_claim.mix_into(channel); // 9
+        self.buy_insert_claim.mix_into(channel); // 7
+        self.sell_insert_claim.mix_into(channel); // 7
+        self.buy_aggressive_match_claim.mix_into(channel); // 6
+        self.sell_aggressive_match_claim.mix_into(channel); // 6
+        self.buy_passive_match_claim.mix_into(channel); // 6
+        self.sell_passive_match_claim.mix_into(channel); // 6
     }
 
     /// Returns the total log size of all components
@@ -80,6 +98,10 @@ impl VexClaim {
                 self.processor_claim.log_sizes(),
                 self.buy_insert_claim.log_sizes(),
                 self.sell_insert_claim.log_sizes(),
+                self.buy_aggressive_match_claim.log_sizes(),
+                self.sell_aggressive_match_claim.log_sizes(),
+                self.buy_passive_match_claim.log_sizes(),
+                self.sell_passive_match_claim.log_sizes(),
             ]
             .into_iter(),
         )
@@ -101,6 +123,22 @@ impl std::fmt::Debug for VexClaim {
             )
             .field("less_than_log_size", &self.less_than_claim.log_size)
             .field("bytes_log_size", &self.bytes_claim.log_size)
+            .field(
+                "buy_aggressive_match_log_size",
+                &self.buy_aggressive_match_claim.log_size,
+            )
+            .field(
+                "sell_aggressive_match_log_size",
+                &self.sell_aggressive_match_claim.log_size,
+            )
+            .field(
+                "buy_passive_match_log_size",
+                &self.buy_passive_match_claim.log_size,
+            )
+            .field(
+                "sell_passive_match_log_size",
+                &self.sell_passive_match_claim.log_size,
+            )
             .finish()
     }
 }
@@ -122,6 +160,14 @@ pub struct VexInteractionClaim {
     pub less_than_interaction_claim: InteractionClaim<LessThanColumn>,
     /// Bytes component interaction claim
     pub bytes_interaction_claim: InteractionClaim<BytesPreProcessedColumn>,
+    /// Buy Aggressive Match Interaction Claim
+    pub buy_aggressive_match_interaction_claim: InteractionClaim<MatchColumn<Aggressive>>,
+    /// Sell Aggressive Match Interaction Claim
+    pub sell_aggressive_match_interaction_claim: InteractionClaim<MatchColumn<Aggressive>>,
+    /// Buy Passive Match Interaction Claim
+    pub buy_passive_match_interaction_claim: InteractionClaim<MatchColumn<Passive>>,
+    /// Sell Passive Match Interaction Claim
+    pub sell_passive_match_interaction_claim: InteractionClaim<MatchColumn<Passive>>,
 }
 
 impl VexInteractionClaim {
@@ -134,13 +180,16 @@ impl VexInteractionClaim {
         self.processor_interaction_claim.mix_into(channel);
         self.buy_insert_interaction_claim.mix_into(channel);
         self.sell_insert_interaction_claim.mix_into(channel);
+        self.buy_aggressive_match_interaction_claim
+            .mix_into(channel);
+        self.sell_aggressive_match_interaction_claim
+            .mix_into(channel);
+        self.buy_passive_match_interaction_claim.mix_into(channel);
+        self.sell_passive_match_interaction_claim.mix_into(channel);
     }
 
     /// Returns the total logup sum of all components
-    /// Note that the Total LogUp Sum will be Non-Zero
-    /// The Initial State Elements have to yielded and the final state elements have to be used
-    /// SecureField::zero() = interactionclaim.logup_sum() - (initial_state_elements)^(-1) + (final_state_elements)^(-1)
-    pub fn logup_sum(&self) -> SecureField {
+    fn components_logup_sum(&self) -> SecureField {
         let mut sum = SecureField::zero();
         sum += self.processor_interaction_claim.claimed_sum;
         sum += self.buy_insert_interaction_claim.claimed_sum;
@@ -149,7 +198,19 @@ impl VexInteractionClaim {
         sum += self.strict_less_than_interaction_claim.claimed_sum;
         sum += self.less_than_interaction_claim.claimed_sum;
         sum += self.bytes_interaction_claim.claimed_sum;
+        sum += self.buy_aggressive_match_interaction_claim.claimed_sum;
+        sum += self.sell_aggressive_match_interaction_claim.claimed_sum;
+        sum += self.buy_passive_match_interaction_claim.claimed_sum;
+        sum += self.sell_passive_match_interaction_claim.claimed_sum;
         sum
+    }
+
+    /// Returns the logup sum of all components and yields the initial state and final state
+    /// This Must be Zero if all the lookups were correct
+    pub fn logup_sum(&self, claim: &VexClaim, state_elements: &StateElements) -> SecureField {
+        let initial_state_comb: SecureField = state_elements.combine(&claim.initial_state);
+        let final_state_comb: SecureField = state_elements.combine(&claim.final_state);
+        self.components_logup_sum() + final_state_comb.inverse() - initial_state_comb.inverse()
     }
 }
 
@@ -169,6 +230,22 @@ impl std::fmt::Debug for VexInteractionClaim {
             )
             .field("less_than", &self.less_than_interaction_claim.claimed_sum)
             .field("bytes", &self.bytes_interaction_claim.claimed_sum)
+            .field(
+                "buy_aggressive_match",
+                &self.buy_aggressive_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "sell_aggressive_match",
+                &self.sell_aggressive_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "buy_passive_match",
+                &self.buy_passive_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "sell_passive_match",
+                &self.sell_passive_match_interaction_claim.claimed_sum,
+            )
             .finish()
     }
 }
