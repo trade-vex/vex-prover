@@ -350,10 +350,12 @@ impl ExecutionTrace<BaseField> {
 
 /// Execution Trace Shape
 /// Used For Debugging and Logging
-/// Can be created from Execution Trace
+/// Can be created from Execution`` Trace
 /// Can contain log sizes or sizes
 /// Example:
 /// ```
+/// use vex_prover::executor::record::ExecutionTrace;
+/// 
 /// let trace = ExecutionTrace::new();
 /// let shape = trace.sizes();
 /// let log_shape = trace.log_sizes();
