@@ -503,16 +503,13 @@ mod test {
         );
     }
 
-    // currently the orders are places such that they are not matched
-    // this test is to check if the orders are inserted correctly
-    // this will be updated once the matching state updates are implemented
     fn generate_random_order<S: OrderSide>(time: u64, base_price: u64) -> Order<BaseField, S> {
         let mut rng = rand::thread_rng();
         let price = match S::side() {
             Side::Buy => rng.gen_range(100..110),
             Side::Sell => rng.gen_range(100..=110),
         };
-        let volume = 100;
+        let volume = rng.gen_range(1..=1000);
         Order::new(volume, base_price + price, time)
     }
 
