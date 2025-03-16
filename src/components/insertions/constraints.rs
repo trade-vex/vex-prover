@@ -169,7 +169,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                 // initial state's buy root hash must be equal to the root hash of the merkle tree
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.initial_state.buy_root_hash[i].clone()
+                        op.initial_state.buy_root[i].clone()
                             - op.low_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
@@ -202,7 +202,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                 // initial state's sell root hash must be equal to the root hash of the merkle tree
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.initial_state.sell_root_hash[i].clone()
+                        op.initial_state.sell_root[i].clone()
                             - op.low_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
@@ -278,34 +278,34 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                 // final state's buy root hash must be equal to the root in the inserted leaf's merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.buy_root_hash[i].clone()
+                        op.final_state.buy_root[i].clone()
                             - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
 
                 // the initial priority for sell IMT must be equal to the final priority
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.sell_imt_priority[i].clone()
-                            - op.final_state.sell_imt_priority[i].clone(),
+                        op.initial_state.best_sell_price[i].clone()
+                            - op.final_state.best_sell_price[i].clone(),
                     );
                 }
 
                 // the initial priority for buy IMT must change only if the low leaf is the first leaf in the buy imt
                 // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time
                 let first_leaf_price_time = Leaf::<E::F, Buy>::first_price_time_felts();
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        (op.final_state.buy_imt_priority[i].clone()
-                            - op.initial_state.buy_imt_priority[i].clone())
+                        (op.final_state.best_buy_price[i].clone()
+                            - op.initial_state.best_buy_price[i].clone())
                             * (op.low_leaf[LeafColumn::PRICE + i].clone()
                                 - first_leaf_price_time[i].clone()),
                     );
 
                     eval.add_constraint(
-                        (op.final_state.buy_imt_priority[i].clone()
-                            - op.initial_state.buy_imt_priority[i].clone())
-                            * (op.final_state.buy_imt_priority[i].clone()
+                        (op.final_state.best_buy_price[i].clone()
+                            - op.initial_state.best_buy_price[i].clone())
+                            * (op.final_state.best_buy_price[i].clone()
                                 - op.leaf[LeafColumn::PRICE + i].clone()),
                     );
                 }
@@ -314,34 +314,34 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                 // initial state's sell root hash must be equal to the root in the inserted leaf's merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.sell_root_hash[i].clone()
+                        op.final_state.sell_root[i].clone()
                             - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
 
                 // the initial priority for buy IMT must be equal to the final priority
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.buy_imt_priority[i].clone()
-                            - op.final_state.buy_imt_priority[i].clone(),
+                        op.initial_state.best_buy_price[i].clone()
+                            - op.final_state.best_buy_price[i].clone(),
                     );
                 }
 
                 // the initial priority for sell IMT must change only if the low leaf is the first leaf in the sell IMT
                 // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time
                 let first_leaf_price_time = Leaf::<E::F, Sell>::first_price_time_felts();
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        (op.final_state.sell_imt_priority[i].clone()
-                            - op.initial_state.sell_imt_priority[i].clone())
+                        (op.final_state.best_sell_price[i].clone()
+                            - op.initial_state.best_sell_price[i].clone())
                             * (op.low_leaf[LeafColumn::PRICE + i].clone()
                                 - first_leaf_price_time[i].clone()),
                     );
 
                     eval.add_constraint(
-                        (op.final_state.sell_imt_priority[i].clone()
-                            - op.initial_state.sell_imt_priority[i].clone())
-                            * (op.final_state.sell_imt_priority[i].clone()
+                        (op.final_state.best_sell_price[i].clone()
+                            - op.initial_state.best_sell_price[i].clone())
+                            * (op.final_state.best_sell_price[i].clone()
                                 - op.leaf[LeafColumn::PRICE + i].clone()),
                     );
                 }
@@ -350,10 +350,10 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
 
         let values: Vec<E::F> = flatten!(
             op.initial_state.n,
-            op.initial_state.buy_root_hash,
-            op.initial_state.buy_imt_priority,
-            op.initial_state.sell_root_hash,
-            op.initial_state.sell_imt_priority,
+            op.initial_state.buy_root,
+            op.initial_state.best_buy_price,
+            op.initial_state.sell_root,
+            op.initial_state.best_sell_price,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -366,10 +366,10 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             op.index,
             op.leaf,
             op.final_state.n,
-            op.final_state.buy_root_hash,
-            op.final_state.buy_imt_priority,
-            op.final_state.sell_root_hash,
-            op.final_state.sell_imt_priority,
+            op.final_state.buy_root,
+            op.final_state.best_buy_price,
+            op.final_state.sell_root,
+            op.final_state.best_sell_price,
             op.is_real
         );
         // yield the results

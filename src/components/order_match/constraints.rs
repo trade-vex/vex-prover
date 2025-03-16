@@ -68,8 +68,8 @@ pub struct MatchEval<S, T: OrderMatchType> {
 ///          Note - The previous operation can be either full or partial match.
 ///   5. Check For the Match Invairant:(This Check is only for Aggressive Match)
 ///      - Invariant: MAX(buy_imt) >= MIN(sell_imt)
-///      - On Buy Side: leaf.price >= initial_state.sell_imt_priority(trade_price), less_than_values [trade_price, leaf.price, 1]
-///      - On Sell Side: leaf.price <= initial_state.buy_imt_priority(trade_price), less_than_values [leaf.price, trade_price, 1]
+///      - On Buy Side: leaf.price >= initial_state.best_sell_price(trade_price), less_than_values [trade_price, leaf.price, 1]
+///      - On Sell Side: leaf.price <= initial_state.best_buy_price(trade_price), less_than_values [leaf.price, trade_price, 1]
 ///      - The Match Elements are yielded, Match Elements consist of (price, volume) pair.
 ///      - Todo: This must contain the side of the aggressive side, like 0/1
 ///      - Todo: This must contain Trade_ID
@@ -134,7 +134,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                         Side::Buy => {
                             // opcode must be equal to the instruction's opcode
                             let trade_price =
-                                array::from_fn(|i| op.initial_state.sell_imt_priority[i].clone());
+                                array::from_fn(|i| op.initial_state.best_sell_price[i].clone());
                             let values = chain!(
                                 trade_price.iter().cloned(),
                                 price.iter().cloned(),
@@ -145,7 +145,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                         }
                         Side::Sell => {
                             let trade_price =
-                                array::from_fn(|i| op.initial_state.buy_imt_priority[i].clone());
+                                array::from_fn(|i| op.initial_state.best_buy_price[i].clone());
                             let values = chain!(
                                 price.iter().cloned(),
                                 trade_price.iter().cloned(),
@@ -220,7 +220,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 // initial state's buy root hash must be equal to the root hash of the merkle tree
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.initial_state.buy_root_hash[i].clone()
+                        op.initial_state.buy_root[i].clone()
                             - op.low_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
@@ -229,7 +229,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 // initial state's sell root hash must be equal to the root hash of the merkle tree
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.initial_state.sell_root_hash[i].clone()
+                        op.initial_state.sell_root[i].clone()
                             - op.low_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
@@ -305,31 +305,31 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 // final state's buy root hash must be equal to the root in the matched leaf's updated merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.buy_root_hash[i].clone()
+                        op.final_state.buy_root[i].clone()
                             - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
 
                 // the initial priority for sell IMT must be equal to the final priority
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.sell_imt_priority[i].clone()
-                            - op.final_state.sell_imt_priority[i].clone(),
+                        op.initial_state.best_sell_price[i].clone()
+                            - op.final_state.best_sell_price[i].clone(),
                     );
                 }
 
                 // the final root hash for sell IMT must be equal to the initial root hash
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.sell_root_hash[i].clone()
-                            - op.initial_state.sell_root_hash[i].clone(),
+                        op.final_state.sell_root[i].clone()
+                            - op.initial_state.sell_root[i].clone(),
                     );
                 }
 
                 // the final priority will be equal to matched leaf's next price_time
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.final_state.buy_imt_priority[i].clone()
+                        op.final_state.best_buy_price[i].clone()
                             - op.leaf[LeafColumn::NEXT_PRICE + i].clone(),
                     );
                 }
@@ -338,31 +338,31 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 // initial state's sell root hash must be equal to the root in the matched leaf's updated merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.sell_root_hash[i].clone()
+                        op.final_state.sell_root[i].clone()
                             - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
 
                 // the initial priority for buy IMT must be equal to the final priority
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.buy_imt_priority[i].clone()
-                            - op.final_state.buy_imt_priority[i].clone(),
+                        op.initial_state.best_buy_price[i].clone()
+                            - op.final_state.best_buy_price[i].clone(),
                     );
                 }
 
                 // the final root hash for buy IMT must be equal to the initial root hash
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.buy_root_hash[i].clone()
-                            - op.initial_state.buy_root_hash[i].clone(),
+                        op.final_state.buy_root[i].clone()
+                            - op.initial_state.buy_root[i].clone(),
                     );
                 }
 
                 // the final priority will be equal to matched leaf's next price_time
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.final_state.sell_imt_priority[i].clone()
+                        op.final_state.best_sell_price[i].clone()
                             - op.leaf[LeafColumn::NEXT_PRICE + i].clone(),
                     );
                 }
@@ -371,10 +371,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
 
         let values: Vec<E::F> = flatten!(
             op.initial_state.n,
-            op.initial_state.buy_root_hash,
-            op.initial_state.buy_imt_priority,
-            op.initial_state.sell_root_hash,
-            op.initial_state.sell_imt_priority,
+            op.initial_state.buy_root,
+            op.initial_state.best_buy_price,
+            op.initial_state.sell_root,
+            op.initial_state.best_sell_price,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -387,10 +387,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
             op.index,
             op.leaf,
             op.final_state.n,
-            op.final_state.buy_root_hash,
-            op.final_state.buy_imt_priority,
-            op.final_state.sell_root_hash,
-            op.final_state.sell_imt_priority,
+            op.final_state.buy_root,
+            op.final_state.best_buy_price,
+            op.final_state.sell_root,
+            op.final_state.best_sell_price,
             op.is_real
         );
         // yield the results

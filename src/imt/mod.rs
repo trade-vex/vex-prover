@@ -31,6 +31,8 @@ pub type IndexBits<F> = [F; MERKLE_HEIGHT];
 pub type PriceTimeFelts<F> = [F; 2 * N_U64_FELTS];
 /// Hash contain 8 BaseField elements.
 pub type Hash<F> = [F; 8];
+/// Price Felts
+pub type PriceFelts<F> = [F; 8];
 pub const MERKLE_HEIGHT: usize = 20;
 pub const MERKLE_WIDTH: usize = 1 << MERKLE_HEIGHT; // number of leaves at the bottom of the tree
 pub const N_LEAF_FELTS: usize = 41; // number of felts in a leaf
@@ -587,6 +589,11 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
     /// Returns the best price in the tree.
     pub fn best_price(&self) -> Price<BaseField> {
         self.leaves[0].next.price()
+    }
+
+    /// Returns the best price in the tree.
+    pub fn best_price_felts(&self) -> PriceFelts<BaseField> {
+        self.leaves[0].next.price().to_felts()
     }
 
     /// returns best price and time in the tree
