@@ -42,6 +42,7 @@ pub(crate) mod constraints_utils;
 pub mod insertions;
 pub mod less_than;
 pub mod order_match;
+pub mod partial_order_match;
 pub mod poseidon;
 pub mod processor;
 pub(crate) mod trace_utils;
@@ -424,14 +425,14 @@ pub enum VexComponent {
 
 #[cfg(test)]
 mod test {
-    use stwo_prover::core::fields::m31::M31;
     use super::*;
+    use stwo_prover::core::fields::m31::M31;
 
     #[test]
     fn test_is_real() {
         let n_rows = 1179;
         let is_real = is_real_col(n_rows);
-        assert_eq!(is_real.data.len(), 2048/16);
+        assert_eq!(is_real.data.len(), 2048 / 16);
         for i in 0..n_rows {
             assert_eq!(is_real.as_slice()[i], M31::one());
         }
