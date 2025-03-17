@@ -63,8 +63,8 @@ pub fn trace(
     }
     let mut trace = ComponentTrace::<{ ProcessorColumn::MAIN_COLS }>::zeroed(log_size);
     trace
-        .iter_mut()
-        .zip(instructions.chunks_exact(N_LANES))
+        .par_iter_mut()
+        .zip(instructions.par_chunks_exact(N_LANES))
         .for_each(|(row, data)| {
             for (i, cell) in row.into_iter().enumerate() {
                 let column_chunk = core::array::from_fn(|j| data[j][i]); // Extracts the i-th column from 16 rows
