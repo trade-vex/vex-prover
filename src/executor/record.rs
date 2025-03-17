@@ -1,5 +1,5 @@
 use crate::components::TraceSize;
-use itertools::{chain, izip, Itertools};
+use itertools::{chain, izip};
 use num_traits::{One, Zero};
 use std::array;
 use stwo_prover::core::{
@@ -228,18 +228,32 @@ impl ExecutionTrace<BaseField> {
         self.comparison_operations.push(event);
     }
 
-    /// Adds a Poseidon Event by recording the corresponding Trace Row
+    /// Adds a Poseidon hash operation for a Merkle tree node
+    ///
+    /// This hashes two child nodes together, each represented by 8 BaseField elements
     pub fn add_merkle_hash_event(&mut self, a: [BaseField; 8], b: [BaseField; 8]) {
-        self.poseidon_operations
-            .push(chain!(a, b).collect_vec().try_into().unwrap());
+        let mut input = [BaseField::zero(); 17];
+        input[0..8].copy_from_slice(&a);
+        input[8..16].copy_from_slice(&b);
+        input[16] = BaseField::one(); // Selector for Merkle hash operation
+
+        self.poseidon_operations.push(input);
     }
 
-    /// Add a Leaf Hash Event
+    /// Adds a Poseidon hash operation for a leaf node
+    ///
+    /// # Arguments
+    /// * `leaf_felts` - The field elements representing the leaf data
     pub fn add_leaf_hash_event(&mut self, leaf_felts: &LeafFelts<BaseField>) {
-        // @todo: The Hash Function is not implemented.
-        // Only the first 16 elements are taken into account
-        self.poseidon_operations
-            .push(leaf_felts[0..16].try_into().unwrap());
+        let mut input = [BaseField::zero(); 17];
+
+        // Only the first 16 elements are used in the hash
+        for (i, value) in leaf_felts[0..16].iter().enumerate() {
+            input[i] = *value;
+        }
+
+        input[16] = BaseField::one(); // Selector for leaf hash operation
+        self.poseidon_operations.push(input);
     }
 
     /// Adds an And U8 Event by recording the corresponding Trace Row
