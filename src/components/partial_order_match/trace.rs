@@ -1,6 +1,7 @@
 use crate::{
     components::{
         less_than::LessThanElements,
+        order_match::MatchElements,
         poseidon::PoseidonElements,
         trace_utils::{
             add_interaction_col, add_less_than_interaction_col, add_merkle_interaction_col,
@@ -48,7 +49,7 @@ use stwo_prover::{
 };
 use tracing::{debug, span, Level};
 
-use super::{MatchElements, PartialMatchColumn};
+use super::PartialMatchColumn;
 
 /// Preprocessed Trace for Partial Order Matches, each row consisting of a single field element
 /// First row is M31(1), rest are M31(0)

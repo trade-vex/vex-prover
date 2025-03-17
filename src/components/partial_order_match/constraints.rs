@@ -14,7 +14,9 @@ use num_traits::{One, Zero};
 use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use crate::{
-    components::{less_than::LessThanElements, poseidon::PoseidonElements, Claim},
+    components::{
+        less_than::LessThanElements, order_match::MatchElements, poseidon::PoseidonElements, Claim,
+    },
     executor::instruction::{Instruction, InstructionElements},
     flatten,
     hash::N_HASH,
@@ -25,7 +27,7 @@ use crate::{
     },
 };
 
-use super::{MatchElements, PartialMatchColumn};
+use super::PartialMatchColumn;
 
 #[derive(Clone)]
 pub struct PartialMatchEval<S, T: OrderMatchType> {
@@ -193,7 +195,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         for i in 0..2 * N_U64_FELTS {
             low_leaf[LeafColumn::LABEL + i] = first_price_time_felts[i].clone();
         }
-        for i in 0..N_U64_FELTS {
+        for i in 0..2 * N_U64_FELTS {
             low_leaf[LeafColumn::NEXT + i] = op.leaf[LeafColumn::LABEL + i].clone();
         }
 

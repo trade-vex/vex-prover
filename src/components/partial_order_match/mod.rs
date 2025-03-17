@@ -2,7 +2,6 @@ use std::marker::PhantomData;
 
 use stwo_prover::{
     constraint_framework::FrameworkComponent, core::fields::secure_column::SECURE_EXTENSION_DEGREE,
-    relation,
 };
 
 use crate::{
@@ -24,7 +23,8 @@ pub use trace::{interaction_trace, preprocessed_trace, trace};
 pub type BuyAgessivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Buy, Aggressive>>;
 pub type BuyPassivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Buy, Passive>>;
 
-pub type SellAggressivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Sell, Aggressive>>;
+pub type SellAggressivePartialMatchComponent =
+    FrameworkComponent<PartialMatchEval<Sell, Aggressive>>;
 pub type SellPassivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Sell, Passive>>;
 
 /// Match Column
@@ -40,25 +40,22 @@ impl<T: OrderMatchType> TraceSize for PartialMatchColumn<T> {
     /// is_first column
     const PREPROCESSED_COLS: usize = 1;
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
-    /// number of poseidon hashes: 4 times for leaf hashes
+    /// number of poseidon hashes: 3 times for leaf hashes
     ///     - 1 for 0th leaf
-    ///     - 1 for updated 0th leaf
     ///     - 1 for merkle_proof for matched leaf
     ///     - 1 for updated matched leaf (leaf.active = zero)
-    /// 4*MERKLE_HEIGHT for merkle paths verification
-    /// Total Poseidon Interactions: 4 + 4*MERKLE_HEIGHT
+    /// 3*MERKLE_HEIGHT for merkle paths verification
+    /// Total Poseidon Interactions: 3 + 3*MERKLE_HEIGHT
     /// Match Invariant: MAX(buy_imt) >= MIN(sell_imt) only in Aggressive Side
     /// Total Non Strict Less Than Interactions: 1
     /// When an Aggressive Match is made (price, volume) is yielded
     /// When an Passive Match is made (price, volume) is used
     /// 1 column for Match Elements (price, volume)
     /// 1 column for yielding the final result
-    /// Total Columns: 4 + 4*MERKLE_HEIGHT + 3 + 1 + 1 = 4*MERKLE_HEIGHT + 9
+    /// Total Columns: 3 + 3*MERKLE_HEIGHT + 3 + 1 + 1 = 4*MERKLE_HEIGHT + 9
     const INTERACTION_COLS: usize =
-        ((4 * MERKLE_HEIGHT + 6) + T::LESSTHANCOL) * SECURE_EXTENSION_DEGREE;
+        ((3 * MERKLE_HEIGHT + 5) + T::LESSTHANCOL) * SECURE_EXTENSION_DEGREE;
 }
-
-relation!(MatchElements, 16);
 
 #[cfg(test)]
 mod tests {
@@ -77,7 +74,9 @@ mod tests {
     use tracing::{span, Level};
 
     use crate::{
-        components::{less_than::LessThanElements, poseidon::PoseidonElements},
+        components::{
+            less_than::LessThanElements, order_match::MatchElements, poseidon::PoseidonElements,
+        },
         executor::{
             instruction::InstructionElements,
             order_book::OrderBook,

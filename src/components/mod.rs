@@ -5,6 +5,10 @@ use order_match::{
     BuyAgessiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
     SellAggressiveMatchComponent, SellPassiveMatchComponent,
 };
+use partial_order_match::{
+    BuyAgessivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
+    SellAggressivePartialMatchComponent, SellPassivePartialMatchComponent,
+};
 use stwo_prover::{
     constraint_framework::TraceLocationAllocator,
     core::{
@@ -197,6 +201,10 @@ pub struct VexComponents {
     sell_aggressive_match: SellAggressiveMatchComponent,
     buy_passive_match: BuyPassiveMatchComponent,
     sell_passive_match: SellPassiveMatchComponent,
+    buy_aggressive_partial_match: BuyAgessivePartialMatchComponent,
+    sell_aggressive_partial_match: SellAggressivePartialMatchComponent,
+    buy_passive_partial_match: BuyPassivePartialMatchComponent,
+    sell_passive_partial_match: SellPassivePartialMatchComponent,
 }
 
 impl VexComponents {
@@ -352,6 +360,70 @@ impl VexComponents {
                 .claimed_sum,
         );
 
+        let buy_aggressive_partial_match = BuyAgessivePartialMatchComponent::new(
+            tree_span_provider,
+            PartialMatchEval {
+                claim: claim.buy_aggressive_partial_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Buy>,
+                _type: PhantomData::<Aggressive>,
+            },
+            interaction_claim
+                .buy_aggressive_partial_match_interaction_claim
+                .claimed_sum,
+        );
+
+        let sell_aggressive_partial_match = SellAggressivePartialMatchComponent::new(
+            tree_span_provider,
+            PartialMatchEval {
+                claim: claim.sell_aggressive_partial_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Sell>,
+                _type: PhantomData::<Aggressive>,
+            },
+            interaction_claim
+                .sell_aggressive_partial_match_interaction_claim
+                .claimed_sum,
+        );
+
+        let buy_passive_partial_match = BuyPassivePartialMatchComponent::new(
+            tree_span_provider,
+            PartialMatchEval {
+                claim: claim.buy_passive_partial_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Buy>,
+                _type: PhantomData::<Passive>,
+            },
+            interaction_claim
+                .buy_passive_partial_match_interaction_claim
+                .claimed_sum,
+        );
+
+        let sell_passive_partial_match = SellPassivePartialMatchComponent::new(
+            tree_span_provider,
+            PartialMatchEval {
+                claim: claim.sell_passive_partial_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Sell>,
+                _type: PhantomData::<Passive>,
+            },
+            interaction_claim
+                .sell_passive_partial_match_interaction_claim
+                .claimed_sum,
+        );
+
         Self {
             processor,
             strict_less_than,
@@ -364,6 +436,10 @@ impl VexComponents {
             sell_aggressive_match,
             buy_passive_match,
             sell_passive_match,
+            buy_aggressive_partial_match,
+            sell_aggressive_partial_match,
+            buy_passive_partial_match,
+            sell_passive_partial_match,
         }
     }
 
@@ -381,6 +457,10 @@ impl VexComponents {
             &self.sell_aggressive_match,
             &self.buy_passive_match,
             &self.sell_passive_match,
+            &self.buy_aggressive_partial_match,
+            &self.sell_aggressive_partial_match,
+            &self.buy_passive_partial_match,
+            &self.sell_passive_partial_match,
         ]
     }
 

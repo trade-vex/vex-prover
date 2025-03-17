@@ -190,16 +190,24 @@ impl ExecutionTrace<BaseField> {
 
     /// Adds a Poseidon Event by recording the corresponding Trace Row
     pub fn add_merkle_hash_event(&mut self, a: [BaseField; 8], b: [BaseField; 8]) {
-        self.poseidon_operations
-            .push(chain!(a, b).collect_vec().try_into().unwrap());
+        self.poseidon_operations.push(
+            chain!(a, b, [BaseField::one()])
+                .collect_vec()
+                .try_into()
+                .unwrap(),
+        );
     }
 
     /// Add a Leaf Hash Event
     pub fn add_leaf_hash_event(&mut self, leaf_felts: &LeafFelts<BaseField>) {
         // @todo: The Hash Function is not implemented.
         // Only the first 16 elements are taken into account
-        self.poseidon_operations
-            .push(leaf_felts[0..16].try_into().unwrap());
+        self.poseidon_operations.push(
+            chain!(leaf_felts[0..16].iter().cloned(), [BaseField::one()])
+                .collect_vec()
+                .try_into()
+                .unwrap(),
+        );
     }
 
     /// Adds an And U8 Event by recording the corresponding Trace Row
@@ -355,7 +363,7 @@ impl ExecutionTrace<BaseField> {
 /// Example:
 /// ```
 /// use vex_prover::executor::record::ExecutionTrace;
-/// 
+///
 /// let trace = ExecutionTrace::new();
 /// let shape = trace.sizes();
 /// let log_shape = trace.log_sizes();

@@ -15,8 +15,8 @@ use tracing::{span, Level};
 
 use crate::{
     components::{
-        bytes, insertions, is_first, less_than, order_match, poseidon, processor, VexComponent,
-        VexComponents, VexInteractionElements,
+        bytes, insertions, is_first, less_than, order_match, partial_order_match, poseidon,
+        processor, VexComponent, VexComponents, VexInteractionElements,
     },
     error::{VexProvingError, VexVerificationError},
     executor::record::ExecutionTrace,
@@ -63,6 +63,19 @@ pub fn prove_vex(
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveSell)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveBuy)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveSell)));
+    tree_builder.extend_evals(is_first(
+        trace.log_size(VexComponent::PartialMatchAggressiveBuy),
+    ));
+    tree_builder.extend_evals(is_first(
+        trace.log_size(VexComponent::PartialMatchAggressiveSell),
+    ));
+    tree_builder.extend_evals(is_first(
+        trace.log_size(VexComponent::PartialMatchPassiveBuy),
+    ));
+    tree_builder.extend_evals(is_first(
+        trace.log_size(VexComponent::PartialMatchPassiveSell),
+    ));
+
     tree_builder.commit(channel);
     span.exit();
 
@@ -84,6 +97,14 @@ pub fn prove_vex(
         order_match::trace::<Buy, Passive>(trace.buy_passive_match);
     let (match_passive_sell_trace, sell_passive_match_claim) =
         order_match::trace::<Sell, Passive>(trace.sell_passive_match);
+    let (partial_match_aggressive_buy_trace, buy_aggressive_partial_match_claim) =
+        partial_order_match::trace::<Buy, Aggressive>(trace.buy_aggressive_partial_match);
+    let (partial_match_aggressive_sell_trace, sell_aggressive_partial_match_claim) =
+        partial_order_match::trace::<Sell, Aggressive>(trace.sell_aggressive_partial_match);
+    let (partial_match_passive_buy_trace, buy_passive_partial_match_claim) =
+        partial_order_match::trace::<Buy, Passive>(trace.buy_passive_partial_match);
+    let (partial_match_passive_sell_trace, sell_passive_partial_match_claim) =
+        partial_order_match::trace::<Sell, Passive>(trace.sell_passive_partial_match);
 
     // Extend the main trace with the components
     tree_builder.extend_evals(bytes_trace);
@@ -97,6 +118,10 @@ pub fn prove_vex(
     tree_builder.extend_evals(match_aggressive_sell_trace.clone());
     tree_builder.extend_evals(match_passive_buy_trace.clone());
     tree_builder.extend_evals(match_passive_sell_trace.clone());
+    tree_builder.extend_evals(partial_match_aggressive_buy_trace.clone());
+    tree_builder.extend_evals(partial_match_aggressive_sell_trace.clone());
+    tree_builder.extend_evals(partial_match_passive_buy_trace.clone());
+    tree_builder.extend_evals(partial_match_passive_sell_trace.clone());
 
     // create the VexClaim
     let claim = VexClaim {
@@ -113,6 +138,10 @@ pub fn prove_vex(
         sell_aggressive_match_claim,
         buy_passive_match_claim,
         sell_passive_match_claim,
+        buy_aggressive_partial_match_claim,
+        sell_aggressive_partial_match_claim,
+        buy_passive_partial_match_claim,
+        sell_passive_partial_match_claim,
     };
 
     // Mix the claim into the channel.
@@ -203,6 +232,44 @@ pub fn prove_vex(
             &interaction_elements.instruction_elements,
             &interaction_elements.match_elements,
         );
+    let (
+        buy_aggressive_partial_match_interaction_trace,
+        buy_aggressive_partial_match_interaction_claim,
+    ) = partial_order_match::interaction_trace::<Buy, Aggressive>(
+        &partial_match_aggressive_buy_trace,
+        &interaction_elements.poseidon_elements,
+        &interaction_elements.less_than_elements,
+        &interaction_elements.instruction_elements,
+        &interaction_elements.match_elements,
+    );
+    let (
+        sell_aggressive_partial_match_interaction_trace,
+        sell_aggressive_partial_match_interaction_claim,
+    ) = partial_order_match::interaction_trace::<Sell, Aggressive>(
+        &partial_match_aggressive_sell_trace,
+        &interaction_elements.poseidon_elements,
+        &interaction_elements.less_than_elements,
+        &interaction_elements.instruction_elements,
+        &interaction_elements.match_elements,
+    );
+    let (buy_passive_partial_match_interaction_trace, buy_passive_partial_match_interaction_claim) =
+        partial_order_match::interaction_trace::<Buy, Passive>(
+            &partial_match_passive_buy_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (
+        sell_passive_partial_match_interaction_trace,
+        sell_passive_partial_match_interaction_claim,
+    ) = partial_order_match::interaction_trace::<Sell, Passive>(
+        &partial_match_passive_sell_trace,
+        &interaction_elements.poseidon_elements,
+        &interaction_elements.less_than_elements,
+        &interaction_elements.instruction_elements,
+        &interaction_elements.match_elements,
+    );
 
     tree_builder.extend_evals(bytes_interaction_trace);
     tree_builder.extend_evals(poseidon_interaction_trace);
@@ -215,6 +282,10 @@ pub fn prove_vex(
     tree_builder.extend_evals(sell_aggressive_match_interaction_trace);
     tree_builder.extend_evals(buy_passive_match_interaction_trace);
     tree_builder.extend_evals(sell_passive_match_interaction_trace);
+    tree_builder.extend_evals(buy_aggressive_partial_match_interaction_trace);
+    tree_builder.extend_evals(sell_aggressive_partial_match_interaction_trace);
+    tree_builder.extend_evals(buy_passive_partial_match_interaction_trace);
+    tree_builder.extend_evals(sell_passive_partial_match_interaction_trace);
 
     let interaction_claim = VexInteractionClaim {
         processor_interaction_claim,
@@ -228,6 +299,10 @@ pub fn prove_vex(
         sell_aggressive_match_interaction_claim,
         buy_passive_match_interaction_claim,
         sell_passive_match_interaction_claim,
+        buy_aggressive_partial_match_interaction_claim,
+        sell_aggressive_partial_match_interaction_claim,
+        buy_passive_partial_match_interaction_claim,
+        sell_passive_partial_match_interaction_claim,
     };
 
     // Validate the Lookup Sum
@@ -342,13 +417,13 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 7;
+        let n = 1 << 11;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
             // using volume as 100, because partial matching is not implemented
-            let buy_order = Order::new(100, rng.gen_range(100..=105), time);
-            let sell_order = Order::new(100, rng.gen_range(100..=105), time);
+            let buy_order = Order::new(rng.gen_range(1..1000), rng.gen_range(100..=105), time);
+            let sell_order = Order::new(rng.gen_range(1..1000), rng.gen_range(100..=105), time);
             order_book.place_buy_order(buy_order).unwrap();
             order_book.place_sell_order(sell_order).unwrap();
         }
