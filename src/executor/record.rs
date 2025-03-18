@@ -124,7 +124,7 @@ impl ExecutionTrace<BaseField> {
             Opcode::MatchBuyOrder => self.buy_order_match.push(instruction),
             Opcode::PartialMatchBuyOrder => self.buy_order_partially_match.push(instruction),
             Opcode::InsertSellOrder => self.sell_insert_order.push(instruction),
-            Opcode::CancelSellOrder => self.sell_insert_order.push(instruction),
+            Opcode::CancelSellOrder => self.sell_delete_order.push(instruction),
             Opcode::UpdateSellOrder => self.sell_modify_order.push(instruction),
             Opcode::MatchSellOrder => self.sell_order_match.push(instruction),
             Opcode::PartialMatchSellOrder => self.sell_order_partially_match.push(instruction),
