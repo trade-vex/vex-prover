@@ -16,17 +16,11 @@ use crate::{
         addition::AddColumn,
         bytes::ByteOperations,
         less_than::{LessThanColumn, LessThanOperations},
+        poseidon::PoseidonOperations,
     },
+    imt::LeafFelts,
     types::N_U64_LIMBS,
 };
-
-/// Poseidon Operations
-/// Containts State of the Poseidon Hash Function during Permutation
-/// Index: 0-16: Initial State
-/// Index: 16-80: First 4 Full Rounds End: 16 + 4 * 16 = 80
-/// Index: 80-94: 14 Partial Rounds End Applied to state[0]: 80 + 14 = 94
-/// Index: 94-158: Last 4 Full Rounds End: 94 + 4 * 16 = 158
-pub type PoseidonOperations = Vec<[BaseField; 158]>;
 
 /// ExecutionTrace contains Instructions executed by matching engine during the execution
 /// There are two types of events:
@@ -110,7 +104,7 @@ impl ExecutionTrace<BaseField> {
             less_than_operations: Vec::new(),
             comparison_operations: Vec::new(),
             poseidon_operations: Vec::new(),
-            byte_operations: array::from_fn(|_| unsafe { BaseColumn::uninitialized(1 << 16) }),
+            byte_operations: array::from_fn(|_| BaseColumn::zeros(1 << 16)),
         }
     }
 
@@ -234,9 +228,32 @@ impl ExecutionTrace<BaseField> {
         self.comparison_operations.push(event);
     }
 
-    /// Adds a Poseidon Event by recording the corresponding Trace Row
-    pub fn add_poseidon_event(&mut self, event: [BaseField; 158]) {
-        self.poseidon_operations.push(event);
+    /// Adds a Poseidon hash operation for a Merkle tree node
+    ///
+    /// This hashes two child nodes together, each represented by 8 BaseField elements
+    pub fn add_merkle_hash_event(&mut self, a: [BaseField; 8], b: [BaseField; 8]) {
+        let mut input = [BaseField::zero(); 17];
+        input[0..8].copy_from_slice(&a);
+        input[8..16].copy_from_slice(&b);
+        input[16] = BaseField::one(); // Selector for Merkle hash operation
+
+        self.poseidon_operations.push(input);
+    }
+
+    /// Adds a Poseidon hash operation for a leaf node
+    ///
+    /// # Arguments
+    /// * `leaf_felts` - The field elements representing the leaf data
+    pub fn add_leaf_hash_event(&mut self, leaf_felts: &LeafFelts<BaseField>) {
+        let mut input = [BaseField::zero(); 17];
+
+        // Only the first 16 elements are used in the hash
+        for (i, value) in leaf_felts[0..16].iter().enumerate() {
+            input[i] = *value;
+        }
+
+        input[16] = BaseField::one(); // Selector for leaf hash operation
+        self.poseidon_operations.push(input);
     }
 
     /// Adds an And U8 Event by recording the corresponding Trace Row

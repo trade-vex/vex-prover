@@ -1,11 +1,13 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::Rng;
 use std::hint::black_box;
+use vex_prover::executor::record::ExecutionTrace;
 use vex_prover::imt::order::Order;
 use vex_prover::imt::SellIMT;
 
 fn insert_batch(n: u64) {
-    let mut imt = SellIMT::new();
+    let mut trace = ExecutionTrace::new();
+    let mut imt = SellIMT::new(&mut trace);
     let mut rng = rand::thread_rng();
     let mut time = 1;
     for _ in 0..n {
