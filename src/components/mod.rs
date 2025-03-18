@@ -1,15 +1,7 @@
-use num_traits::{One, Zero};
 use std::{marker::PhantomData, vec};
 use stwo_prover::core::{
-    backend::{
-        simd::{
-            column::BaseColumn,
-            m31::{PackedBaseField, LOG_N_LANES, N_LANES},
-        },
-        Column,
-    },
     channel::Channel,
-    fields::{m31::BaseField, qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
+    fields::{qm31::SecureField, secure_column::SECURE_EXTENSION_DEGREE},
     pcs::TreeVec,
 };
 pub mod addition;
@@ -92,30 +84,4 @@ impl<T: TraceSize> InteractionClaim<T> {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         channel.mix_felts(&[self.claimed_sum]);
     }
-}
-
-/// Generate IsReal column.
-/// For any given number of inputs, the size of the column is next power of two.
-/// The First `padding_offset` elements are set to 1; the rest are set to 0.
-pub fn is_real_col(padding_offset: usize) -> BaseColumn {
-    let log_size = (padding_offset - 1).ilog2() + 1;
-    let mut is_real = BaseColumn::zeros(1 << log_size);
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
-        let row_offset = vec_row * N_LANES;
-        if padding_offset <= row_offset {
-            is_real.data[vec_row] = PackedBaseField::zero();
-            continue;
-        }
-        if padding_offset >= row_offset + N_LANES {
-            is_real.data[vec_row] = PackedBaseField::one();
-            continue;
-        }
-
-        let mut res = [BaseField::zero(); N_LANES];
-        for v in res.iter_mut().take(padding_offset - row_offset) {
-            *v = BaseField::one();
-        }
-        is_real.data[vec_row] = PackedBaseField::from_array(res);
-    }
-    is_real
 }
