@@ -40,7 +40,7 @@ use less_than::{
 };
 use poseidon::{PoseidonComponent, PoseidonElements};
 use processor::{ProcessorComponent, ProcessorEval};
-
+pub mod addition;
 pub mod bytes;
 pub(crate) mod constraints_utils;
 pub mod insertions;
