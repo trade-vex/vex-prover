@@ -1,5 +1,6 @@
 use crate::{
     components::{
+        addition::AddElements,
         less_than::LessThanElements,
         order_match::MatchElements,
         poseidon::PoseidonElements,
@@ -109,6 +110,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
     less_than_elements: &LessThanElements,
     instruction_elements: &InstructionElements,
     match_elements: &MatchElements,
+    add_elements: &AddElements,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     InteractionClaim<PartialMatchColumn<T>>,
@@ -144,6 +146,8 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
         array::from_fn(|i| &trace[InstructionColumn::LOW_LEAF + i].data);
     let remaining_volume: [&Vec<PackedBaseField>; N_U64_FELTS] =
         array::from_fn(|i| &trace[InstructionColumn::LOW_LEAF + N_U64_FELTS + i].data);
+    let total_volume: [&Vec<PackedBaseField>; N_U64_FELTS] =
+        array::from_fn(|i| &trace[InstructionColumn::LEAF + LeafColumn::VOLUME + i].data);
     let mut updated_leaf = leaf.clone();
     for i in 0..N_U64_FELTS {
         updated_leaf[LeafColumn::VOLUME + i] = &remaining_volume[i];
@@ -229,6 +233,20 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
             );
         }
     }
+
+    add_interaction_col(
+        &mut logup_gen,
+        &chain!(
+            filled_volume.into_iter(),
+            remaining_volume.into_iter(),
+            total_volume.into_iter()
+        )
+        .collect_vec(),
+        is_real,
+        log_size,
+        add_elements,
+        PackedSecureField::one(),
+    );
 
     for (leaf, proof, path, index) in [
         (low_leaf, low_merkle_proof, low_merkle_path, low_index),

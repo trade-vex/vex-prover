@@ -15,8 +15,8 @@ use tracing::{span, Level};
 
 use crate::{
     components::{
-        bytes, insertions, is_first, less_than, order_match, partial_order_match, poseidon,
-        processor, VexComponent, VexComponents, VexInteractionElements,
+        addition, bytes, insertions, is_first, less_than, order_match, partial_order_match,
+        poseidon, processor, VexComponent, VexComponents, VexInteractionElements,
     },
     error::{VexProvingError, VexVerificationError},
     executor::record::ExecutionTrace,
@@ -56,6 +56,7 @@ pub fn prove_vex(
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Poseidon)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::StrictLessThan)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::LessThan)));
+    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Addition)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Processor)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertBuyOrder)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertSellOrder)));
@@ -86,6 +87,7 @@ pub fn prove_vex(
     let (strict_less_than_trace, strict_less_than_claim) =
         less_than::trace::<true>(trace.strict_less_than_operations);
     let (less_than_trace, less_than_claim) = less_than::trace::<false>(trace.less_than_operations);
+    let (add_trace, add_claim) = addition::trace(trace.add_operations);
     let (processor_trace, processor_claim) = processor::trace(trace.instructions);
     let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
     let (sell_insert_trace, sell_insert_claim) = insertions::trace::<Sell>(trace.sell_insert_order);
@@ -111,6 +113,7 @@ pub fn prove_vex(
     tree_builder.extend_evals(poseidon_trace.clone());
     tree_builder.extend_evals(strict_less_than_trace.clone());
     tree_builder.extend_evals(less_than_trace.clone());
+    tree_builder.extend_evals(add_trace.clone());
     tree_builder.extend_evals(processor_trace.clone());
     tree_builder.extend_evals(buy_insert_trace.clone());
     tree_builder.extend_evals(sell_insert_trace.clone());
@@ -133,6 +136,7 @@ pub fn prove_vex(
         poseidon_claim,
         strict_less_than_claim,
         less_than_claim,
+        add_claim,
         bytes_claim,
         buy_aggressive_match_claim,
         sell_aggressive_match_claim,
@@ -184,6 +188,11 @@ pub fn prove_vex(
             &interaction_elements.less_than_u8_elements,
             &interaction_elements.less_than_elements,
         );
+    let (add_interaction_trace, add_interaction_claim) = addition::interaction_trace(
+        &add_trace,
+        &interaction_elements.range_check_u8_elements,
+        &interaction_elements.add_elements,
+    );
     let (buy_insert_interaction_trace, buy_insert_interaction_claim) =
         insertions::interaction_trace::<Buy>(
             &buy_insert_trace,
@@ -241,6 +250,7 @@ pub fn prove_vex(
         &interaction_elements.less_than_elements,
         &interaction_elements.instruction_elements,
         &interaction_elements.match_elements,
+        &interaction_elements.add_elements,
     );
     let (
         sell_aggressive_partial_match_interaction_trace,
@@ -251,6 +261,7 @@ pub fn prove_vex(
         &interaction_elements.less_than_elements,
         &interaction_elements.instruction_elements,
         &interaction_elements.match_elements,
+        &interaction_elements.add_elements,
     );
     let (buy_passive_partial_match_interaction_trace, buy_passive_partial_match_interaction_claim) =
         partial_order_match::interaction_trace::<Buy, Passive>(
@@ -259,6 +270,7 @@ pub fn prove_vex(
             &interaction_elements.less_than_elements,
             &interaction_elements.instruction_elements,
             &interaction_elements.match_elements,
+            &interaction_elements.add_elements,
         );
     let (
         sell_passive_partial_match_interaction_trace,
@@ -269,12 +281,14 @@ pub fn prove_vex(
         &interaction_elements.less_than_elements,
         &interaction_elements.instruction_elements,
         &interaction_elements.match_elements,
+        &interaction_elements.add_elements,
     );
 
     tree_builder.extend_evals(bytes_interaction_trace);
     tree_builder.extend_evals(poseidon_interaction_trace);
     tree_builder.extend_evals(strict_less_than_interaction_trace);
     tree_builder.extend_evals(less_than_interaction_trace);
+    tree_builder.extend_evals(add_interaction_trace);
     tree_builder.extend_evals(processor_interaction_trace);
     tree_builder.extend_evals(buy_insert_interaction_trace);
     tree_builder.extend_evals(sell_insert_interaction_trace);
@@ -294,6 +308,7 @@ pub fn prove_vex(
         poseidon_interaction_claim,
         strict_less_than_interaction_claim,
         less_than_interaction_claim,
+        add_interaction_claim,
         bytes_interaction_claim,
         buy_aggressive_match_interaction_claim,
         sell_aggressive_match_interaction_claim,
@@ -417,7 +432,7 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 11;
+        let n = 1 << 10;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;

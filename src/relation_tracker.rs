@@ -1,5 +1,4 @@
 use std::marker::PhantomData;
-
 use itertools::Itertools;
 use stwo_prover::constraint_framework::relation_tracker::{
     RelationSummary, RelationTrackerComponent,
@@ -12,6 +11,7 @@ use stwo_prover::core::pcs::CommitmentSchemeProver;
 use stwo_prover::core::poly::circle::CanonicCoset;
 use tracing::info;
 
+use crate::components::addition::{AddElements, AddEval};
 use crate::components::bytes::{AndElements, BytesEval, LessThanU8Elements, RangeCheckU8Elements};
 use crate::components::insertions::InsertionsEval;
 use crate::components::less_than::{LessThanElements, LessThanEval, StrictLessThanElements};
@@ -92,6 +92,19 @@ pub fn track_vex_relations<MC: MerkleChannel>(
                 less_than_u8_elements: LessThanU8Elements::dummy(),
             },
             1 << claim.less_than_claim.log_size,
+        )
+        .entries(trace),
+    );
+
+    entries.extend(
+        RelationTrackerComponent::new(
+            tree_span_provider,
+            AddEval {
+                claim: claim.add_claim.clone(),
+                range_check_u8_elements: RangeCheckU8Elements::dummy(),
+                add_elements: AddElements::dummy(),
+            },
+            1 << claim.add_claim.log_size,
         )
         .entries(trace),
     );
@@ -218,6 +231,7 @@ pub fn track_vex_relations<MC: MerkleChannel>(
                 less_than_elements: LessThanElements::dummy(),
                 match_elements: MatchElements::dummy(),
                 instruction_elements: InstructionElements::dummy(),
+                add_elements: AddElements::dummy(),
                 _side: PhantomData::<Buy>,
                 _type: PhantomData::<Aggressive>,
             },
@@ -235,6 +249,7 @@ pub fn track_vex_relations<MC: MerkleChannel>(
                 less_than_elements: LessThanElements::dummy(),
                 match_elements: MatchElements::dummy(),
                 instruction_elements: InstructionElements::dummy(),
+                add_elements: AddElements::dummy(),
                 _side: PhantomData::<Sell>,
                 _type: PhantomData::<Aggressive>,
             },
@@ -252,6 +267,7 @@ pub fn track_vex_relations<MC: MerkleChannel>(
                 less_than_elements: LessThanElements::dummy(),
                 match_elements: MatchElements::dummy(),
                 instruction_elements: InstructionElements::dummy(),
+                add_elements: AddElements::dummy(),
                 _side: PhantomData::<Buy>,
                 _type: PhantomData::<Passive>,
             },
@@ -269,6 +285,7 @@ pub fn track_vex_relations<MC: MerkleChannel>(
                 less_than_elements: LessThanElements::dummy(),
                 match_elements: MatchElements::dummy(),
                 instruction_elements: InstructionElements::dummy(),
+                add_elements: AddElements::dummy(),
                 _side: PhantomData::<Sell>,
                 _type: PhantomData::<Passive>,
             },

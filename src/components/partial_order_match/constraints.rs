@@ -1,5 +1,5 @@
 use crate::{
-    components::constraints_utils::eval_merkle_proof,
+    components::{addition::AddElements, constraints_utils::eval_merkle_proof},
     executor::{flatten_single, instruction::IMTOperation},
     imt::{
         leaf::Leaf,
@@ -36,6 +36,7 @@ pub struct PartialMatchEval<S, T: OrderMatchType> {
     pub less_than_elements: LessThanElements,
     pub instruction_elements: InstructionElements,
     pub match_elements: MatchElements,
+    pub add_elements: AddElements,
     pub _side: PhantomData<S>,
     pub _type: PhantomData<T>,
 }
@@ -78,24 +79,25 @@ pub struct PartialMatchEval<S, T: OrderMatchType> {
 ///      - Todo: This must contain Trade_ID
 ///   7. Use The Match Elements:(This Check is only for Passive Match)
 ///      - Since the trade_price is always set by the passive side, the leaf price, volume = filled_volume
-///   8. Construct the low leaf, from the first price_time felts, and the next to be matched leaf's label.
-///   9. Assert that the low index is 0.
-///   10. Assert that the initial root hash of the initial state is equal to the root hash in the merkle path of the low/0th leaf.
-///   11. The Low leaf is part of the Merkle Tree by verifying the Merkle Proof.
+///   8. The Remaining Voume + Filled Volume must be equal to the initial volume.
+///   9. Construct the low leaf, from the first price_time felts, and the next to be matched leaf's label.
+///   10. Assert that the low index is 0.
+///   11. Assert that the initial root hash of the initial state is equal to the root hash in the merkle path of the low/0th leaf.
+///   12. The Low leaf is part of the Merkle Tree by verifying the Merkle Proof.
 ///      - The Merkle Proof is a list of sibling hashes from the leaf to the root.
 ///      - The Merkle Path is a list of hashes from the leaf to the root.
 ///      - IndexBits is the binary representation of the index of the leaf.
-///   12. Ensure that the root hash in low leaf's merkle path is equal to the root contained in matched leaf's merkle path.
-///   11. Verify the Merkle Proof of the Matched Leaf.
-///   12. Update the Matched Leaf's volume to remaining volume.
-///   13. Ensure that the final state's count is equal to the initial state's count + 1.
-///   14. Ensure that the resulting root hash from update of matched leaf's is equal to the final state's root hash.
-///   15. Ensure That the final state values for the other side of the tree are same as the initial state values.
-///   16. Ensure that the final state's priority remains the same.
-///   16. Yield the Results by adding the values to the ProcessorLookupElements.   
+///   13. Ensure that the root hash in low leaf's merkle path is equal to the root contained in matched leaf's merkle path.
+///   14. Verify the Merkle Proof of the Matched Leaf.
+///   15. Update the Matched Leaf's volume to remaining volume.
+///   16. Ensure that the final state's count is equal to the initial state's count + 1.
+///   17. Ensure that the resulting root hash from update of matched leaf's is equal to the final state's root hash.
+///   18. Ensure That the final state values for the other side of the tree are same as the initial state values.
+///   19. Ensure that the final state's priority remains the same.
+///   20. Yield the Results by adding the values to the ProcessorLookupElements.   
 ///        - Multiplicity of the relation is positive of is_real flag.
 ///        - Values is the entire row of the trace table.
-///   17. Finalize the evaluation by calling `eval.finalize_logup_in_pairs()`.
+///   21. Finalize the evaluation by calling `eval.finalize_logup_in_pairs()`.
 ///
 impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
     fn log_size(&self) -> u32 {
@@ -164,8 +166,8 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                     &less_than_values,
                 ));
 
-                let values =
-                    chain!(trade_price.into_iter(), filled_volume.into_iter()).collect_vec();
+                let values = chain!(trade_price.into_iter(), filled_volume.clone().into_iter())
+                    .collect_vec();
                 eval.add_to_relation(RelationEntry::new(
                     &self.match_elements,
                     -mult.clone(),
@@ -181,7 +183,8 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                 //@todo prev op must be aggressive match S::side
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
-                let values = chain!(price.into_iter(), filled_volume.into_iter()).collect_vec();
+                let values =
+                    chain!(price.into_iter(), filled_volume.clone().into_iter()).collect_vec();
                 eval.add_to_relation(RelationEntry::new(
                     &self.match_elements,
                     mult.clone(),
@@ -189,6 +192,22 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                 ));
             }
         }
+
+        // remaining volume + filled volume must be equal to the initial volume
+        let add_elements = chain!(
+            filled_volume.iter().cloned(),
+            remaining_volume.iter().cloned(),
+            op.leaf[LeafColumn::VOLUME..LeafColumn::PRICE]
+                .iter()
+                .cloned()
+        )
+        .collect_vec();
+        eval.add_to_relation(RelationEntry::new(
+            &self.add_elements,
+            mult.clone(),
+            &add_elements,
+        ));
+
         let mut low_leaf: [E::F; N_LEAF_FELTS] = array::from_fn(|_| E::F::zero());
         low_leaf[LeafColumn::ACTIVE] = E::F::one();
         let first_price_time_felts = Leaf::<E::F, S>::first_price_time_felts();

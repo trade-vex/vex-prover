@@ -1,7 +1,7 @@
 use crate::types::N_U64_LIMBS;
 use std::array;
 use stwo_prover::{
-    constraint_framework::EvalAtRow,
+    constraint_framework::{EvalAtRow, FrameworkComponent},
     core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
     relation,
 };
@@ -11,7 +11,11 @@ use super::TraceSize;
 mod constraints;
 mod trace;
 
+pub use constraints::AddEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
+
+/// Addition Component, containts constraints for adding two u64 numbers, represented as N u8 limbs.
+pub type AddComponent = FrameworkComponent<AddEval>;
 
 /// AddOperations represents a collection of add operations to be processed in the circuit.
 /// Each operation is represented as an array of field elements arranged according to the AddColumn layout.
@@ -68,7 +72,6 @@ impl<F> AddOp<F> {
 pub struct AddColumn;
 
 impl AddColumn {
-
     /// Starting index for the first operand (a) columns
     pub const A: usize = 0;
     /// Starting index for the second operand (b) columns
@@ -88,9 +91,9 @@ impl TraceSize for AddColumn {
     const MAIN_COLS: usize = Self::IS_REAL + 1;
 
     // Number of interaction columns includes:
-    // - 1 column for AddU8 element checks
+    // - 6 column for RangeCheckU8Elements
     // - 1 column for yielding the result
-    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
+    const INTERACTION_COLS: usize = 7 * SECURE_EXTENSION_DEGREE;
 }
 
 // Defines a relation for storing and verifying addition operation elements
@@ -109,7 +112,9 @@ mod tests {
     use tracing::{span, Level};
 
     use super::*;
-    use crate::{components::bytes::RangeCheckU8Elements, executor::record::ExecutionTrace, types::Price};
+    use crate::{
+        components::bytes::RangeCheckU8Elements, executor::record::ExecutionTrace, types::Price,
+    };
 
     #[test_log::test]
     fn test_addition_table() {
@@ -121,7 +126,7 @@ mod tests {
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen());
             let b: Price<BaseField> = Price::from_u64(rng.gen());
-            record.add_add_event(a.to_felts(), b.to_felts());
+            record.add_add_event(a.to_felts(), b.to_felts()).unwrap();
         }
         let log_size = (record.add_operations.len() - 1).ilog2() + 1;
         span.exit();

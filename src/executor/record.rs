@@ -162,7 +162,11 @@ impl ExecutionTrace<BaseField> {
     }
 
     /// Adds an Add Event to the Execution Trace
-    pub fn add_add_event(&mut self, a: [BaseField; N_U64_LIMBS], b: [BaseField; N_U64_LIMBS]) {
+    pub fn add_add_event(
+        &mut self,
+        a: [BaseField; N_U64_LIMBS],
+        b: [BaseField; N_U64_LIMBS],
+    ) -> Result<(), IMTError> {
         let mut row = [BaseField::zero(); AddColumn::MAIN_COLS];
 
         // Copy input operands a and b into the trace row
@@ -196,6 +200,15 @@ impl ExecutionTrace<BaseField> {
             a[7] + b[7] + carry[6]
         };
 
+        // Dispatch range check events in the same order as in constraints.rs
+        let values: Vec<BaseField> = chain!(a.into_iter(), b.into_iter(), c.into_iter()).collect();
+
+        // Add range checks for each byte of a, b and c
+        for i in (0..24).step_by(4) {
+            self.add_range_check_u8_event(values[i].0, values[i + 1].0)?;
+            self.add_range_check_u8_event(values[i + 2].0, values[i + 3].0)?;
+        }
+
         // Copy computed c and carry values into the row
         row[AddColumn::C..AddColumn::CARRY].copy_from_slice(&c);
         row[AddColumn::CARRY..AddColumn::IS_REAL].copy_from_slice(&carry);
@@ -204,6 +217,8 @@ impl ExecutionTrace<BaseField> {
         row[AddColumn::IS_REAL] = BaseField::one();
 
         self.add_operations.push(row);
+
+        Ok(())
     }
 
     /// Adds a Less Than Event by recording the corresponding Trace Row
@@ -271,10 +286,14 @@ impl ExecutionTrace<BaseField> {
         Ok(())
     }
 
-    /// Adds a Range Check U8 Event by recording the corresponding Trace Row
-    /// Returns an error if a or b is greater than 255
+    /// Adds a Range Check U8 Event by recording the corresponding Trace Row.
+    ///
+    /// # Errors
+    /// Returns a `RangeCheckError::InputLimbExceedsRange` if `a` or `b` is greater than 255.
     pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        assert!(a < 256 && b < 256, "Invalid U8 Pair");
+        if a >= 256 || b >= 256 {
+            return Err(IMTError::InvalidU8Pair(a, b));
+        }
         let offset = (a << 8) + b;
         self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
         Ok(())

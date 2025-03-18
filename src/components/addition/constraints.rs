@@ -31,7 +31,7 @@ impl FrameworkEval for AddEval {
     }
 
     /// Evaluates constraints for an addition operation on a row.
-    /// 
+    ///
     /// Steps performed:
     /// 1. Validate the `is_real` flag (boolean check).
     /// 2. Ensure correct byte-wise addition with carry propagation.
@@ -44,7 +44,6 @@ impl FrameworkEval for AddEval {
 
         // Base value for overflow check (256 in the field)
         let base = E::F::from(BaseField::from(256));
-
 
         // CONSTRAINT 1: Ensure `is_real` is a boolean (0 or 1)
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));

@@ -208,7 +208,7 @@ impl OrderBook {
 
             self.trace
                 .borrow_mut()
-                .add_less_than_event(order.price().to_felts(),match_leaf.price().to_felts())?;
+                .add_less_than_event(order.price().to_felts(), match_leaf.price().to_felts())?;
             if order.volume == Volume::zero() {
                 let proof = self.sell_imt.match_order()?;
                 self.finalize_match(proof, true)?;
@@ -292,6 +292,7 @@ impl OrderBook {
         proof: PartialMatchProof<S>,
         is_aggresive: bool,
     ) -> Result<(), IMTError> {
+        let mut trace = self.trace.borrow_mut();
         let initial_state = self.state;
         let mut final_state = initial_state;
         let opcode = match S::SIDE {
@@ -318,6 +319,10 @@ impl OrderBook {
         };
         final_state.n += BaseField::one();
         self.state = final_state;
+        trace.add_add_event(
+            proof.filled_volume.to_felts(),
+            proof.remaining_volume.to_felts(),
+        )?;
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
             initial_state.buy_root,
@@ -344,7 +349,7 @@ impl OrderBook {
             final_state.best_sell_price,
             BaseField::one()
         );
-        self.trace.borrow_mut().add_instruction(instruction_felts);
+        trace.add_instruction(instruction_felts);
         Ok(())
     }
 }

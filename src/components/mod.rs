@@ -1,5 +1,6 @@
 use std::{marker::PhantomData, vec};
 
+use addition::{AddComponent, AddElements, AddEval};
 use num_traits::{One, Zero};
 use order_match::{
     BuyAgessiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
@@ -143,6 +144,7 @@ pub struct VexInteractionElements {
     pub and_elements: AndElements,
     pub range_check_u8_elements: RangeCheckU8Elements,
     pub match_elements: MatchElements,
+    pub add_elements: AddElements,
 }
 
 impl VexInteractionElements {
@@ -158,6 +160,7 @@ impl VexInteractionElements {
             and_elements: AndElements::draw(channel),
             range_check_u8_elements: RangeCheckU8Elements::draw(channel),
             match_elements: MatchElements::draw(channel),
+            add_elements: AddElements::draw(channel),
         }
     }
 }
@@ -196,6 +199,7 @@ pub struct VexComponents {
     poseidon: PoseidonComponent,
     strict_less_than: StrictLessThanComponent,
     less_than: LessThanComponent,
+    add_component: AddComponent,
     bytes: BytesComponent,
     buy_aggressive_match: BuyAgessiveMatchComponent,
     sell_aggressive_match: SellAggressiveMatchComponent,
@@ -258,6 +262,16 @@ impl VexComponents {
                 less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
             },
             interaction_claim.less_than_interaction_claim.claimed_sum,
+        );
+
+        let add_component = AddComponent::new(
+            tree_span_provider,
+            AddEval {
+                claim: claim.add_claim.clone(),
+                range_check_u8_elements: interaction_elements.range_check_u8_elements.clone(),
+                add_elements: interaction_elements.add_elements.clone(),
+            },
+            interaction_claim.add_interaction_claim.claimed_sum,
         );
 
         let processor = ProcessorComponent::new(
@@ -368,6 +382,7 @@ impl VexComponents {
                 less_than_elements: interaction_elements.less_than_elements.clone(),
                 match_elements: interaction_elements.match_elements.clone(),
                 instruction_elements: interaction_elements.instruction_elements.clone(),
+                add_elements: interaction_elements.add_elements.clone(),
                 _side: PhantomData::<Buy>,
                 _type: PhantomData::<Aggressive>,
             },
@@ -384,6 +399,7 @@ impl VexComponents {
                 less_than_elements: interaction_elements.less_than_elements.clone(),
                 match_elements: interaction_elements.match_elements.clone(),
                 instruction_elements: interaction_elements.instruction_elements.clone(),
+                add_elements: interaction_elements.add_elements.clone(),
                 _side: PhantomData::<Sell>,
                 _type: PhantomData::<Aggressive>,
             },
@@ -400,6 +416,7 @@ impl VexComponents {
                 less_than_elements: interaction_elements.less_than_elements.clone(),
                 match_elements: interaction_elements.match_elements.clone(),
                 instruction_elements: interaction_elements.instruction_elements.clone(),
+                add_elements: interaction_elements.add_elements.clone(),
                 _side: PhantomData::<Buy>,
                 _type: PhantomData::<Passive>,
             },
@@ -416,6 +433,7 @@ impl VexComponents {
                 less_than_elements: interaction_elements.less_than_elements.clone(),
                 match_elements: interaction_elements.match_elements.clone(),
                 instruction_elements: interaction_elements.instruction_elements.clone(),
+                add_elements: interaction_elements.add_elements.clone(),
                 _side: PhantomData::<Sell>,
                 _type: PhantomData::<Passive>,
             },
@@ -428,6 +446,7 @@ impl VexComponents {
             processor,
             strict_less_than,
             less_than,
+            add_component,
             buy_insert,
             sell_insert,
             poseidon,
@@ -450,6 +469,7 @@ impl VexComponents {
             &self.poseidon,
             &self.strict_less_than,
             &self.less_than,
+            &self.add_component,
             &self.processor,
             &self.buy_insert,
             &self.sell_insert,

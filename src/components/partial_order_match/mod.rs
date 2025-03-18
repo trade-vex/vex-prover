@@ -50,11 +50,12 @@ impl<T: OrderMatchType> TraceSize for PartialMatchColumn<T> {
     /// Total Non Strict Less Than Interactions: 1
     /// When an Aggressive Match is made (price, volume) is yielded
     /// When an Passive Match is made (price, volume) is used
+    /// 1 column for Add Elements (filled_volume + remaining_volume, volume)
     /// 1 column for Match Elements (price, volume)
     /// 1 column for yielding the final result
-    /// Total Columns: 3 + 3*MERKLE_HEIGHT + 3 + 1 + 1 = 4*MERKLE_HEIGHT + 9
+    /// Total Columns: 3 + 3*MERKLE_HEIGHT + 1 + 1 + 1 = 4*MERKLE_HEIGHT + 9
     const INTERACTION_COLS: usize =
-        ((3 * MERKLE_HEIGHT + 5) + T::LESSTHANCOL) * SECURE_EXTENSION_DEGREE;
+        ((3 * MERKLE_HEIGHT + 6) + T::LESSTHANCOL) * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]
@@ -75,7 +76,8 @@ mod tests {
 
     use crate::{
         components::{
-            less_than::LessThanElements, order_match::MatchElements, poseidon::PoseidonElements,
+            addition::AddElements, less_than::LessThanElements, order_match::MatchElements,
+            poseidon::PoseidonElements,
         },
         executor::{
             instruction::InstructionElements,
@@ -96,6 +98,7 @@ mod tests {
         less_than_elements: &LessThanElements,
         match_elements: &MatchElements,
         instruction_elements: &InstructionElements,
+        add_elements: &AddElements,
     ) {
         let log_size = (partial_matches.len() - 1).ilog2() + 1;
         let span = span!(Level::INFO, "Trace Generation", log_size).entered();
@@ -107,6 +110,7 @@ mod tests {
             less_than_elements,
             instruction_elements,
             match_elements,
+            add_elements,
         );
         span.exit();
 
@@ -119,6 +123,7 @@ mod tests {
             poseidon_elements: poseidon_elements.clone(),
             match_elements: match_elements.clone(),
             instruction_elements: instruction_elements.clone(),
+            add_elements: add_elements.clone(),
             _side: PhantomData,
             _type: PhantomData,
             claim,
@@ -164,6 +169,7 @@ mod tests {
         let less_than_elements = LessThanElements::draw(&mut channel);
         let match_elements = MatchElements::draw(&mut channel);
         let instruction_elements = InstructionElements::draw(&mut channel);
+        let add_elements = AddElements::draw(&mut channel);
 
         // Aggressive Buy Trace Evaluation
         evaluate_trace::<Buy, Aggressive>(
@@ -172,6 +178,7 @@ mod tests {
             &less_than_elements,
             &match_elements,
             &instruction_elements,
+            &add_elements,
         );
 
         // Passive Buy Trace Evaluation
@@ -181,15 +188,16 @@ mod tests {
             &less_than_elements,
             &match_elements,
             &instruction_elements,
+            &add_elements,
         );
 
-        
         evaluate_trace::<Sell, Aggressive>(
             execution_trace.sell_aggressive_partial_match,
             &poseidon_elements,
             &less_than_elements,
             &match_elements,
             &instruction_elements,
+            &add_elements,
         );
 
         evaluate_trace::<Sell, Passive>(
@@ -198,6 +206,7 @@ mod tests {
             &less_than_elements,
             &match_elements,
             &instruction_elements,
+            &add_elements,
         );
     }
 }

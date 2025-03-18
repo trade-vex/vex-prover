@@ -3,9 +3,7 @@
 
 use crate::executor::state::StateFelts;
 use components::{
-    bytes::BytesPreProcessedColumn, insertions::InsertionsColumn, less_than::LessThanColumn,
-    order_match::MatchColumn, partial_order_match::PartialMatchColumn, poseidon::PoseidonColumn,
-    processor::ProcessorColumn, Claim, InteractionClaim,
+    addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn, less_than::LessThanColumn, order_match::MatchColumn, partial_order_match::PartialMatchColumn, poseidon::PoseidonColumn, processor::ProcessorColumn, Claim, InteractionClaim
 };
 use executor::state::StateElements;
 use imt::side::{Aggressive, Passive};
@@ -59,6 +57,8 @@ pub struct VexClaim {
     pub strict_less_than_claim: Claim<LessThanColumn>,
     /// less than claim
     pub less_than_claim: Claim<LessThanColumn>,
+    /// add claim
+    pub add_claim: Claim<AddColumn>,
     /// bytes component claim
     pub bytes_claim: Claim<BytesPreProcessedColumn>,
     /// Buy Aggressive Match Claim
@@ -86,6 +86,7 @@ impl VexClaim {
         self.poseidon_claim.mix_into(channel);
         self.strict_less_than_claim.mix_into(channel);
         self.less_than_claim.mix_into(channel);
+        self.add_claim.mix_into(channel);
         self.processor_claim.mix_into(channel);
         self.buy_insert_claim.mix_into(channel);
         self.sell_insert_claim.mix_into(channel);
@@ -107,6 +108,7 @@ impl VexClaim {
                 self.poseidon_claim.log_sizes(),
                 self.strict_less_than_claim.log_sizes(),
                 self.less_than_claim.log_sizes(),
+                self.add_claim.log_sizes(),
                 self.processor_claim.log_sizes(),
                 self.buy_insert_claim.log_sizes(),
                 self.sell_insert_claim.log_sizes(),
@@ -138,6 +140,7 @@ impl std::fmt::Debug for VexClaim {
                 &self.strict_less_than_claim.log_size,
             )
             .field("less_than_log_size", &self.less_than_claim.log_size)
+            .field("add_log_size", &self.add_claim.log_size)
             .field("bytes_log_size", &self.bytes_claim.log_size)
             .field(
                 "buy_aggressive_match_log_size",
@@ -190,6 +193,8 @@ pub struct VexInteractionClaim {
     pub strict_less_than_interaction_claim: InteractionClaim<LessThanColumn>,
     /// Less than component interaction claim
     pub less_than_interaction_claim: InteractionClaim<LessThanColumn>,
+    /// Add component interaction claim
+    pub add_interaction_claim: InteractionClaim<AddColumn>,
     /// Bytes component interaction claim
     pub bytes_interaction_claim: InteractionClaim<BytesPreProcessedColumn>,
     /// Buy Aggressive Match Interaction Claim
@@ -219,6 +224,7 @@ impl VexInteractionClaim {
         self.poseidon_interaction_claim.mix_into(channel);
         self.strict_less_than_interaction_claim.mix_into(channel);
         self.less_than_interaction_claim.mix_into(channel);
+        self.add_interaction_claim.mix_into(channel);
         self.processor_interaction_claim.mix_into(channel);
         self.buy_insert_interaction_claim.mix_into(channel);
         self.sell_insert_interaction_claim.mix_into(channel);
@@ -247,6 +253,7 @@ impl VexInteractionClaim {
         sum += self.poseidon_interaction_claim.claimed_sum;
         sum += self.strict_less_than_interaction_claim.claimed_sum;
         sum += self.less_than_interaction_claim.claimed_sum;
+        sum += self.add_interaction_claim.claimed_sum;
         sum += self.bytes_interaction_claim.claimed_sum;
         sum += self.buy_aggressive_match_interaction_claim.claimed_sum;
         sum += self.sell_aggressive_match_interaction_claim.claimed_sum;
@@ -283,6 +290,7 @@ impl std::fmt::Debug for VexInteractionClaim {
                 &self.strict_less_than_interaction_claim.claimed_sum,
             )
             .field("less_than", &self.less_than_interaction_claim.claimed_sum)
+            .field("add", &self.add_interaction_claim.claimed_sum)
             .field("bytes", &self.bytes_interaction_claim.claimed_sum)
             .field(
                 "buy_aggressive_match",
