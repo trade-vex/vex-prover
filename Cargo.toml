@@ -16,6 +16,8 @@ rayon = "1.10.0"
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
+csv = "1.3.1"
+serde = { version = "1.0", features = ["derive"] }
 rand = "0.8.5"
 criterion = { version = "0.5", features = ["html_reports"] }
 vex-matching-engine = { git = "https://github.com/aerius-labs/VEX-matching-engine.git" }

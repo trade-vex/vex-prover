@@ -415,9 +415,10 @@ pub fn verify_vex(
 
 #[cfg(test)]
 mod tests {
+    use csv::Reader;
+    use serde::Deserialize;
+    use std::error::Error;
     use std::{cell::RefCell, rc::Rc};
-
-    use rand::Rng;
     use tracing::{span, Level};
 
     use crate::{
@@ -433,26 +434,7 @@ mod tests {
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let record = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut order_book = OrderBook::new(Rc::clone(&record));
-        let mut rng = rand::thread_rng();
-        let mut time = 1;
-        let n = 1 << 7;
-        for _ in 0..n {
-            let time_inc = rng.gen_range(1..=16);
-            time += time_inc;
-            // using volume as 100, because partial matching is not implemented
-            let buy_order = Order::new(
-                rng.gen_range(100000..10000000),
-                rng.gen_range(1000000..=1000990),
-                time,
-            );
-            let sell_order = Order::new(
-                rng.gen_range(100000..10000000),
-                rng.gen_range(1000000..=1000990),
-                time,
-            );
-            order_book.place_buy_order(buy_order).unwrap();
-            order_book.place_sell_order(sell_order).unwrap();
-        }
+        process_csv("../Downloads/data.csv", &mut order_book).unwrap();
 
         let mut execution_trace =
             std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
@@ -461,5 +443,46 @@ mod tests {
         span.exit();
         let proof = prove_vex(execution_trace).unwrap();
         verify_vex(proof).unwrap();
+    }
+
+    // Process the CSV and place orders accordingly.
+    fn process_csv(path: &str, order_book: &mut OrderBook) -> Result<(), Box<dyn Error>> {
+        let mut rdr = Reader::from_path(path)?;
+        let mut time = 1;
+        for result in rdr.deserialize() {
+            let record: Record = result?;
+            // Multiply to convert decimals to u64:
+            // price: multiply rate by 10^7, volume: multiply amount by 10^6.
+            let price: u64 = (record.rate * 10_000_000_f64) as u64;
+            let volume: u64 = (record.amount * 1_000_000_f64) as u64;
+            if price == 0 || volume == 0 {
+                continue;
+            }
+            if time > 10000 {
+                break;
+            }
+            match record.type_sb {
+                1 => {
+                    let order = Order::new(volume, price, time);
+                    time = time + 1;
+                    order_book.place_buy_order(order).unwrap();
+                }
+                0 => {
+                    let order = Order::new(volume, price, time);
+                    time = time + 1;
+                    order_book.place_sell_order(order).unwrap();
+                }
+                _ => eprintln!("Encountered unknown type_sb value: {}", record.type_sb),
+            }
+        }
+        Ok(())
+    }
+
+    #[derive(Debug, Deserialize)]
+    struct Record {
+        #[serde(rename = "typeSB")]
+        type_sb: u8, // 1 for buy, 0 for sell
+        rate: f64,   // actual rate at which it was traded/bidded/asked
+        amount: f64, // actual amount                     // Other fields in the CSV will be ignored
     }
 }
