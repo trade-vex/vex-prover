@@ -1,5 +1,5 @@
-use std::marker::PhantomData;
 use itertools::Itertools;
+use std::marker::PhantomData;
 use stwo_prover::constraint_framework::relation_tracker::{
     RelationSummary, RelationTrackerComponent,
 };

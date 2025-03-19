@@ -322,11 +322,11 @@ impl ExecutionTrace<BaseField> {
             self.strict_less_than_operations.len(),
             self.comparison_operations.len(),
             self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
-            1 << 2 * N_U64_FELTS, // 2^8 * 2^8 combinations
+            1 << (2 * N_U64_FELTS), // 2^8 * 2^8 combinations
         ])
         .unwrap();
-        let log_size = (n - 1).ilog2() + 1;
-        log_size
+        // log size is ceil(log2(n))
+        (n - 1).ilog2() + 1
     }
 
     /// Returns the log size for a given Component

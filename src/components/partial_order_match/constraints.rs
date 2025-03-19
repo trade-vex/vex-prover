@@ -58,8 +58,8 @@ pub struct PartialMatchEval<S, T: OrderMatchType> {
 ///  Order Match Operation within a Single IMT:
 ///  1) Check if the low leaf points to the matched leaf.
 ///  2) Update the Volume of the Matched Leaf.
-///  The constraints must ensure that the low leaf in the instruction is the first leaf in the tree.
-///  The constraints must ensure that the updates are done correctly.
+///     The constraints must ensure that the low leaf in the instruction is the first leaf in the tree.
+///     The constraints must ensure that the updates are done correctly.
 ///
 ///   The method follows these steps:
 ///   1. Retrieve Instruction for the row
@@ -211,13 +211,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         let mut low_leaf: [E::F; N_LEAF_FELTS] = array::from_fn(|_| E::F::zero());
         low_leaf[LeafColumn::ACTIVE] = E::F::one();
         let first_price_time_felts = Leaf::<E::F, S>::first_price_time_felts();
-        for i in 0..2 * N_U64_FELTS {
-            low_leaf[LeafColumn::LABEL + i] = first_price_time_felts[i].clone();
-        }
-        for i in 0..2 * N_U64_FELTS {
-            low_leaf[LeafColumn::NEXT + i] = op.leaf[LeafColumn::LABEL + i].clone();
-        }
-
+        low_leaf[LeafColumn::LABEL..(2 * N_U64_FELTS + LeafColumn::LABEL)]
+            .clone_from_slice(&first_price_time_felts[..(2 * N_U64_FELTS)]);
+        low_leaf[LeafColumn::NEXT..(2 * N_U64_FELTS + LeafColumn::NEXT)]
+            .clone_from_slice(&op.leaf[LeafColumn::LABEL..(2 * N_U64_FELTS + LeafColumn::LABEL)]);
         // low index must be 0
         for i in 0..MERKLE_HEIGHT {
             eval.add_constraint(op.low_index[i].clone());
@@ -276,10 +273,8 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
 
         // updates matched leaf active flag to 0
         let mut updated_leaf = op.leaf.clone();
-        for i in 0..N_U64_FELTS {
-            updated_leaf[LeafColumn::VOLUME + i] = remaining_volume[i].clone();
-        }
-
+        updated_leaf[LeafColumn::VOLUME..(N_U64_FELTS + LeafColumn::VOLUME)]
+            .clone_from_slice(&remaining_volume[..N_U64_FELTS]);
         // eval updated leaf's merkle proof
         eval_merkle_proof(
             &mut eval,

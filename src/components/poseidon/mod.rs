@@ -1,5 +1,8 @@
 use itertools::Itertools;
 use num_traits::{One, Zero};
+use rayon::iter::IndexedParallelIterator;
+use rayon::iter::ParallelIterator;
+use rayon::slice::ParallelSlice;
 // use rayon::iter::{
 //     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
 // };
@@ -156,8 +159,8 @@ pub fn trace(
     let mut trace = ComponentTrace::<{ PoseidonColumn::MAIN_COLS }>::zeroed(log_size);
 
     trace
-        .iter_mut()
-        .zip(poseidon_operations.chunks_exact(N_INSTANCES_PER_ROW * N_LANES))
+        .par_iter_mut()
+        .zip(poseidon_operations.par_chunks_exact(N_INSTANCES_PER_ROW * N_LANES))
         .for_each(|(mut row, data)| {
             let mut col_index = 0;
             for rep_i in 0..N_INSTANCES_PER_ROW {
@@ -235,7 +238,7 @@ pub fn interaction_trace(
 
     for rep_i in 0..N_INSTANCES_PER_ROW {
         let mut col_gen = logup_gen.new_col();
-        for vec_row in 0..(1 << log_size - LOG_N_LANES) {
+        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
             // fetch the initial state and the final hash from the trace.
             let values: [PackedBaseField; N_ELEMENTS] = array::from_fn(|i| {
                 if i < 16 {

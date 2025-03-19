@@ -46,11 +46,11 @@ pub struct InsertionsEval<S> {
 /// # Constaint Evaluation
 ///
 /// - `evaluate<E: EvalAtRow>(&self, mut eval: E) -> E`:
-///  Insertion Operation happens in two steps
+///     Insertion Operation happens in two steps
 ///  1) Updating the low leafs's "next" value
 ///  2) Updating the inactive leaf's value
-///  The constraints must ensure that the low leaf is indeed the "low" leaf of the order being inserted.
-///  The constraints must ensure that the updates are done correctly.
+///     The constraints must ensure that the low leaf is indeed the "low" leaf of the order being inserted.
+///     The constraints must ensure that the updates are done correctly.
 ///
 ///   The method follows these steps:
 ///   1. Retrieve Instruction for the row

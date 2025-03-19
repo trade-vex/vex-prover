@@ -184,7 +184,6 @@ mod tests {
             &instruction_elements,
         );
 
-        
         evaluate_trace::<Sell, Aggressive>(
             execution_trace.sell_aggressive_match,
             &poseidon_elements,

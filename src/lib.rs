@@ -3,7 +3,9 @@
 
 use crate::executor::state::StateFelts;
 use components::{
-    addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn, less_than::LessThanColumn, order_match::MatchColumn, partial_order_match::PartialMatchColumn, poseidon::PoseidonColumn, processor::ProcessorColumn, Claim, InteractionClaim
+    addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn,
+    less_than::LessThanColumn, order_match::MatchColumn, partial_order_match::PartialMatchColumn,
+    poseidon::PoseidonColumn, processor::ProcessorColumn, Claim, InteractionClaim,
 };
 use executor::state::StateElements;
 use imt::side::{Aggressive, Passive};
@@ -238,7 +240,7 @@ impl VexInteractionClaim {
             .mix_into(channel);
         self.sell_aggressive_partial_match_interaction_claim
             .mix_into(channel);
-        self.buy_passive_partial_match_interaction_claim    
+        self.buy_passive_partial_match_interaction_claim
             .mix_into(channel);
         self.sell_passive_partial_match_interaction_claim
             .mix_into(channel);
@@ -259,10 +261,16 @@ impl VexInteractionClaim {
         sum += self.sell_aggressive_match_interaction_claim.claimed_sum;
         sum += self.buy_passive_match_interaction_claim.claimed_sum;
         sum += self.sell_passive_match_interaction_claim.claimed_sum;
-        sum += self.buy_aggressive_partial_match_interaction_claim.claimed_sum;
-        sum += self.sell_aggressive_partial_match_interaction_claim.claimed_sum;
+        sum += self
+            .buy_aggressive_partial_match_interaction_claim
+            .claimed_sum;
+        sum += self
+            .sell_aggressive_partial_match_interaction_claim
+            .claimed_sum;
         sum += self.buy_passive_partial_match_interaction_claim.claimed_sum;
-        sum += self.sell_passive_partial_match_interaction_claim.claimed_sum;
+        sum += self
+            .sell_passive_partial_match_interaction_claim
+            .claimed_sum;
         sum
     }
 
@@ -310,11 +318,15 @@ impl std::fmt::Debug for VexInteractionClaim {
             )
             .field(
                 "buy_aggressive_partial_match",
-                &self.buy_aggressive_partial_match_interaction_claim.claimed_sum,
+                &self
+                    .buy_aggressive_partial_match_interaction_claim
+                    .claimed_sum,
             )
             .field(
                 "sell_aggressive_partial_match",
-                &self.sell_aggressive_partial_match_interaction_claim.claimed_sum,
+                &self
+                    .sell_aggressive_partial_match_interaction_claim
+                    .claimed_sum,
             )
             .field(
                 "buy_passive_partial_match",
@@ -322,7 +334,9 @@ impl std::fmt::Debug for VexInteractionClaim {
             )
             .field(
                 "sell_passive_partial_match",
-                &self.sell_passive_partial_match_interaction_claim.claimed_sum,
+                &self
+                    .sell_passive_partial_match_interaction_claim
+                    .claimed_sum,
             )
             .finish()
     }

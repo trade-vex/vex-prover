@@ -64,10 +64,10 @@ impl OrderBook {
         if order.is_invalid() {
             return Err(IMTError::InvalidOrder);
         }
-        let initial_state = self.state.clone();
+        let initial_state = self.state;
         let proof = self.buy_imt.insert(order)?;
         debug_assert_eq!(initial_state.buy_root, proof.initial_root);
-        let mut final_state = initial_state.clone();
+        let mut final_state = initial_state;
         final_state.n += BaseField::one();
         final_state.buy_root = self.buy_imt.root();
         final_state.best_buy_price = self.buy_imt.best_price_felts();
@@ -112,10 +112,10 @@ impl OrderBook {
         if order.is_invalid() {
             return Err(IMTError::InvalidOrder);
         }
-        let initial_state = self.state.clone();
+        let initial_state = self.state;
         let proof = self.sell_imt.insert(order)?;
         debug_assert_eq!(initial_state.sell_root, proof.initial_root);
-        let mut final_state = initial_state.clone();
+        let mut final_state = initial_state;
         final_state.n += BaseField::one();
         final_state.sell_root = self.sell_imt.root();
         final_state.best_sell_price = self.sell_imt.best_price_felts();

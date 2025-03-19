@@ -148,9 +148,9 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
         array::from_fn(|i| &trace[InstructionColumn::LOW_LEAF + N_U64_FELTS + i].data);
     let total_volume: [&Vec<PackedBaseField>; N_U64_FELTS] =
         array::from_fn(|i| &trace[InstructionColumn::LEAF + LeafColumn::VOLUME + i].data);
-    let mut updated_leaf = leaf.clone();
+    let mut updated_leaf = leaf;
     for i in 0..N_U64_FELTS {
-        updated_leaf[LeafColumn::VOLUME + i] = &remaining_volume[i];
+        updated_leaf[LeafColumn::VOLUME + i] = remaining_volume[i];
     }
 
     let low_merkle_proof: [[&Vec<PackedBaseField>; N_HASH]; MERKLE_HEIGHT] = array::from_fn(|i| {
@@ -281,7 +281,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
                 poseidon_elements,
                 PackedSecureField::one(),
             );
-            curr = hash.clone();
+            curr = *hash;
         }
     }
 

@@ -415,7 +415,7 @@ mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     use rand::Rng;
-    use tracing::{debug, span, Level};
+    use tracing::{span, Level};
 
     use crate::{
         executor::{order_book::OrderBook, record::ExecutionTrace},
@@ -432,20 +432,20 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 10;
+        let n = 1 << 7;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
             // using volume as 100, because partial matching is not implemented
-            let buy_order = Order::new(rng.gen_range(1..1000), rng.gen_range(100..=105), time);
-            let sell_order = Order::new(rng.gen_range(1..1000), rng.gen_range(100..=105), time);
+            let buy_order = Order::new(rng.gen_range(100000..10000000), rng.gen_range(1000000..=1000990), time);
+            let sell_order = Order::new(rng.gen_range(100000..10000000), rng.gen_range(1000000..=1000990), time);
             order_book.place_buy_order(buy_order).unwrap();
             order_book.place_sell_order(sell_order).unwrap();
         }
 
         let mut execution_trace =
             std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
-        debug!("shape: {:#?}", execution_trace.sizes());
+        println!("shape: {:#?}", execution_trace.sizes());
         execution_trace.final_state = order_book.state().to_felts();
         span.exit();
         let proof = prove_vex(execution_trace).unwrap();

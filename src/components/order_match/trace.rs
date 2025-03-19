@@ -143,7 +143,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
         array::from_fn(|i| &trace[InstructionColumn::LOW_INDEX + i].data);
     let leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] =
         array::from_fn(|i| &trace[InstructionColumn::LEAF + i].data);
-    let mut updated_leaf = leaf.clone();
+    let mut updated_leaf = leaf;
     let new_active = BaseColumn::zeros(1 << log_size).data;
     updated_leaf[LeafColumn::ACTIVE] = &new_active;
     let merkle_proof: [[&Vec<PackedBaseField>; N_HASH]; MERKLE_HEIGHT] = array::from_fn(|i| {
@@ -159,7 +159,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
     let index: [&Vec<PackedBaseField>; MERKLE_HEIGHT] =
         array::from_fn(|i| &trace[InstructionColumn::INDEX + i].data);
 
-    let mut updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = low_leaf.clone();
+    let mut updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = low_leaf;
     updated_low_leaf[LeafColumn::NEXT..N_LEAF_FELTS].copy_from_slice(&leaf[LeafColumn::NEXT..]);
 
     let is_real = &trace[InstructionColumn::IS_REAL].data;
@@ -173,8 +173,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
             let trade_price = match S::SIDE {
                 Side::Buy => {
                     let trade_price: [&Vec<PackedBaseField>; N_U64_FELTS] = array::from_fn(|i| {
-                        &trace
-                            [InstructionColumn::INITIAL_STATE + StateColumn::BEST_SELL_PRICE + i]
+                        &trace[InstructionColumn::INITIAL_STATE + StateColumn::BEST_SELL_PRICE + i]
                             .data
                     });
                     add_less_than_interaction_col(
@@ -276,7 +275,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
                     poseidon_elements,
                     PackedSecureField::one(),
                 );
-                curr = hash.clone();
+                curr = *hash;
             }
         }
     }
