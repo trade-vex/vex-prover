@@ -82,6 +82,7 @@ pub fn prove_vex(
 
     let span = span!(Level::INFO, "Main Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
+    let trace_gen_span = span!(Level::INFO, "Trace Generation").entered();
     let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
     let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations);
     let (strict_less_than_trace, strict_less_than_claim) =
@@ -107,6 +108,7 @@ pub fn prove_vex(
         partial_order_match::trace::<Buy, Passive>(trace.buy_passive_partial_match);
     let (partial_match_passive_sell_trace, sell_passive_partial_match_claim) =
         partial_order_match::trace::<Sell, Passive>(trace.sell_passive_partial_match);
+    trace_gen_span.exit();
 
     // Extend the main trace with the components
     tree_builder.extend_evals(bytes_trace);
@@ -163,6 +165,7 @@ pub fn prove_vex(
     let interaction_elements = VexInteractionElements::draw(channel);
 
     let mut tree_builder = commitment_scheme.tree_builder();
+    let trace_gen_span = span!(Level::INFO, "Interaction Trace Generation").entered();
     let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
         trace.byte_operations,
         &interaction_elements.and_elements,
@@ -283,7 +286,7 @@ pub fn prove_vex(
         &interaction_elements.match_elements,
         &interaction_elements.add_elements,
     );
-
+    trace_gen_span.exit();
     tree_builder.extend_evals(bytes_interaction_trace);
     tree_builder.extend_evals(poseidon_interaction_trace);
     tree_builder.extend_evals(strict_less_than_interaction_trace);
@@ -437,8 +440,16 @@ mod tests {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
             // using volume as 100, because partial matching is not implemented
-            let buy_order = Order::new(rng.gen_range(100000..10000000), rng.gen_range(1000000..=1000990), time);
-            let sell_order = Order::new(rng.gen_range(100000..10000000), rng.gen_range(1000000..=1000990), time);
+            let buy_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
+            let sell_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
             order_book.place_buy_order(buy_order).unwrap();
             order_book.place_sell_order(sell_order).unwrap();
         }
