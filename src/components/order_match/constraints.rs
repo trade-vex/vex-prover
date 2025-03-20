@@ -126,7 +126,12 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 eval.add_constraint(
                     op.opcode.clone() - E::F::from(S::op_code(IMTOperation::MatchAggressive)),
                 );
-                //@todo prev op must be insert S::Side
+                eval.add_constraint(
+                    (op.initial_state.op_code.clone()
+                        - E::F::from(S::op_code(IMTOperation::Insertion)))
+                        * (op.initial_state.op_code.clone()
+                            - E::F::from(S::complement_op_code(IMTOperation::MatchPassive))),
+                );
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
 
@@ -177,8 +182,15 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 eval.add_constraint(
                     op.opcode.clone() - E::F::from(S::op_code(IMTOperation::MatchPassive)),
                 );
+                eval.add_constraint(
+                    (op.initial_state.op_code.clone()
+                        - E::F::from(S::complement_op_code(IMTOperation::MatchAggressive)))
+                        * (op.initial_state.op_code.clone()
+                            - E::F::from(S::complement_op_code(
+                                IMTOperation::PartialMatchAggressive,
+                            ))),
+                );
 
-                //@todo prev op must be aggressive match S::side
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
                 let volume: [E::F; N_U64_FELTS] =
@@ -374,6 +386,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
             op.initial_state.best_buy_price,
             op.initial_state.sell_root,
             op.initial_state.best_sell_price,
+            op.initial_state.op_code,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -390,6 +403,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
             op.final_state.best_buy_price,
             op.final_state.sell_root,
             op.final_state.best_sell_price,
+            op.final_state.op_code,
             op.is_real
         );
         // yield the results

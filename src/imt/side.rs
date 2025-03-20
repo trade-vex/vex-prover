@@ -1,4 +1,5 @@
 use crate::{executor::instruction::IMTOperation, types::Price};
+use num_traits::One;
 use std::fmt::Debug;
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -74,6 +75,13 @@ pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Copy + Debug {
     }
     /// get op code based on the imt operation
     fn op_code(op: IMTOperation) -> BaseField;
+    /// get the complement opcode, i.e., the opcode for the other side
+    fn complement_op_code(op: IMTOperation) -> BaseField {
+        match Self::side() {
+            Side::Buy => Self::op_code(op) + BaseField::one(),
+            Side::Sell => Self::op_code(op) - BaseField::one(),
+        }
+    }
     /// get the name of the side
     fn name() -> &'static str {
         match Self::side() {
