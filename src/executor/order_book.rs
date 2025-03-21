@@ -167,6 +167,7 @@ impl OrderBook {
             } else {
                 match_leaf.volume
             };
+            debug!("Trade: {:?}, {:?}", match_leaf.price(), volume);
             order.volume -= volume;
             match_leaf.volume -= volume;
             let initial_state = self.state;
@@ -210,6 +211,7 @@ impl OrderBook {
             } else {
                 match_leaf.volume
             };
+            debug!("Trade: {:?}, {:?}", match_leaf.price(), volume);
             order.volume -= volume;
             match_leaf.volume -= volume;
 
