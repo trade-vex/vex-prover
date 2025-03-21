@@ -436,7 +436,6 @@ mod tests {
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
-            // using volume as 100, because partial matching is not implemented
             let buy_order = Order::new(
                 rng.gen_range(100000..10000000),
                 rng.gen_range(1000000..=1000990),

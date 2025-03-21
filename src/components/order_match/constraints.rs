@@ -63,7 +63,7 @@ pub struct MatchEval<S, T: OrderMatchType> {
 ///   2. IsReal must be a boolean. it is true if the operation is from non-padded row.
 ///   3. The Matched Leaf must be active.
 ///   3. Assert that the opcode is equal to the operation's opcode. // different for side + type combination
-///   4. Todo constraint:- The Op code that precedes the current operation must be correct.
+///   4. The Op code that precedes the current operation must be correct.
 ///        - Aggressive Match: The previous operation must be an insert operation on the same side.
 ///        - Passive Match: The previous operation must be an aggressive match operation on the opposite side.
 ///          Note - The previous operation can be either full or partial match.
