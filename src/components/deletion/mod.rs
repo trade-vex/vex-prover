@@ -1,14 +1,13 @@
-
-use stwo_prover::core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE};
 use super::TraceSize;
 use crate::{executor::instruction::N_INSTRUCTION_FELTS, imt::MERKLE_HEIGHT};
+use stwo_prover::core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE};
 
 mod constraints;
 mod trace;
 
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
-pub type Deletion = Vec<[BaseField; DeletionsColumn::MAIN_COLS]>;
+pub type Deletions = Vec<[BaseField; DeletionsColumn::MAIN_COLS]>;
 
 #[derive(Debug, Clone)]
 pub struct DeletionsColumn;
@@ -31,6 +30,4 @@ impl TraceSize for DeletionsColumn {
 }
 
 #[cfg(test)]
-mod tests {
-    
-}
+mod tests {}

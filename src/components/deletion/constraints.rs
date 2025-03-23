@@ -1,21 +1,17 @@
 use crate::{
-    executor::instruction::N_INSTRUCTION_FELTS,
+    executor::{flatten_single, instruction::IMTOperation},
     imt::{
-        leaf::Leaf;
+        leaf::Leaf,
         side::{Buy, Sell},
-    }
-}
-use std::{array, marker::PhantomData};
-
-use itertools::{Itertools, chain};
-use num_traits::{Zero,One};
+    },
+};
+use itertools::chain;
+use num_traits::{One, Zero};
+use std::array;
 use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use crate::{
-    components::{
-        poseidon::PoseidonElements,
-        Claim,
-    },
+    components::{poseidon::PoseidonElements, Claim},
     executor::instruction::{Instruction, InstructionElements},
     flatten,
     hash::{N_HASH, N_STATE},
@@ -28,16 +24,13 @@ use crate::{
 
 use super::DeletionsColumn;
 
-
 /// Deletions evaluation helper
-pub struct DeletionEval<S: OrderSide> {
+pub struct DeletionsEval<S: OrderSide> {
     pub poseidon_elements: PoseidonElements,
     pub instruction_elements: InstructionElements,
     pub claim: Claim<DeletionsColumn>,
     pub phantom: std::marker::PhantomData<S>,
 }
-
-
 
 /// This implementation of the `FrameworkEval` trait for `DeletionsEval` provides methods to evaluate
 /// constraints on Deletions from Buy and Sell IMT;
@@ -85,10 +78,10 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
 
-        /// is_real must be a boolean
+        // is_real must be a boolean
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
 
-        /// opcode must be equal to the instruction's opcode
+        // opcode must be equal to the instruction's opcode
         eval.add_constraint(op.opcode.clone() - E::F::from(S::op_code(IMTOperation::Deletion)));
 
         let mult = E::EF::from(op.is_real.clone());
@@ -120,8 +113,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
         // Create updated prev_leaf with next pointer updated to target's next pointer
         let mut updated_prev_leaf = op.low_leaf.clone();
-        updated_prev_leaf[LeafColumn::NEXT..]
-            .clone_from_slice(&op.leaf[25..41]);
+        updated_prev_leaf[LeafColumn::NEXT..].clone_from_slice(&op.leaf[25..41]);
 
         // eval updated prev_leaf's merkle proof
         eval_merkle_proof(
@@ -199,24 +191,25 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // For the Buy side
                 let first_leaf_price_time = Leaf::<E::F, Buy>::first_price_time_felts();
-                let low_leaf_is_first = array::from_fn(|i| {
-                    (op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone())
+                let low_leaf_is_first: [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
+                    op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone()
                 });
 
-                // If the low_leaf is the first leaf (i.e., target leaf is next of first leaf), 
+                // If the low_leaf is the first leaf (i.e., target leaf is next of first leaf),
                 // the priority must be updated to the target leaf's next
                 for i in 0..2 * N_U64_FELTS {
                     // Check if priority changed
-                    let priority_changed = op.final_state.buy_imt_priority[i].clone() - 
-                                        op.initial_state.buy_imt_priority[i].clone();
-                    
+                    let priority_changed = op.final_state.buy_imt_priority[i].clone()
+                        - op.initial_state.buy_imt_priority[i].clone();
+
                     // If priority changed, then low_leaf must be the first leaf
                     eval.add_constraint(priority_changed.clone() * low_leaf_is_first[i].clone());
-                    
+
                     // If priority changed, new priority must be the target's next
                     eval.add_constraint(
-                        priority_changed.clone() * 
-                        (op.final_state.buy_imt_priority[i].clone() - op.leaf[LeafColumn::NEXT_PRICE + i].clone())
+                        priority_changed.clone()
+                            * (op.final_state.buy_imt_priority[i].clone()
+                                - op.leaf[LeafColumn::NEXT_PRICE + i].clone()),
                     );
                 }
             }
@@ -247,26 +240,28 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // For the Sell side
                 let first_leaf_price_time = Leaf::<E::F, Sell>::first_price_time_felts();
-                let low_leaf_is_first = array::from_fn(|i| {
-                    (op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone())
+                let low_leaf_is_first: [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
+                    op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone()
                 });
 
-                // If the low_leaf is the first leaf (i.e., target leaf is next of first leaf), 
+                // If the low_leaf is the first leaf (i.e., target leaf is next of first leaf),
                 // the priority must be updated to the target leaf's next
                 for i in 0..2 * N_U64_FELTS {
                     // Check if priority changed
-                    let priority_changed = op.final_state.sell_imt_priority[i].clone() - 
-                                        op.initial_state.sell_imt_priority[i].clone();
-                    
+                    let priority_changed = op.final_state.sell_imt_priority[i].clone()
+                        - op.initial_state.sell_imt_priority[i].clone();
+
                     // If priority changed, then low_leaf must be the first leaf
                     eval.add_constraint(priority_changed.clone() * low_leaf_is_first[i].clone());
-                    
+
                     // If priority changed, new priority must be the target's next
                     eval.add_constraint(
-                        priority_changed.clone() * 
-                        (op.final_state.sell_imt_priority[i].clone() - op.leaf[LeafColumn::NEXT_PRICE + i].clone())
+                        priority_changed.clone()
+                            * (op.final_state.sell_imt_priority[i].clone()
+                                - op.leaf[LeafColumn::NEXT_PRICE + i].clone()),
                     );
                 }
+            }
         }
 
         let values: Vec<E::F> = flatten!(

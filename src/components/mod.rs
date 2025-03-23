@@ -14,10 +14,10 @@ use stwo_prover::core::{
 };
 
 pub mod bytes;
+pub mod deletion;
 pub mod insertions;
 pub mod less_than;
 pub mod poseidon;
-
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {
     /// Number of columns in the main trace table
