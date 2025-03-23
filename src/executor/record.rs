@@ -47,7 +47,7 @@ pub type InstructionFelts<F> = [F; N_INSTRUCTION_FELTS];
 /// 2. Less Than Operations: Compare two Price pairs, comprising 8 Field Elements each
 /// 3. Comparison Operations: Compare two Price, Time pairs
 /// 4. Hash Operations: Poseidon Hash Operations
-/// 5. Byte Operations: U8 Operations such as and, less than, range check
+/// 5. Byte Operations: U8 Operations such as less than, range check
 pub struct ExecutionTrace<F> {
     /// Buy Side Instructions
     /// 1. Place Buy Order

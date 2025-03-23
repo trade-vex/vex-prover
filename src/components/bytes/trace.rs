@@ -28,7 +28,6 @@ use tracing::{span, Level};
 /// Columns in the Preprocessed Trace correspond to:
 /// - a: higher bits
 /// - b: lower bits
-/// - c_and: a & b
 /// - c_less_than: a < b
 /// - is_first: is the first column
 pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>
