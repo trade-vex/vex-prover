@@ -23,7 +23,7 @@ use crate::{
 };
 
 use super::DeletionsColumn;
-
+     
 /// Deletions evaluation helper
 pub struct DeletionsEval<S: OrderSide> {
     pub poseidon_elements: PoseidonElements,
@@ -79,25 +79,35 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
         let op = Instruction::<E::F>::from_eval(&mut eval);
 
         // is_real must be a boolean
+        println!("1");
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
-
+        println!("2");
         // opcode must be equal to the instruction's opcode
+        println!("3");
+        println!("{:?}", op.opcode.clone());
+        println!("{:?}", S::op_code(IMTOperation::Deletion));
         eval.add_constraint(op.opcode.clone() - E::F::from(S::op_code(IMTOperation::Deletion)));
-
+        println!("4");
         let mult = E::EF::from(op.is_real.clone());
 
         // prev_leaf (low_leaf) must be active
+        println!("5");
         eval.add_constraint(E::F::one() - op.low_leaf[0].clone());
+        println!("6");
 
         // target_leaf (leaf) must be active
+        println!("7");
         eval.add_constraint(E::F::one() - op.leaf[0].clone());
+        println!("8");
 
         // Verify that prev leaf's next points to target leaf
         // We check that the "next" field of prev leaf contains the price-time of the target leaf
         for i in 0..2 * N_U64_FELTS {
+            println!("9");
             eval.add_constraint(
                 op.low_leaf[LeafColumn::NEXT + i].clone() - op.leaf[LeafColumn::PRICE + i].clone(),
             );
+            println!("10");
         }
 
         // eval prev_leaf's merkle proof
@@ -129,10 +139,12 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
         // the resultant root hash from updating prev_leaf must be equal the path of deleted leaf
         // this ensures that both leaf updates are consistent
         for i in 0..N_HASH {
+            println!("11");
             eval.add_constraint(
                 op.updated_low_merkle_path[MERKLE_HEIGHT][i].clone()
                     - op.merkle_path[MERKLE_HEIGHT][i].clone(),
             );
+            println!("12");
         }
 
         // eval target_leaf's merkle proof
@@ -161,7 +173,11 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
         );
 
         // ensure that the state count is updated correctly (decremented by 1)
+        println!("13");
+        println!("{:?}", op.initial_state.n.clone());
+        println!("{:?}", op.final_state.n.clone());
         eval.add_constraint(op.initial_state.n.clone() - op.final_state.n.clone() - E::F::one());
+        println!("14"); 
 
         match S::side() {
             Side::Buy => {
@@ -191,7 +207,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // For the Buy side
                 let first_leaf_price_time = Leaf::<E::F, Buy>::first_price_time_felts();
-                let low_leaf_is_first: [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
+                let low_leaf_is_first:  [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
                     op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone()
                 });
 
@@ -240,7 +256,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // For the Sell side
                 let first_leaf_price_time = Leaf::<E::F, Sell>::first_price_time_felts();
-                let low_leaf_is_first: [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
+                let low_leaf_is_first:  [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
                     op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone()
                 });
 

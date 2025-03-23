@@ -106,7 +106,7 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 4;
+        let n = 16;
 
         // First, place some orders that we'll delete later
         let mut buy_order_pricetimes = Vec::new();

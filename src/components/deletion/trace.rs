@@ -133,10 +133,18 @@ pub fn interaction_trace<S: OrderSide>(
     let target_index: [&Vec<PackedBaseField>; MERKLE_HEIGHT] =
         array::from_fn(|i| &trace[InstructionColumn::INDEX + i].data);
 
-    let mut updated_prev_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = prev_leaf.clone();
-    // Update prev leaf's next pointer to target leaf's next pointer
-    updated_prev_leaf[LeafColumn::NEXT..LeafColumn::NEXT + 2 * N_U64_FELTS]
-        .copy_from_slice(&target_leaf[LeafColumn::NEXT..LeafColumn::NEXT + 2 * N_U64_FELTS]);
+    // Create a properly updated copy of the prev_leaf with target's NEXT values
+    let mut updated_prev_leaf_vec: [Vec<PackedBaseField>; N_LEAF_FELTS] = 
+        array::from_fn(|i| prev_leaf[i].clone());
+    
+    // Copy the target leaf's NEXT values to the updated prev_leaf's NEXT field
+    for i in 0..2 * N_U64_FELTS {
+        updated_prev_leaf_vec[LeafColumn::NEXT + i] = target_leaf[LeafColumn::NEXT + i].clone();
+    }
+    
+    // Convert to reference slices for the interaction calculation
+    let updated_prev_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = 
+        array::from_fn(|i| &updated_prev_leaf_vec[i]);
 
     let is_real = &trace[InstructionColumn::IS_REAL].data;
 

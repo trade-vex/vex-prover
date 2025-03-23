@@ -48,8 +48,8 @@ impl OrderSide for Buy {
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
             IMTOperation::Insertion => BaseField::from_u32_unchecked(0),
-            IMTOperation::Deletion => BaseField::from_u32_unchecked(2),
-            IMTOperation::Update => BaseField::from_u32_unchecked(4),
+            IMTOperation::Deletion => BaseField::from_u32_unchecked(4),
+            IMTOperation::Update => BaseField::from_u32_unchecked(2),
             IMTOperation::Match => BaseField::from_u32_unchecked(6),
             IMTOperation::PartialMatch => BaseField::from_u32_unchecked(8),
         }
@@ -66,8 +66,8 @@ impl OrderSide for Sell {
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
             IMTOperation::Insertion => BaseField::from_u32_unchecked(1),
-            IMTOperation::Deletion => BaseField::from_u32_unchecked(3),
-            IMTOperation::Update => BaseField::from_u32_unchecked(5),
+            IMTOperation::Deletion => BaseField::from_u32_unchecked(5),
+            IMTOperation::Update => BaseField::from_u32_unchecked(3),
             IMTOperation::Match => BaseField::from_u32_unchecked(7),
             IMTOperation::PartialMatch => BaseField::from_u32_unchecked(9),
         }

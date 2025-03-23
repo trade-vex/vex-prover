@@ -1,7 +1,8 @@
 use stwo_prover::core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE};
 
 use crate::{executor::instruction::N_INSTRUCTION_FELTS, imt::MERKLE_HEIGHT};
-
+use stwo_prover::
+    core::backend::simd::m31::LOG_N_LANES;
 use super::TraceSize;
 
 mod constraints;
@@ -77,6 +78,9 @@ mod tests {
         let log_size = (insertions.len() - 1).ilog2() + 1;
         let span = span!(Level::INFO, "Trace Generation", log_size).entered();
         let constant_trace = preprocessed_trace(log_size);
+        println!("Log Size: {}", log_size);
+        println!("LOG_N_LANES: {}", LOG_N_LANES);
+        println!("Insertions length: {:?}", insertions.len());
         let (trace, claim) = trace::<S>(insertions);
         let (interaction_trace, interaction_claim) = interaction_trace::<S>(
             &trace,

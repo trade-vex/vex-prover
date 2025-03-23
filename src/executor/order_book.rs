@@ -154,7 +154,7 @@ impl OrderBook {
         assert_eq!(initial_state.buy_root_hash, proof.initial_root);
         
         let mut final_state = initial_state.clone();
-        final_state.n += BaseField::one();
+        final_state.n -= BaseField::one();
         final_state.buy_root_hash = self.buy_imt.root();
         final_state.buy_imt_priority = self.buy_imt.best_price_time();
         self.state = final_state;
@@ -199,7 +199,7 @@ impl OrderBook {
         assert_eq!(initial_state.sell_root_hash, proof.initial_root);
         
         let mut final_state = initial_state.clone();
-        final_state.n += BaseField::one();
+        final_state.n -= BaseField::one();
         final_state.sell_root_hash = self.sell_imt.root();
         final_state.sell_imt_priority = self.sell_imt.best_price_time();
         self.state = final_state;
