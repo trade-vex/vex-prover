@@ -4,13 +4,14 @@ use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry}
 
 use crate::components::{bytes::LessThanU8Elements, Claim};
 
-use super::{LessThanColumn, LessThanElements, LessThanOp};
+use super::{LessThanColumn, LessThanElements, LessThanOp, StrictLessThanElements};
 
 #[derive(Clone)]
-pub struct LessThanEval {
+pub struct LessThanEval<const STRICT: bool> {
     pub claim: Claim<LessThanColumn>,
     pub less_than_u8_elements: LessThanU8Elements,
     pub less_than_elements: LessThanElements,
+    pub strict_less_than_elements: StrictLessThanElements,
 }
 
 /// This implementation of the `FrameworkEval` trait for `LessThanEval` provides methods to evaluate
@@ -41,7 +42,7 @@ pub struct LessThanEval {
 ///        - Multiplicity of the relation is the negation of is_real flag.
 ///        - Values are a, b, and c.
 ///   10. Finalize the evaluation by calling `eval.finalize_logup_in_pairs()`.
-impl FrameworkEval for LessThanEval {
+impl<const STRICT: bool> FrameworkEval for LessThanEval<STRICT> {
     fn log_size(&self) -> u32 {
         self.claim.log_size
     }
@@ -53,7 +54,6 @@ impl FrameworkEval for LessThanEval {
 
         // is_real must be a boolean
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
-
         // Each flag must be boolean
         let mut sum_flags = E::F::zero();
         for flag in op.flags.iter() {
@@ -65,8 +65,7 @@ impl FrameworkEval for LessThanEval {
         // 1 if a is not equal to b
         eval.add_constraint(sum_flags.clone() * (E::F::one() - sum_flags.clone()));
 
-        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where
-        // a[i] is not equal to b[i] from the most significant byte
+        // a_comparison_byte and b_comparison_byte must be equal to the first bytes where a[i] is not equal to b[i]
         let mut is_inequality_visited = E::F::zero();
         let mut a_comparison_byte = E::F::zero();
         let mut b_comparison_byte = E::F::zero();
@@ -94,31 +93,49 @@ impl FrameworkEval for LessThanEval {
         // is_inequality_visited must be 0
         // a_comparison_byte must be 0
         // b_comparison_byte must be 0
-        // c must be 0
         eval.add_constraint((E::F::one() - sum_flags.clone()) * is_inequality_visited.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * a_comparison_byte.clone());
         eval.add_constraint((E::F::one() - sum_flags.clone()) * b_comparison_byte.clone());
-        eval.add_constraint((E::F::one() - sum_flags) * op.c.clone());
-
-        // c must be 1 if a_comparison_byte is less than b_comparison_byte
-        // c must be 0 if a_comparison_byte is greater than b_comparison_byte
+        // if strict: the result must be 0 if a is equal to b
+        // if not strict: the result must be 1 if a is equal to b
+        if STRICT {
+            eval.add_constraint((E::F::one() - sum_flags.clone()) * op.c.clone());
+        } else {
+            eval.add_constraint((E::F::one() - sum_flags.clone()) * (E::F::one() - op.c.clone()));
+        }
+        // c must be 1 if a_comparision_byte is less than b_comparison_byte
+        // c must be 0 if a_comparision_byte is greater than b_comparison_byte
         // Look Up if the c has been set correctly and "use" the result of the comparison bytes
+        // If strict, the result must be 1 if a_comparision_byte is less than b_comparison_byte
+        // the less_than_u8_elements result is strictly 1 if a_comparision_byte is less than b_comparison_byte
+        // therefore if a is equal to b, the result for less_than_u8_elements must be 0
+        let c = if STRICT {
+            op.c.clone()
+        } else {
+            sum_flags.clone() * op.c.clone()
+        };
         eval.add_to_relation(RelationEntry::new(
             &self.less_than_u8_elements,
             E::EF::from(op.is_real.clone()),
-            &[op.a_comparison_byte, op.b_comparison_byte, op.c.clone()],
+            &[op.a_comparison_byte, op.b_comparison_byte, c.clone()],
         ));
 
         // Yield the Results
         let values: Vec<E::F> =
             chain!(op.a.into_iter(), op.b.into_iter(), std::iter::once(op.c)).collect();
-
-        eval.add_to_relation(RelationEntry::new(
-            &self.less_than_elements,
-            -E::EF::from(op.is_real),
-            &values,
-        ));
-
+        if STRICT {
+            eval.add_to_relation(RelationEntry::new(
+                &self.strict_less_than_elements,
+                -E::EF::from(op.is_real.clone()),
+                &values,
+            ));
+        } else {
+            eval.add_to_relation(RelationEntry::new(
+                &self.less_than_elements,
+                -E::EF::from(op.is_real.clone()),
+                &values,
+            ));
+        }
         eval.finalize_logup_in_pairs();
         eval
     }

@@ -8,6 +8,14 @@ macro_rules! implement_field_array_type {
 
         impl<F: Copy> Copy for $type_name<F> {}
 
+        impl<F> $type_name<F> {
+            /// Create a new instance of the type from eval felts
+            /// This should be used only in evaluation context
+            pub fn from_eval_felts(value: [F; N_U64_LIMBS]) -> Self {
+                Self(value)
+            }
+        }
+
         impl<F: Copy + Default + Ord + From<u32>> $type_name<F> {
             /// Create a new instance of the type
             /// # Panics

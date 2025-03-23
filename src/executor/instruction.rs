@@ -1,4 +1,18 @@
-use crate::imt::{LeafFelts, MerklePath, MerkleProof};
+use std::array;
+
+use stwo_prover::{constraint_framework::EvalAtRow, core::fields::m31::BaseField, relation};
+
+use crate::{
+    hash::N_HASH,
+    imt::{IndexBits, LeafFelts, MerklePath, MerkleProof, MERKLE_HEIGHT, N_LEAF_FELTS},
+};
+
+pub const N_INSTRUCTION_FELTS: usize = 1 // opcode
+    + 2 * MERKLE_HEIGHT * N_HASH // 2 * merkle proofs
+    + 4 * (MERKLE_HEIGHT + 1) * N_HASH // 4 * merkle paths
+    + 2 * N_LEAF_FELTS // 2 * leafs
+    + 2 * MERKLE_HEIGHT // 2 * indexes
+    + 1; // is_real
 
 /// Instruction represents a single instruction in the program
 /// Represents an instruction with its opcode, Merkle proof, and Merkle path.
@@ -6,7 +20,7 @@ use crate::imt::{LeafFelts, MerklePath, MerkleProof};
 #[derive(Clone, Copy)]
 pub struct Instruction<F> {
     /// The opcode of the instruction
-    pub opcode: Opcode,
+    pub opcode: F,
     /// Low Leafs Merkle Proof to which the instruction applies
     /// Merkle Proof contains sibling hashes of the leafs in the path from the leaf to the root
     pub low_merkle_proof: MerkleProof<F>,
@@ -16,7 +30,7 @@ pub struct Instruction<F> {
     /// Updated Low Leafs Merkle Path after the instruction is applied
     pub updated_low_merkle_path: MerklePath<F>,
     /// Low Leafs Index in the IMT
-    pub low_index: F,
+    pub low_index: IndexBits<F>,
     /// Low Leaf
     pub low_leaf: LeafFelts<F>,
     /// Merkle Proof of the leaf to which the instruction applies
@@ -26,21 +40,126 @@ pub struct Instruction<F> {
     /// Updated Merkle Path after the instruction is applied
     pub updated_merkle_path: MerklePath<F>,
     /// Index of the leaf in the IMT
-    pub index: F,
+    pub index: IndexBits<F>,
     /// Leaf to which the instruction applies
     pub leaf: LeafFelts<F>,
+    /// is_real flag to check if the operation is not among the dummy padded operations
+    pub is_real: F,
 }
 
+impl<F> Instruction<F> {
+    /// from_eval returns a LessThanOp instance from a given EvalAtRow instance
+    pub fn from_eval<E: EvalAtRow>(eval: &mut E) -> Instruction<E::F> {
+        let opcode = eval.next_trace_mask();
+        let low_merkle_proof = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
+        let low_merkle_path = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
+        let updated_low_merkle_path =
+            array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
+        let low_index = array::from_fn(|_| eval.next_trace_mask());
+        let low_leaf = array::from_fn(|_| eval.next_trace_mask());
+        let merkle_proof = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
+        let merkle_path = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
+        let updated_merkle_path = array::from_fn(|_| array::from_fn(|_| eval.next_trace_mask()));
+        let index = array::from_fn(|_| eval.next_trace_mask());
+        let leaf = array::from_fn(|_| eval.next_trace_mask());
+        let is_real = eval.next_trace_mask();
+        Instruction {
+            opcode,
+            low_merkle_proof,
+            low_merkle_path,
+            updated_low_merkle_path,
+            low_index,
+            low_leaf,
+            merkle_proof,
+            merkle_path,
+            updated_merkle_path,
+            index,
+            leaf,
+            is_real,
+        }
+    }
+}
+
+pub struct InstructionColumn;
+
+impl InstructionColumn {
+    pub const OPCODE: usize = 0;
+    pub const LOW_MERKLE_PROOF: usize = Self::OPCODE + 1;
+    pub const LOW_MERKLE_PATH: usize = Self::LOW_MERKLE_PROOF + MERKLE_HEIGHT * N_HASH;
+    pub const UPDATED_LOW_MERKLE_PATH: usize = Self::LOW_MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
+    pub const LOW_INDEX: usize = Self::UPDATED_LOW_MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
+    pub const LOW_LEAF: usize = Self::LOW_INDEX + MERKLE_HEIGHT;
+    pub const MERKLE_PROOF: usize = Self::LOW_LEAF + N_LEAF_FELTS;
+    pub const MERKLE_PATH: usize = Self::MERKLE_PROOF + MERKLE_HEIGHT * N_HASH;
+    pub const UPDATED_MERKLE_PATH: usize = Self::MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
+    pub const INDEX: usize = Self::UPDATED_MERKLE_PATH + (MERKLE_HEIGHT + 1) * N_HASH;
+    pub const LEAF: usize = Self::INDEX + MERKLE_HEIGHT;
+    pub const IS_REAL: usize = Self::LEAF + N_LEAF_FELTS;
+    pub const N_INSTRUCTION_FELTS: usize = Self::IS_REAL + 1;
+}
+
+// InstructionElements are used in the processor component
+// and yielded by the specific insutruction's component
+// the number of elements used/yielded is equal to the number of columns in the instruction
+relation!(InstrctionElements, {
+    InstructionColumn::N_INSTRUCTION_FELTS
+});
+
+/// The Higher Level Operation to be performed in both the IMTs
 #[derive(Clone, Copy)]
 pub enum Opcode {
-    PlaceBuyOrder,
-    PlaceSellOrder,
+    InsertBuyOrder,
+    InsertSellOrder,
     UpdateBuyOrder,
     UpdateSellOrder,
     CancelBuyOrder,
     CancelSellOrder,
-    ExecuteBuyOrder,
-    ExecuteSellOrder,
-    PartialExecuteBuyOrder,
-    PartialExecuteSellOrder,
+    MatchBuyOrder,
+    MatchSellOrder,
+    PartialMatchBuyOrder,
+    PartialMatchSellOrder,
+}
+
+impl Opcode {
+    /// from field returns an Opcode instance from a given field
+    pub fn from_field(felt: BaseField) -> Opcode {
+        match felt.0 {
+            0 => Opcode::InsertBuyOrder,
+            1 => Opcode::InsertSellOrder,
+            2 => Opcode::UpdateBuyOrder,
+            3 => Opcode::UpdateSellOrder,
+            4 => Opcode::CancelBuyOrder,
+            5 => Opcode::CancelSellOrder,
+            6 => Opcode::MatchBuyOrder,
+            7 => Opcode::MatchSellOrder,
+            8 => Opcode::PartialMatchBuyOrder,
+            9 => Opcode::PartialMatchSellOrder,
+            _ => panic!("Invalid Opcode"),
+        }
+    }
+
+    /// to_field returns a field instance from a given Opcode
+    pub fn to_field(&self) -> BaseField {
+        match self {
+            Opcode::InsertBuyOrder => BaseField::from_u32_unchecked(0),
+            Opcode::InsertSellOrder => BaseField::from_u32_unchecked(1),
+            Opcode::UpdateBuyOrder => BaseField::from_u32_unchecked(2),
+            Opcode::UpdateSellOrder => BaseField::from_u32_unchecked(3),
+            Opcode::CancelBuyOrder => BaseField::from_u32_unchecked(4),
+            Opcode::CancelSellOrder => BaseField::from_u32_unchecked(5),
+            Opcode::MatchBuyOrder => BaseField::from_u32_unchecked(6),
+            Opcode::MatchSellOrder => BaseField::from_u32_unchecked(7),
+            Opcode::PartialMatchBuyOrder => BaseField::from_u32_unchecked(8),
+            Opcode::PartialMatchSellOrder => BaseField::from_u32_unchecked(9),
+        }
+    }
+}
+
+/// 5 Types of IMT Operations
+pub enum IMTOperation {
+    Insertion,
+    Update,
+    Deletion,
+    Match,
+    PartialMatch,
 }

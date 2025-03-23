@@ -9,6 +9,7 @@ pub enum IMTError {
     InvalidNode,
     OperationFailed(String),
     InsufficientVolumeToFill(u64, u64),
+    InvalidU8Pair(u32, u32),
 }
 
 impl fmt::Display for IMTError {
@@ -23,6 +24,7 @@ impl fmt::Display for IMTError {
             IMTError::InsufficientVolumeToFill(volume, available) => {
                 write!(f, "Insufficient volume to fill: {} > {}", volume, available)
             }
+            IMTError::InvalidU8Pair(a, b) => write!(f, "Invalid u8 pair: {} {}", a, b),
         }
     }
 }

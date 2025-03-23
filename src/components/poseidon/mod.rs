@@ -268,8 +268,13 @@ impl TraceSize for PoseidonColumn {
 
 #[cfg(test)]
 mod tests {
+    use std::{cell::RefCell, rc::Rc};
+
     use super::*;
-    use crate::{executor::record::ExecutionTrace, imt::order::Order, imt::BuyIMT};
+    use crate::{
+        executor::record::ExecutionTrace,
+        imt::{order::Order, BuyIMT, SellIMT},
+    };
     use rand::Rng;
     use stwo_prover::{
         constraint_framework::{assert_constraints, preprocessed_columns::IsFirst},
@@ -280,22 +285,29 @@ mod tests {
     fn test_poseidon_constraints() {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
-        let mut record = ExecutionTrace::new();
-        let mut imt = BuyIMT::new(&mut record);
+        let record = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut buy_imt = BuyIMT::new(Rc::clone(&record));
+        let mut sell_imt = SellIMT::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
         let n = 1_000;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
-            let order = Order::new(rng.gen(), rng.gen(), time);
-            imt.insert(order).unwrap();
+            let buy_order = Order::new(rng.gen(), rng.gen(), time);
+            let sell_order = Order::new(rng.gen(), rng.gen(), time);
+            buy_imt.insert(buy_order).unwrap();
+            sell_imt.insert(sell_order).unwrap();
         }
-        let log_size = (record.poseidon_operations.len() / N_INSTANCES_PER_ROW - 1).ilog2() + 1;
+
+        let execution_trace = std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
+
+        let log_size =
+            (execution_trace.poseidon_operations.len() / N_INSTANCES_PER_ROW - 1).ilog2() + 1;
         span.exit();
 
         // Trace.
-        let (trace, claim) = trace(record.poseidon_operations);
+        let (trace, claim) = trace(execution_trace.poseidon_operations);
         let poseidon_elements = PoseidonElements::dummy();
         let (interaction_trace, interaction_claim) = interaction_trace(&trace, &poseidon_elements);
 
