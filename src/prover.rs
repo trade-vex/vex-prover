@@ -165,7 +165,6 @@ pub fn prove_vex(
     let mut tree_builder = commitment_scheme.tree_builder();
     let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
         trace.byte_operations,
-        &interaction_elements.and_elements,
         &interaction_elements.less_than_u8_elements,
         &interaction_elements.range_check_u8_elements,
     );
@@ -432,7 +431,7 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 7;
+        let n = 1 << 10;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;

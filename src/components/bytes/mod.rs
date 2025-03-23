@@ -13,10 +13,9 @@ pub use constraints::{BytesComponent, BytesEval};
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
 /// U8 Operations
-/// Index- 0: multiplicities of and operation for a u8 pair
-/// Index- 1: multiplicities of less than range checks for u8 pairs. checks a < b < 256
-/// Index- 2: multiplicities of range check for a pair of u8. checks if a < 256 && b < 256
-pub type ByteOperations = [BaseColumn; 3];
+/// Index- 0: multiplicities of less than range checks for u8 pairs. checks a < b < 256
+/// Index- 1: multiplicities of range check for a pair of u8. checks if a < 256 && b < 256
+pub type ByteOperations = [BaseColumn; 2];
 
 /// Element Bits Represents the number of bits for which the operation is pre-computed.
 pub const ELEMENT_BITS: u32 = 8;
@@ -26,24 +25,23 @@ pub const ELEMENT_BITS: u32 = 8;
 pub const LOG_SIZE: u32 = 2 * ELEMENT_BITS;
 
 /// Number of PreProcessed Columns for Bytes Component.
-pub const N_PREPROCESSED_COLUMNS: usize = 4;
+pub const N_PREPROCESSED_COLUMNS: usize = 3;
 
 /// Bytes Component is the PreProcessed Table for Binary Operations b/w pair of ELEMENT_BITS elements.
 #[derive(Debug, Clone)]
 pub enum BytesPreProcessedColumn {
     A = 0,
     B = 1,
-    CAnd = 2,
-    CLessThanU8 = 3,
+    CLessThanU8 = 2,
 }
 
 impl TraceSize for BytesPreProcessedColumn {
-    /// A, B, CAnd, CLessThanU8, is_first
-    const PREPROCESSED_COLS: usize = 5;
-    /// multiplicities of and, less than, and range check operations
-    const MAIN_COLS: usize = 3;
-    /// (and, less than) batched column + range check interaction column
-    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
+    /// A, B, CLessThanU8, is_first
+    const PREPROCESSED_COLS: usize = 4;
+    /// multiplicities of less than, and range check operations
+    const MAIN_COLS: usize = 2;
+    /// (less than, range check) batched interaction columns
+    const INTERACTION_COLS: usize = SECURE_EXTENSION_DEGREE;
 }
 
 impl BytesPreProcessedColumn {
@@ -57,8 +55,7 @@ impl BytesPreProcessedColumn {
         match self {
             Self::A => 0,
             Self::B => 1,
-            Self::CAnd => 2,
-            Self::CLessThanU8 => 3,
+            Self::CLessThanU8 => 2,
         }
     }
 }
@@ -66,9 +63,7 @@ impl BytesPreProcessedColumn {
 // Relation Elements for and,
 // a ==> First Operand
 // b ==> Second Operand
-// c_and ==> a & b
 // c_less_than ==> a < b
-relation!(AndElements, 3);
 relation!(LessThanU8Elements, 3);
 relation!(RangeCheckU8Elements, 2);
 
@@ -97,11 +92,7 @@ mod tests {
         for _ in 0..n {
             let a = rng.gen_range(0..256);
             let b = rng.gen_range(0..256);
-            record.add_and_u8_event(a, b).unwrap();
-            if a != b {
-                let (min, max) = if a < b { (a, b) } else { (b, a) };
-                record.add_less_than_u8_event(min, max).unwrap();
-            }
+            record.add_less_than_u8_event(a, b).unwrap();
             record.add_range_check_u8_event(a, b).unwrap();
         }
         span.exit();
@@ -109,7 +100,6 @@ mod tests {
         let mut channel = Blake2sChannel::default();
 
         // Relation Elements
-        let and_elements = AndElements::draw(&mut channel);
         let less_than_u8_elements = LessThanU8Elements::draw(&mut channel);
         let range_check_u8_elements = RangeCheckU8Elements::draw(&mut channel);
 
@@ -119,7 +109,6 @@ mod tests {
         let (trace, claim) = trace(record.byte_operations.clone());
         let (interaction_trace, interaction_claim) = interaction_trace(
             record.byte_operations,
-            &and_elements,
             &less_than_u8_elements,
             &range_check_u8_elements,
         );
@@ -129,7 +118,6 @@ mod tests {
         let trace_polys = TreeVec::<Vec<_>>::map_cols(trace, |c| c.interpolate());
 
         let component = BytesEval {
-            and_elements,
             less_than_u8_elements,
             range_check_u8_elements,
             claim,

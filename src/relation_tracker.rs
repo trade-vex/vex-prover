@@ -12,7 +12,7 @@ use stwo_prover::core::poly::circle::CanonicCoset;
 use tracing::info;
 
 use crate::components::addition::{AddElements, AddEval};
-use crate::components::bytes::{AndElements, BytesEval, LessThanU8Elements, RangeCheckU8Elements};
+use crate::components::bytes::{BytesEval, LessThanU8Elements, RangeCheckU8Elements};
 use crate::components::insertions::InsertionsEval;
 use crate::components::less_than::{LessThanElements, LessThanEval, StrictLessThanElements};
 use crate::components::order_match::{MatchElements, MatchEval};
@@ -47,7 +47,6 @@ pub fn track_vex_relations<MC: MerkleChannel>(
             tree_span_provider,
             BytesEval {
                 claim: claim.bytes_claim.clone(),
-                and_elements: AndElements::dummy(),
                 less_than_u8_elements: LessThanU8Elements::dummy(),
                 range_check_u8_elements: RangeCheckU8Elements::dummy(),
             },
