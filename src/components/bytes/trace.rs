@@ -88,7 +88,7 @@ pub fn trace(
 
 /// Interaction Trace for the Byte Events For Logup Constraints
 pub fn interaction_trace(
-    byte_operations: ByteOperations,
+    trace: &ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     less_than_u8_elements: &LessThanU8Elements,
     range_check_u8_elements: &RangeCheckU8Elements,
 ) -> (
@@ -132,8 +132,8 @@ pub fn interaction_trace(
         let range_check_elements: PackedSecureField = range_check_u8_elements
             .combine(&[a, b].map(|x| unsafe { PackedBaseField::from_simd_unchecked(x) }));
 
-        let less_than_mult = PackedSecureField::from(byte_operations[0].data[vec_row]);
-        let range_check_mult = PackedSecureField::from(byte_operations[1].data[vec_row]);
+        let less_than_mult = PackedSecureField::from(trace[0].data[vec_row]);
+        let range_check_mult = PackedSecureField::from(trace[1].data[vec_row]);
         let denom = less_than_elements * range_check_elements;
         let num = -(less_than_mult * range_check_elements + range_check_mult * less_than_elements);
         col_gen.write_frac(vec_row, num, denom);

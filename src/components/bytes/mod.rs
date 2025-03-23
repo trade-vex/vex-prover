@@ -108,7 +108,7 @@ mod tests {
         let constant_trace = preprocessed_trace();
         let (trace, claim) = trace(record.byte_operations.clone());
         let (interaction_trace, interaction_claim) = interaction_trace(
-            record.byte_operations,
+            &trace,
             &less_than_u8_elements,
             &range_check_u8_elements,
         );

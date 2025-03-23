@@ -109,7 +109,7 @@ pub fn prove_vex(
         partial_order_match::trace::<Sell, Passive>(trace.sell_passive_partial_match);
 
     // Extend the main trace with the components
-    tree_builder.extend_evals(bytes_trace);
+    tree_builder.extend_evals(bytes_trace.clone());
     tree_builder.extend_evals(poseidon_trace.clone());
     tree_builder.extend_evals(strict_less_than_trace.clone());
     tree_builder.extend_evals(less_than_trace.clone());
@@ -164,7 +164,7 @@ pub fn prove_vex(
 
     let mut tree_builder = commitment_scheme.tree_builder();
     let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
-        trace.byte_operations,
+        &bytes_trace,
         &interaction_elements.less_than_u8_elements,
         &interaction_elements.range_check_u8_elements,
     );
