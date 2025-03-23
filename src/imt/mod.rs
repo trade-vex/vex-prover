@@ -447,7 +447,7 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
 
     /// Finds the index of the leaf in the tree which has the given Price, Time.
     #[inline]
-    fn find(&self, key: &PriceTime<BaseField, S>) -> Result<usize, IMTError> {
+    pub fn find(&self, key: &PriceTime<BaseField, S>) -> Result<usize, IMTError> {
         self.index_map
             .get(key)
             .copied()

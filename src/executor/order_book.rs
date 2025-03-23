@@ -142,6 +142,96 @@ impl OrderBook {
         self.match_sell(order)?;
         Ok(())
     }
+    /// Cancel a buy order in the order book
+    /// Returns an error if the order doesn't exist or other IMT errors occur
+    pub fn cancel_buy_order(&mut self, price_time: PriceTime<BaseField, Buy>) -> Result<(), IMTError> {
+        debug!("Canceling buy order with price_time: {:?}", price_time);
+
+        // Get the index of the order to cancel
+        let index = self.buy_imt.find(&price_time)?;
+        let initial_state = self.state.clone();
+        let proof = self.buy_imt.cancel_at_index(index)?;
+        assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+        
+        let mut final_state = initial_state.clone();
+        final_state.n += BaseField::one();
+        final_state.buy_root_hash = self.buy_imt.root();
+        final_state.buy_imt_priority = self.buy_imt.best_price_time();
+        self.state = final_state;
+
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            initial_state.n,
+            initial_state.buy_root_hash,
+            initial_state.buy_imt_priority,
+            initial_state.sell_root_hash,
+            initial_state.sell_imt_priority,
+            Opcode::CancelBuyOrder.to_field(),
+            proof.low_merkle_proof,
+            proof.low_merkle_path,
+            proof.low_merkle_updated_path,
+            proof.low_index,
+            proof.low_leaf.to_felts(),
+            proof.cancel_leaf_proof,
+            proof.cancel_leaf_path,
+            proof.cancel_leaf_updated_path,
+            proof.cancel_leaf_index,
+            proof.cancel_leaf.to_felts(),
+            final_state.n,
+            final_state.buy_root_hash,
+            final_state.buy_imt_priority,
+            final_state.sell_root_hash,
+            final_state.sell_imt_priority,
+            BaseField::one()
+        );
+        self.trace.borrow_mut().add_instruction(instruction_felts);
+        Ok(())
+    }
+
+    /// Cancel a sell order in the order book
+    /// Returns an error if the order doesn't exist or other IMT errors occur
+    pub fn cancel_sell_order(&mut self, price_time: PriceTime<BaseField, Sell>) -> Result<(), IMTError> {
+        debug!("Canceling sell order with price_time: {:?}", price_time);
+
+        // Get the index of the order to cancel
+        let index = self.sell_imt.find(&price_time)?;
+        let initial_state = self.state.clone();
+        let proof = self.sell_imt.cancel_at_index(index)?;
+        assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+        
+        let mut final_state = initial_state.clone();
+        final_state.n += BaseField::one();
+        final_state.sell_root_hash = self.sell_imt.root();
+        final_state.sell_imt_priority = self.sell_imt.best_price_time();
+        self.state = final_state;
+
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            initial_state.n,
+            initial_state.buy_root_hash,
+            initial_state.buy_imt_priority,
+            initial_state.sell_root_hash,
+            initial_state.sell_imt_priority,
+            Opcode::CancelSellOrder.to_field(),
+            proof.low_merkle_proof,
+            proof.low_merkle_path,
+            proof.low_merkle_updated_path,
+            proof.low_index,
+            proof.low_leaf.to_felts(),
+            proof.cancel_leaf_proof,
+            proof.cancel_leaf_path,
+            proof.cancel_leaf_updated_path,
+            proof.cancel_leaf_index,
+            proof.cancel_leaf.to_felts(),
+            final_state.n,
+            final_state.buy_root_hash,
+            final_state.buy_imt_priority,
+            final_state.sell_root_hash,
+            final_state.sell_imt_priority,
+            BaseField::one()
+        );
+        self.trace.borrow_mut().add_instruction(instruction_felts);
+        Ok(())
+    }
+
 
     // @todo: state transition
     fn match_buy(&mut self, mut order: Order<BaseField, Buy>) -> Result<(), IMTError> {
