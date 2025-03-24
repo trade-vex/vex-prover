@@ -59,7 +59,7 @@ pub fn trace(
     let mut dummy = instructions[0];
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - instructions.len() {
-        instructions.push(instructions[0]);
+        instructions.push(dummy);
     }
     let mut trace = ComponentTrace::<{ ProcessorColumn::MAIN_COLS }>::zeroed(log_size);
     trace
