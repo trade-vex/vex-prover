@@ -13,7 +13,7 @@ use crate::{
     imt::{side::OrderSide, MERKLE_HEIGHT, N_LEAF_FELTS},
 };
 use itertools::Itertools;
-use num_traits::{One, Zero};
+use num_traits::{One, Zero, pow};
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSlice,
@@ -37,7 +37,7 @@ use stwo_prover::{
         ColumnVec,
     },
 };
-use tracing::{debug, span, Level};
+use tracing::{span, Level};
 
 use super::{Deletions, DeletionsColumn};
 
@@ -57,21 +57,13 @@ pub fn trace<S: OrderSide>(
 ) {
     let _span = span!(Level::INFO, "Deletions: Main Trace", "{}", S::NAME).entered();
     // calculate shape of the trace table
-    println!("deletions length {}", deletions.len());
-    
-    // debug!("Log Size: {}", log_size);
-    // println!("Log Size: {}", log_size);
-    println!("LOG_N_LANES: {}", LOG_N_LANES);
     // pad deletions to a power of 2
     let mut dummy = deletions[0];
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();
-    while deletions.len() < 16 {
-        println!("hello");
+    while deletions.len() < pow(2, LOG_N_LANES.try_into().unwrap()) {
         deletions.push(deletions[0]);
     }
-    let mut log_size = (deletions.len() - 1).ilog2() + 1;
-    println!("log size2 {}", log_size);
-    println!("deletions length2 {}", deletions.len());
+    let log_size = (deletions.len() - 1).ilog2() + 1;
     let mut trace = ComponentTrace::<{ DeletionsColumn::MAIN_COLS }>::zeroed(log_size);
     trace
         .par_iter_mut()
@@ -151,7 +143,7 @@ pub fn interaction_trace<S: OrderSide>(
     let empty_leaf_data = BaseColumn::zeros(1 << log_size).data;
     let empty_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = array::from_fn(|_| &empty_leaf_data);
 
-    // A Total of 4 leaf updates are performed
+    // A Total of 2 leaf updates are performed
     // for each update
     //   - Verify the Merkle Proof, leaf hash + Merkle Proof -> Merkle Path
     //   - Update the leaf, merkle path ==> updated merkle path, proof remains the same
@@ -228,13 +220,11 @@ fn add_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
     mult: PackedSecureField,
 ) {
     let mut col_gen = logup_gen.new_col();
-    println!("cols length1 {}", cols.len());
     for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
         let values1: Vec<PackedBaseField> = cols.iter().map(|col| col[vec_row]).collect();
         let p1 = lookup_elements.combine(&values1);
         col_gen.write_frac(vec_row, mult * is_real[vec_row], p1);
     }
-    println!("cols length2 {}", cols.len());
     col_gen.finalize_col();
 }
 
