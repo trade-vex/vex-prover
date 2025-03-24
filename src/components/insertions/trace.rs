@@ -66,7 +66,7 @@ pub fn trace<S: OrderSide>(
     let mut dummy = insertions[0];
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - insertions.len() {
-        insertions.push(insertions[0]);
+        insertions.push(dummy);
     }
     let mut trace = ComponentTrace::<{ InsertionsColumn::MAIN_COLS }>::zeroed(log_size);
     trace
@@ -164,7 +164,7 @@ pub fn interaction_trace<S: OrderSide>(
     );
 
     // Constraint 3 in constraints.rs
-    // low_time < next_time
+    // next_time < inserted_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &next_time,
