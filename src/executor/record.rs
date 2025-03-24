@@ -9,7 +9,7 @@ use stwo_prover::core::{
 
 use super::{
     error::RangeCheckError,
-    instruction::{Opcode, N_INSTRUCTION_FELTS},
+    instruction::{InstructionColumn, Opcode, N_INSTRUCTION_FELTS},
 };
 use crate::{
     components::{
@@ -117,7 +117,7 @@ impl ExecutionTrace<BaseField> {
 
     /// Adds an instruction to the Execution Trace
     pub fn add_instruction(&mut self, instruction: InstructionFelts<BaseField>) {
-        match Opcode::from_field(instruction[0]) {
+        match Opcode::from_field(instruction[InstructionColumn::OPCODE]) {
             Opcode::InsertBuyOrder => self.buy_insert_order.push(instruction),
             Opcode::CancelBuyOrder => self.buy_delete_order.push(instruction),
             Opcode::UpdateBuyOrder => self.buy_modify_order.push(instruction),

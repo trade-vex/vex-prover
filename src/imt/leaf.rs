@@ -1,6 +1,7 @@
 use std::cmp::Ordering;
 use std::{array, marker::PhantomData};
 
+use super::PriceTimeFelts;
 use super::{
     side::{Buy, OrderSide, Sell, Side},
     N_LEAF_FELTS, N_U64_FELTS,
@@ -16,7 +17,7 @@ use num_traits::{One, Zero};
 use stwo_prover::constraint_framework::EvalAtRow;
 use stwo_prover::core::fields::m31::{BaseField, M31};
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Leaf<F, S> {
     /// Determines if the leaf is active
     /// active leaf indicate whether the node contains an order eligible to be executed
@@ -67,6 +68,16 @@ impl<S: OrderSide> Leaf<BaseField, S> {
         }
     }
 
+    /// Return The first leaf of the IMT
+    pub fn last() -> Self {
+        Self {
+            active: BaseField::one(),
+            volume: Volume::default(),
+            label: PriceTime::last(),
+            next: PriceTime::default(),
+        }
+    }
+
     /// Return inactive empty leaf
     pub fn empty() -> Self {
         Self {
@@ -113,10 +124,42 @@ impl<S: OrderSide> Leaf<BaseField, S> {
     pub const fn empty_felts() -> [BaseField; N_LEAF_FELTS] {
         [M31(0); N_LEAF_FELTS]
     }
+
+    /// active function returns boolean value of the active field
+    pub fn is_active(&self) -> bool {
+        self.active == BaseField::one()
+    }
+
+    /// returns price of the leaf
+    pub fn price(&self) -> Price<BaseField> {
+        self.label.price()
+    }
+
+    /// returns time of the leaf
+    pub fn time(&self) -> Time<BaseField> {
+        self.label.time()
+    }
+
+    /// returns the volume of the leaf
+    pub fn volume(&self) -> Volume<BaseField> {
+        self.volume
+    }
 }
 
-impl<F, S: OrderSide> Leaf<F, S> {
-    /// from_eval_felts returns a LessThanOp instance from a given EvalAtRow instance
+impl<S: OrderSide> std::fmt::Debug for Leaf<BaseField, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Leaf Order")
+            .field("volume", &self.volume.to_u64())
+            .field("price", &self.price().to_u64())
+            .field("time", &self.time().to_u64())
+            .field("next_price", &self.next.price().to_u64())
+            .field("next_time", &self.next.time().to_u64())
+            .finish()
+    }
+}
+
+impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
+    /// from_eval_felts returns a Leaf instance from a given EvalAtRow instance
     pub fn from_eval_felts<E: EvalAtRow>(eval: &mut E) -> Leaf<E::F, S> {
         let active = eval.next_trace_mask();
         let volume = array::from_fn(|_| eval.next_trace_mask());
@@ -132,13 +175,27 @@ impl<F, S: OrderSide> Leaf<F, S> {
             next: PriceTime::from_eval_felts(next_price, next_time),
         }
     }
+
+    /// first price time of the leaf
+    pub fn first_price_time_felts() -> PriceTimeFelts<F> {
+        let mut price_time = array::from_fn(|_| F::zero());
+        match S::side() {
+            Side::Buy => {
+                for i in 0..N_U64_FELTS {
+                    price_time[i] = F::from(M31(255))
+                }
+            }
+            Side::Sell => {} // sell sides first price time is default/zeros
+        }
+        price_time
+    }
 }
 
 pub type BuyLeaf<F> = Leaf<F, Buy>;
 pub type SellLeaf<F> = Leaf<F, Sell>;
 
 // Holds a price and a time, used as a key in the BTreeMap
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PriceTime<F, S> {
     price: Price<F>,
     time: Time<F>,
@@ -239,12 +296,12 @@ impl<S: OrderSide> PriceTime<BaseField, S> {
         }
     }
 
-    pub fn price(&self) -> &Price<BaseField> {
-        &self.price
+    pub fn price(&self) -> Price<BaseField> {
+        self.price
     }
 
-    pub fn time(&self) -> &Time<BaseField> {
-        &self.time
+    pub fn time(&self) -> Time<BaseField> {
+        self.time
     }
 
     pub fn into_inner(&self) -> (Price<BaseField>, Time<BaseField>) {
@@ -274,6 +331,10 @@ impl<S: OrderSide> PriceTime<BaseField, S> {
         felts[8..16].copy_from_slice(&self.time.to_felts());
         felts
     }
+
+    pub fn zero() -> Self {
+        PriceTime::default()
+    }
 }
 
 impl<F, S> PriceTime<F, S> {
@@ -283,6 +344,15 @@ impl<F, S> PriceTime<F, S> {
             time: Time::from_eval_felts(time),
             _marker: PhantomData,
         }
+    }
+}
+
+impl<S> std::fmt::Debug for PriceTime<BaseField, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PriceTime")
+            .field("price", &self.price.to_u64())
+            .field("time", &self.time.to_u64())
+            .finish()
     }
 }
 
@@ -298,15 +368,30 @@ mod tests {
     use std::collections::BTreeMap;
 
     #[test]
+    fn test_first_price_time() {
+        let first_price_time = Leaf::<BaseField, Buy>::first_price_time_felts();
+        let first_leaf = Leaf::<BaseField, Buy>::first();
+        assert_eq!(first_price_time, first_leaf.label.to_felts());
+        assert_eq!(first_leaf.time(), Time::from_u64(0)); // Time at first leaf is 0
+        assert_eq!(first_leaf.price(), Price::from_u64(u64::MAX)); // buy side => price is decreasing order as priority decreases
+
+        let first_price_time = Leaf::<BaseField, Sell>::first_price_time_felts();
+        let first_leaf = Leaf::<BaseField, Sell>::first();
+        assert_eq!(first_price_time, first_leaf.label.to_felts());
+        assert_eq!(first_leaf.time(), Time::from_u64(0)); // Time at first leaf is 0
+        assert_eq!(first_leaf.price(), Price::from_u64(0)); // sell side => price is increasing order as priority decreases
+    }
+
+    #[test]
     fn test_equality() {
         let pt1 = SellPriceTime::new(100, 8);
         let pt2 = SellPriceTime::new(410, 8);
         let pt3 = SellPriceTime::new(100, 9);
 
-        assert!(pt1 < pt2);
-        assert!(pt1 < pt3);
-        assert!(pt3 < pt2);
-        assert_ne!(pt1, pt3);
+        assert!(pt1 < pt2); // 100 is better sell price than 410
+        assert!(pt1 < pt3); // 100, 8 is better sell price than 100, 9 as time is earlier
+        assert!(pt3 < pt2); // 100, 9 is better sell price than 410, 8 as price is lower
+        assert_ne!(pt1, pt3); // 100, 8 is not equal to 100, 9
     }
 
     #[test]

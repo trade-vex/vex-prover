@@ -3,23 +3,22 @@ use rand::Rng;
 use std::cell::RefCell;
 use std::hint::black_box;
 use std::rc::Rc;
+use vex_prover::executor::order_book::OrderBook;
 use vex_prover::executor::record::ExecutionTrace;
 use vex_prover::imt::order::Order;
-use vex_prover::imt::{BuyIMT, SellIMT};
 
 fn insert_batch(n: u64) {
-    let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
-    let mut buy_imt = BuyIMT::new(Rc::clone(&trace));
-    let mut sell_imt = SellIMT::new(Rc::clone(&trace));
+    let record = Rc::new(RefCell::new(ExecutionTrace::new()));
+    let mut order_book = OrderBook::new(Rc::clone(&record));
     let mut rng = rand::thread_rng();
     let mut time = 1;
     for _ in 0..n {
         let time_inc = rng.gen_range(1..=16);
         time += time_inc;
-        let buy_order = Order::new(rng.gen(), rng.gen(), time);
-        let sell_order = Order::new(rng.gen(), rng.gen(), time);
-        buy_imt.insert(buy_order).unwrap();
-        sell_imt.insert(sell_order).unwrap();
+        let buy_order = Order::new(rng.gen_range(1..=50), rng.gen_range(51..=100), time);
+        let sell_order = Order::new(rng.gen_range(101..=150), rng.gen_range(151..=200), time);
+        order_book.place_buy_order(buy_order).unwrap();
+        order_book.place_sell_order(sell_order).unwrap();
     }
 }
 

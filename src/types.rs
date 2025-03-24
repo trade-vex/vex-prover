@@ -3,7 +3,7 @@ use std::ops::{Add, AddAssign, Sub, SubAssign};
 
 macro_rules! implement_field_array_type {
     ($type_name:ident) => {
-        #[derive(Debug, Clone, PartialEq, Eq)]
+        #[derive(Clone, PartialEq, Eq)]
         pub struct $type_name<F>([F; N_U64_LIMBS]);
 
         impl<F: Copy> Copy for $type_name<F> {}
@@ -171,6 +171,12 @@ macro_rules! implement_field_array_type {
                     bytes[i] = self.0[i].0 as u8;
                 }
                 u64::from_le_bytes(bytes)
+            }
+        }
+
+        impl std::fmt::Debug for $type_name<M31> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "{}({})", stringify!($type_name), self.to_u64())
             }
         }
     };

@@ -1,4 +1,7 @@
-use crate::{imt::N_ORDER_FELTS, types::Volume};
+use crate::{
+    imt::N_ORDER_FELTS,
+    types::{Price, Time, Volume},
+};
 use num_traits::One;
 use stwo_prover::core::fields::m31::BaseField;
 
@@ -8,7 +11,7 @@ use super::{
 };
 
 /// Order struct - generic in field BaseField
-#[derive(Debug, Clone, Copy)]
+#[derive(Clone, Copy)]
 pub struct Order<F, S> {
     /// volume of the order
     pub volume: Volume<F>,
@@ -42,11 +45,46 @@ impl<S: OrderSide> Order<BaseField, S> {
         felts
     }
 
-    pub fn new_buy(volume: u64, price: u64, time: u64) -> Order<BaseField, Buy> {
-        Order::<BaseField, Buy>::new(volume, price, time)
+    /// returns true if the order is invalid
+    pub fn is_invalid(&self) -> bool {
+        self.volume == Volume::zero()
+            || self.price() == Price::zero()
+            || self.time() == Time::zero()
     }
 
-    pub fn new_sell(volume: u64, price: u64, time: u64) -> Order<BaseField, Sell> {
+    pub fn price(&self) -> Price<BaseField> {
+        self.price_time.price()
+    }
+
+    pub fn time(&self) -> Time<BaseField> {
+        self.price_time.time()
+    }
+
+    pub fn volume(&self) -> Volume<BaseField> {
+        self.volume
+    }
+}
+
+impl Order<BaseField, Buy> {
+    /// Creates a new Buy Order.
+    pub fn new_buy(volume: u64, price: u64, time: u64) -> Self {
+        Order::<BaseField, Buy>::new(volume, price, time)
+    }
+}
+
+impl Order<BaseField, Sell> {
+    /// Creates a new Sell Order.
+    pub fn new_sell(volume: u64, price: u64, time: u64) -> Self {
         Order::<BaseField, Sell>::new(volume, price, time)
+    }
+}
+
+impl<S: OrderSide> std::fmt::Debug for Order<BaseField, S> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Order")
+            .field("volume", &self.volume.to_u64())
+            .field("price", &self.price().to_u64())
+            .field("time", &self.time().to_u64())
+            .finish()
     }
 }
