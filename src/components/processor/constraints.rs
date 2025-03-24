@@ -116,9 +116,12 @@ impl FrameworkEval for ProcessorEval {
             &final_state,
         ));
 
+        // Each vector member corresponds to a logup entry, and contains the batch number to which the
+        // entry should be added.
         // the inital and final state relations are batched in pairs in the first interaction column
         // the instruction elements are in the second interaction column
-        eval.finalize_logup_batched(&vec![0, 1, 0]);
+        let batching = vec![0, 1, 0];
+        eval.finalize_logup_batched(&batching);
         eval
     }
 }
