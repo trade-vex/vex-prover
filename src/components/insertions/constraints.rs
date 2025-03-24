@@ -119,7 +119,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             array::from_fn(|i| op.low_leaf[LeafColumn::NEXT_PRICE + i].clone());
         let next_time: [E::F; N_U64_FELTS] =
             array::from_fn(|i| op.low_leaf[LeafColumn::NEXT_TIME + i].clone());
-        // // time of inserted leaf must be greater than time of low leaf and low leaf's next
+        // time of inserted leaf must be greater than time of low leaf and low leaf's next
         eval.add_to_relation(RelationEntry::new(
             &self.strict_less_than_elements,
             mult.clone(),
@@ -310,7 +310,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                 }
             }
             Side::Sell => {
-                // initial state's sell root hash must be equal to the root in the inserted leaf's merkle path
+                // final state's sell root hash must be equal to the root in the inserted leaf's merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
                         op.final_state.sell_root_hash[i].clone()
@@ -392,7 +392,7 @@ fn eval_merkle_proof<E: EvalAtRow>(
     mult: E::EF,
 ) {
     // evaluate leaf hash
-    let leaf: Vec<E::F> = leaf[0..N_STATE].try_into().unwrap();
+    let leaf: Vec<E::F> = leaf[0..N_STATE].into();
     eval.add_to_relation(RelationEntry::new(
         poseidon_elements,
         mult.clone(),
