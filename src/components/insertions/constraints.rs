@@ -392,7 +392,7 @@ fn eval_merkle_proof<E: EvalAtRow>(
     mult: E::EF,
 ) {
     // evaluate leaf hash
-    let leaf: Vec<E::F> = leaf[0..N_STATE].try_into().unwrap();
+    let leaf: Vec<E::F> = leaf[0..N_STATE].into();
     eval.add_to_relation(RelationEntry::new(
         poseidon_elements,
         mult.clone(),
