@@ -75,7 +75,7 @@ pub struct InsertionsEval<S> {
 ///   10. Ensure that the resultant root hash from updating the low leaf is equal to the root contained in inactive leaf's merkle path.
 ///   11. Verify the Merkle Proof of the Inactive Leaf.
 ///   12. Update the Inactive Leaf's value to the inserted leaf using the updated_merkle_path.
-///   13. Ensure that the final state's count is equal to the initial state's count minus 1.
+///   13. Ensure that the final state's count is equal to the initial state's count plus 1.
 ///   14. Verify that the final root hash of the final state is equal to the root hash in the merkle path of the updated leaf.
 ///   15. The Priority must be updated only if the low leaf is the first leaf in the tree.
 ///       - The priority of the leaf will change only if the low leaf is the first leaf in the tree.

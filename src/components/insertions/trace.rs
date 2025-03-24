@@ -1,19 +1,20 @@
-use crate::components::less_than::{LessThanElements, StrictLessThanElements};
-use crate::components::poseidon::PoseidonElements;
-use crate::executor::flatten_single;
-use crate::executor::instruction::InstructionElements;
-use crate::hash::N_ELEMENTS;
-use crate::imt::leaf::LeafColumn;
-use crate::imt::side::Side;
-use crate::imt::N_U64_FELTS;
 use crate::{
-    components::{Claim, InteractionClaim, TraceSize},
-    executor::instruction::InstructionColumn,
+    components::{
+        less_than::{LessThanElements, StrictLessThanElements},
+        poseidon::PoseidonElements,
+        trace_utils::{
+            add_interaction_col, add_less_than_interaction_col, add_merkle_interaction_col,
+        },
+        Claim, InteractionClaim, TraceSize,
+    },
+    executor::{flatten_single, instruction::InstructionColumn, instruction::InstructionElements},
     flatten,
-    hash::{N_HASH, N_STATE},
-    imt::{side::OrderSide, MERKLE_HEIGHT, N_LEAF_FELTS},
+    hash::{N_ELEMENTS, N_HASH, N_STATE},
+    imt::{
+        leaf::LeafColumn, side::OrderSide, side::Side, MERKLE_HEIGHT, N_LEAF_FELTS, N_U64_FELTS,
+    },
 };
-use itertools::{chain, Itertools};
+use itertools::Itertools;
 use num_traits::{One, Zero};
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
@@ -22,12 +23,12 @@ use rayon::{
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
+    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst},
     core::{
         backend::{
             simd::{
                 column::BaseColumn,
-                m31::{PackedBaseField, LOG_N_LANES, N_LANES},
+                m31::{PackedBaseField, N_LANES},
                 qm31::PackedSecureField,
                 SimdBackend,
             },
@@ -65,7 +66,7 @@ pub fn trace<S: OrderSide>(
     let mut dummy = insertions[0];
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();
     for _ in 0..(1 << log_size) - insertions.len() {
-        insertions.push(insertions[0]);
+        insertions.push(dummy);
     }
     let mut trace = ComponentTrace::<{ InsertionsColumn::MAIN_COLS }>::zeroed(log_size);
     trace
@@ -163,7 +164,7 @@ pub fn interaction_trace<S: OrderSide>(
     );
 
     // Constraint 3 in constraints.rs
-    // low_time < next_time
+    // next_time < inserted_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &next_time,
@@ -282,96 +283,4 @@ pub fn interaction_trace<S: OrderSide>(
     );
     let (trace, claimed_sum) = logup_gen.finalize_last();
     (trace, InteractionClaim::new(claimed_sum))
-}
-
-/// add_interaction_col adds an interaction column to the logup generator for the given lookup elements in the given columns
-fn add_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
-    logup_gen: &mut LogupTraceGenerator,
-    cols: &[&Vec<PackedBaseField>],
-    is_real: &Vec<PackedBaseField>,
-    log_size: u32,
-    lookup_elements: &X,
-    mult: PackedSecureField,
-) {
-    let mut col_gen = logup_gen.new_col();
-    for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
-        let values1: Vec<PackedBaseField> = cols.iter().map(|col| col[vec_row]).collect();
-        let p1 = lookup_elements.combine(&values1);
-        col_gen.write_frac(vec_row, mult * is_real[vec_row], p1);
-    }
-    col_gen.finalize_col();
-}
-
-/// add_less_than_interaction_col adds an interaction column to the logup generator for the given a and b columns
-/// for strict less than comparison lookup elements must be StrictLessThanElements
-/// for less than comparison lookup elements must be LessThanElements
-fn add_less_than_interaction_col<R: Relation<PackedBaseField, PackedSecureField>>(
-    logup_gen: &mut LogupTraceGenerator,
-    col_a: &[&Vec<PackedBaseField>],
-    col_b: &[&Vec<PackedBaseField>],
-    is_real: &Vec<PackedBaseField>,
-    log_size: u32,
-    lookup_elements: &R,
-) {
-    let mut col_gen = logup_gen.new_col();
-    for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
-        let a: Vec<PackedBaseField> = col_a.iter().map(|col| col[vec_row]).collect();
-        let b: Vec<PackedBaseField> = col_b.iter().map(|col| col[vec_row]).collect();
-        let c = PackedBaseField::one();
-        let values = chain!(a.into_iter(), b.into_iter(), std::iter::once(c)).collect_vec();
-        let p1 = lookup_elements.combine(&values);
-        col_gen.write_frac(vec_row, PackedSecureField::one() * is_real[vec_row], p1);
-    }
-    col_gen.finalize_col();
-}
-
-/// add_merkle_interaction_col adds an interaction column to the logup generator for the current and sibling columns
-/// the left and right values are determined by the index column
-/// [left, right, hash] -> lookup_elements
-fn add_merkle_interaction_col<X: Relation<PackedBaseField, PackedSecureField>>(
-    logup_gen: &mut LogupTraceGenerator,
-    curr: &[&Vec<PackedBaseField>],
-    sibling: &[&Vec<PackedBaseField>],
-    hash: &[&Vec<PackedBaseField>],
-    index: &Vec<PackedBaseField>,
-    is_real: &Vec<PackedBaseField>,
-    log_size: u32,
-    lookup_elements: &X,
-) {
-    let mut col_gen = logup_gen.new_col();
-    for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
-        let cur: Vec<PackedBaseField> = curr.iter().map(|col| col[vec_row]).collect();
-        let sib: Vec<PackedBaseField> = sibling.iter().map(|col| col[vec_row]).collect();
-        let hash: Vec<PackedBaseField> = hash.iter().map(|col| col[vec_row]).collect();
-        let index: PackedBaseField = index[vec_row];
-        let (mut left, right): (Vec<PackedBaseField>, Vec<PackedBaseField>) = cur
-            .into_iter()
-            .zip(sib.into_iter())
-            .map(|(a, b)| {
-                let a = a.to_array();
-                let b = b.to_array();
-                let index = index.to_array();
-                let mut left = [BaseField::zero(); N_LANES];
-                let mut right = [BaseField::zero(); N_LANES];
-                for i in 0..N_LANES {
-                    if index[i] == BaseField::zero() {
-                        left[i] = a[i];
-                        right[i] = b[i];
-                    } else {
-                        left[i] = b[i];
-                        right[i] = a[i];
-                    }
-                }
-                (
-                    PackedBaseField::from_array(left),
-                    PackedBaseField::from_array(right),
-                )
-            })
-            .unzip();
-        left.extend(right);
-        left.extend(hash);
-        let p1 = lookup_elements.combine(&left);
-        col_gen.write_frac(vec_row, PackedSecureField::one() * is_real[vec_row], p1);
-    }
-    col_gen.finalize_col();
 }
