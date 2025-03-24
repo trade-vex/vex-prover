@@ -1,3 +1,4 @@
+pub mod error;
 pub mod instruction;
 pub mod order_book;
 pub mod record;

@@ -226,36 +226,36 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
             low_leaf.label.time().to_felts(),
             order.price_time.time().to_felts(),
         )?;
-        assert!(low_leaf.label.time() < order.price_time.time());
+        debug_assert!(low_leaf.label.time() < order.price_time.time());
         trace.add_strictly_less_than_event(
             low_leaf.next.time().to_felts(),
             order.price_time.time().to_felts(),
         )?;
-        assert!(low_leaf.next.time() < order.price_time.time());
+        debug_assert!(low_leaf.next.time() < order.price_time.time());
         match S::SIDE {
             Side::Buy => {
                 trace.add_less_than_event(
                     order.price_time.price().to_felts(),
                     low_leaf.label.price().to_felts(),
                 )?;
-                assert!(order.price_time.price() <= low_leaf.label.price());
+                debug_assert!(order.price_time.price() <= low_leaf.label.price());
                 trace.add_strictly_less_than_event(
                     low_leaf.next.price().to_felts(),
                     order.price_time.price().to_felts(),
                 )?;
-                assert!(low_leaf.next.price() < order.price_time.price());
+                debug_assert!(low_leaf.next.price() < order.price_time.price());
             }
             Side::Sell => {
                 trace.add_less_than_event(
                     low_leaf.label.price().to_felts(),
                     order.price_time.price().to_felts(),
                 )?;
-                assert!(low_leaf.label.price() <= order.price_time.price());
+                debug_assert!(low_leaf.label.price() <= order.price_time.price());
                 trace.add_strictly_less_than_event(
                     order.price_time.price().to_felts(),
                     low_leaf.next.price().to_felts(),
                 )?;
-                assert!(order.price_time.price() < low_leaf.next.price());
+                debug_assert!(order.price_time.price() < low_leaf.next.price());
             }
         }
         // manually drop the trace to avoid borrow_mut() conflicts in get_merkle_proof and finalize operations.

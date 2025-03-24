@@ -4,7 +4,10 @@ use crate::{
 };
 use itertools::{chain, Itertools};
 use num_traits::Zero;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::ParallelSlice,
+};
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
@@ -38,6 +41,9 @@ pub fn trace<const STRICT: bool>(
     Claim<LessThanColumn>,
 ) {
     let _span = span!(Level::INFO, "Less Than: Main Trace", "Strict {}", STRICT).entered();
+
+    // len must be greaer than 0
+    debug_assert!(!less_than_operations.is_empty());
     // calculate shape of the trace table
     let log_size = (less_than_operations.len() - 1).ilog2() + 1;
     debug!("Log Size: {}", log_size);
@@ -52,12 +58,7 @@ pub fn trace<const STRICT: bool>(
     // Each row of the trace is a LessThanOp field elements arranged as per the `LessThanColumn`
     trace
         .par_iter_mut()
-        .zip(
-            less_than_operations
-                .into_par_iter()
-                .chunks(N_LANES)
-                .into_par_iter(),
-        )
+        .zip(less_than_operations.par_chunks_exact(N_LANES))
         .for_each(|(row, data)| {
             for (i, cell) in row.into_iter().enumerate() {
                 let column_chunk = core::array::from_fn(|j| data[j][i]); // Extracts the i-th column from 16 rows
