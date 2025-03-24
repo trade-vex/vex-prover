@@ -65,7 +65,7 @@ impl OrderBook {
         }
         let initial_state = self.state.clone();
         let proof = self.buy_imt.insert(order)?;
-        assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
         final_state.buy_root_hash = self.buy_imt.root();
@@ -113,7 +113,7 @@ impl OrderBook {
         }
         let initial_state = self.state.clone();
         let proof = self.sell_imt.insert(order)?;
-        assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
         final_state.sell_root_hash = self.sell_imt.root();
