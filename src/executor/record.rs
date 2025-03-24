@@ -251,7 +251,9 @@ impl ExecutionTrace<BaseField> {
     /// Adds an And U8 Event by recording the corresponding Trace Row
     /// Returns an error if a or b is greater than 255
     pub fn add_and_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        assert!(a < 256 && b < 256, "Invalid U8 Pair");
+        if (a >= 256) || (b >= 256) {
+            return Err(IMTError::InvalidU8Pair(a, b));
+        }
         let offset = (a << 8) + b;
         self.byte_operations[0].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
@@ -260,7 +262,9 @@ impl ExecutionTrace<BaseField> {
     /// Adds a Less Than U8 Event by recording the corresponding Trace Row
     /// Returns an error if a or b is greater than 255
     pub fn add_less_than_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        assert!(a < 256 && b < 256, "Invalid U8 Pair");
+        if a >= 256 || b >= 256 {
+            return Err(IMTError::InvalidU8Pair(a, b));
+        }
         let offset = (a << 8) + b;
         self.byte_operations[1].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
