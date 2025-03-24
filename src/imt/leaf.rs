@@ -159,7 +159,7 @@ impl<S: OrderSide> std::fmt::Debug for Leaf<BaseField, S> {
 }
 
 impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
-    /// from_eval_felts returns a LessThanOp instance from a given EvalAtRow instance
+    /// from_eval_felts returns a Leaf instance from a given EvalAtRow instance
     pub fn from_eval_felts<E: EvalAtRow>(eval: &mut E) -> Leaf<E::F, S> {
         let active = eval.next_trace_mask();
         let volume = array::from_fn(|_| eval.next_trace_mask());
