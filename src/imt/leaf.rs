@@ -30,7 +30,7 @@ pub struct Leaf<F, S> {
     pub next: PriceTime<F, S>,
 }
 
-impl<F: Copy, S: Clone> Copy for Leaf<F, S> {}
+impl<F: Copy, S: Copy> Copy for Leaf<F, S> {}
 
 impl<F: Copy + Default, S> Default for Leaf<F, S> {
     fn default() -> Self {
@@ -202,7 +202,7 @@ pub struct PriceTime<F, S> {
     _marker: PhantomData<S>,
 }
 
-impl<F: Copy, S: Clone> Copy for PriceTime<F, S> {}
+impl<F: Copy, S: Copy> Copy for PriceTime<F, S> {}
 impl<F: Ord, S: OrderSide> Eq for PriceTime<F, S> {}
 
 impl<F: Copy + Default, S> Default for PriceTime<F, S> {

@@ -1,6 +1,8 @@
-use crate::{executor::instruction::IMTOperation, types::Price};
 use std::fmt::Debug;
+
 use stwo_prover::core::fields::m31::BaseField;
+
+use crate::{executor::instruction::IMTOperation, types::Price};
 
 /// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
