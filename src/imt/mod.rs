@@ -496,10 +496,12 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
             let sibling_index = if index % 2 == 0 { index + 1 } else { index - 1 };
             *sibling = if sibling_index < self.raw[i].len() {
                 self.raw[i][sibling_index]
-            } else if index % 2 == 0 {
-                Self::get_empty_hash(i)
             } else {
-                panic!("Unexpected condition: index is odd and sibling index is out of bounds");
+                debug_assert!(
+                    index % 2 != 0,
+                    "Unreachable: index is even and sibling index is out of bounds"
+                );
+                Self::get_empty_hash(i)
             };
             if index % 2 == 0 {
                 trace.add_merkle_hash_event(path[i], *sibling);
