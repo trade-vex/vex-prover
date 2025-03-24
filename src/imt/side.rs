@@ -17,7 +17,7 @@ pub enum Side {
 }
 
 /// Order side marker trait with compile-time constants
-pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Copy + Debug {
+pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Debug {
     /// Associated constant for side name
     const NAME: &'static str;
     /// Associated constant for side variant
