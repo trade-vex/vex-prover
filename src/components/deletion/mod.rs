@@ -21,12 +21,9 @@ impl TraceSize for DeletionsColumn {
     ///     - 1 for empty leaf
     ///  4*MERKLE_HEIGHT for merkle paths verification
     /// Total Poseidon Interactions: 4 + 4*MERKLE_HEIGHT
-    /// Target and parent time checks => 1 equality check
-    /// Target and parent price checks => 1 equality check
-    /// Total Equality Interactions: 2
     /// 1 column for yielding the final result
-    /// Total Columns: 4 + 4*MERKLE_HEIGHT + 2 + 1  = 4*MERKLE_HEIGHT + 9
-    const INTERACTION_COLS: usize = (4 * MERKLE_HEIGHT + 9) * SECURE_EXTENSION_DEGREE;
+    /// Total Columns: 4 + 4*MERKLE_HEIGHT + 1  = 4*MERKLE_HEIGHT + 5
+    const INTERACTION_COLS: usize = (4 * MERKLE_HEIGHT + 5) * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]
@@ -60,12 +57,10 @@ mod tests {
         poseidon_elements: &PoseidonElements,
         instruction_elements: &InstructionElements,
     ) { 
-        println!("Evaluating Deletions Trace");
         while deletions.len() < 16 {
-            println!("hello");
             deletions.push(deletions[0]);
         }
-        let mut log_size = (deletions.len() - 1).ilog2() + 1;
+        let log_size = (deletions.len() - 1).ilog2() + 1;
         let span = span!(Level::INFO, "Trace Generation", log_size).entered();
         let constant_trace = preprocessed_trace(log_size);
         let (trace, claim) = trace::<S>(deletions);
@@ -85,7 +80,6 @@ mod tests {
             claim,
             phantom: PhantomData,
         };
-        println!("Evaluating Constraints");
         // panics if the constraints are not satisfied
         assert_constraints(
             &trace_polys,
@@ -95,7 +89,6 @@ mod tests {
             },
             interaction_claim.claimed_sum,
         );
-        println!("Constraints Satisfied");
     }
 
     #[test_log::test]
