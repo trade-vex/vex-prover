@@ -1,7 +1,9 @@
 use itertools::Itertools;
 use num_traits::{One, Zero};
-use rayon::iter::{IndexedParallelIterator, ParallelIterator};
-use rayon::slice::ParallelSlice;
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::ParallelSlice,
+};
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::core::backend::simd::m31::N_LANES;
@@ -259,6 +261,8 @@ pub fn interaction_trace(
 pub struct PoseidonColumn;
 
 impl TraceSize for PoseidonColumn {
+    // is_first column
+    const PREPROCESSED_COLS: usize = 1;
     // initial state + state transitions for each round + final state + is_real
     const MAIN_COLS: usize = N_COLUMNS;
     // initial state + final hash is combined in 1 interaction column for 1 instance

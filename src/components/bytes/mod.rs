@@ -9,7 +9,7 @@ use super::TraceSize;
 mod constraints;
 mod trace;
 
-pub use constraints::BytesComponent;
+pub use constraints::{BytesComponent, BytesEval};
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
 /// U8 Operations
@@ -26,19 +26,24 @@ pub const ELEMENT_BITS: u32 = 8;
 pub const LOG_SIZE: u32 = 2 * ELEMENT_BITS;
 
 /// Number of PreProcessed Columns for Bytes Component.
-pub const N_PREPROCESSED_COLUMNS: usize = 4;
+pub const N_PREPROCESSED_COLUMNS: usize = 5;
 
 /// Bytes Component is the PreProcessed Table for Binary Operations b/w pair of ELEMENT_BITS elements.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum BytesPreProcessedColumn {
     A = 0,
     B = 1,
     CAnd = 2,
     CLessThanU8 = 3,
+    IsFirst = 4,
 }
 
 impl TraceSize for BytesPreProcessedColumn {
+    /// A, B, CAnd, CLessThanU8, is_first
+    const PREPROCESSED_COLS: usize = 5;
+    /// multiplicities of and, less than, and range check operations
     const MAIN_COLS: usize = 3;
+    /// (and, less than) batched column + range check interaction column
     const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
@@ -55,6 +60,7 @@ impl BytesPreProcessedColumn {
             Self::B => 1,
             Self::CAnd => 2,
             Self::CLessThanU8 => 3,
+            Self::IsFirst => 4,
         }
     }
 }

@@ -81,6 +81,8 @@ impl AddColumn {
 }
 
 impl TraceSize for AddColumn {
+    // is_first preprocessed column
+    const PREPROCESSED_COLS: usize = 1;
     // last field's index + offset
     const MAIN_COLS: usize = Self::IS_REAL + 1;
 

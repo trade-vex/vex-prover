@@ -1,5 +1,4 @@
-use crate::components::TraceSize;
-use itertools::{chain, izip};
+use itertools::{chain, izip, max};
 use num_traits::{One, Zero};
 use std::array;
 use stwo_prover::core::{
@@ -10,15 +9,18 @@ use stwo_prover::core::{
 use super::{
     error::RangeCheckError,
     instruction::{InstructionColumn, Opcode, N_INSTRUCTION_FELTS},
+    state::StateFelts,
 };
+
 use crate::{
     components::{
         addition::AddColumn,
         bytes::ByteOperations,
         less_than::{LessThanColumn, LessThanOperations},
-        poseidon::PoseidonOperations,
+        poseidon::{PoseidonOperations, N_INSTANCES_PER_ROW},
+        TraceSize, VexComponent,
     },
-    imt::{error::IMTError, LeafFelts},
+    imt::{error::IMTError, LeafFelts, N_U64_FELTS},
     types::N_U64_LIMBS,
 };
 
@@ -83,6 +85,10 @@ pub struct ExecutionTrace<F> {
     pub poseidon_operations: PoseidonOperations,
     /// Uint8 Operations
     pub byte_operations: ByteOperations,
+    /// Initial State of the Execution Trace
+    pub initial_state: StateFelts<F>,
+    /// Final State
+    pub final_state: StateFelts<F>,
 }
 
 impl Default for ExecutionTrace<BaseField> {
@@ -112,6 +118,8 @@ impl ExecutionTrace<BaseField> {
             comparison_operations: Vec::new(),
             poseidon_operations: Vec::new(),
             byte_operations: array::from_fn(|_| BaseColumn::zeros(1 << 16)),
+            initial_state: array::from_fn(|_| BaseField::zero()),
+            final_state: array::from_fn(|_| BaseField::zero()),
         }
     }
 
@@ -243,7 +251,9 @@ impl ExecutionTrace<BaseField> {
     /// Adds an And U8 Event by recording the corresponding Trace Row
     /// Returns an error if a or b is greater than 255
     pub fn add_and_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        assert!(a < 256 && b < 256, "Invalid U8 Pair");
+        if (a >= 256) || (b >= 256) {
+            return Err(IMTError::InvalidU8Pair(a, b));
+        }
         let offset = (a << 8) + b;
         self.byte_operations[0].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
@@ -252,7 +262,9 @@ impl ExecutionTrace<BaseField> {
     /// Adds a Less Than U8 Event by recording the corresponding Trace Row
     /// Returns an error if a or b is greater than 255
     pub fn add_less_than_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        assert!(a < 256 && b < 256, "Invalid U8 Pair");
+        if a >= 256 || b >= 256 {
+            return Err(IMTError::InvalidU8Pair(a, b));
+        }
         let offset = (a << 8) + b;
         self.byte_operations[1].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
@@ -269,6 +281,55 @@ impl ExecutionTrace<BaseField> {
         let offset = (a << 8) + b;
         self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
+    }
+
+    /// Max Log Size for the Execution Trace
+    pub fn max_log_size(&self) -> u32 {
+        let n = max([
+            self.buy_insert_order.len(),
+            self.buy_delete_order.len(),
+            self.buy_modify_order.len(),
+            self.buy_order_match.len(),
+            self.buy_order_partially_match.len(),
+            self.sell_insert_order.len(),
+            self.sell_delete_order.len(),
+            self.sell_modify_order.len(),
+            self.sell_order_match.len(),
+            self.sell_order_partially_match.len(),
+            self.instructions.len(),
+            self.add_operations.len(),
+            self.less_than_operations.len(),
+            self.strict_less_than_operations.len(),
+            self.comparison_operations.len(),
+            self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
+            1 << 2 * N_U64_FELTS, // 2^8 * 2^8 combinations
+        ])
+        .unwrap();
+        let log_size = (n - 1).ilog2() + 1;
+        log_size
+    }
+
+    /// Returns the log size for a given Component
+    pub fn log_size(&self, component: VexComponent) -> u32 {
+        let len = match component {
+            VexComponent::InsertBuyOrder => self.buy_insert_order.len(),
+            VexComponent::CancelBuyOrder => self.buy_delete_order.len(),
+            VexComponent::UpdateBuyOrder => self.buy_modify_order.len(),
+            VexComponent::MatchBuyOrder => self.buy_order_match.len(),
+            VexComponent::PartialMatchBuyOrder => self.buy_order_partially_match.len(),
+            VexComponent::InsertSellOrder => self.sell_insert_order.len(),
+            VexComponent::CancelSellOrder => self.sell_delete_order.len(),
+            VexComponent::UpdateSellOrder => self.sell_modify_order.len(),
+            VexComponent::MatchSellOrder => self.sell_order_match.len(),
+            VexComponent::PartialMatchSellOrder => self.sell_order_partially_match.len(),
+            VexComponent::Processor => self.instructions.len(),
+            VexComponent::Addition => self.add_operations.len(),
+            VexComponent::LessThan => self.less_than_operations.len(),
+            VexComponent::StrictLessThan => self.strict_less_than_operations.len(),
+            VexComponent::Poseidon => self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
+            VexComponent::Bytes => 1 << N_U64_FELTS, // 2^8 * 2^8 combinations
+        };
+        (len.max(1) - 1).ilog2() + 1
     }
 
     /// Adds a Less Than Event by recording the corresponding Trace Row
