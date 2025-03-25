@@ -58,7 +58,7 @@ pub struct DeletionsEval<S: OrderSide> {
 ///  10. Update the Parent Leaf's next value to be the target leaf's next value. //
 ///  11. Ensure that the resultant root hash from updating the parent leaf is consistent. //
 ///  12. Set the target leaf to inactive // and verify its Merkle proof.
-///  13. Ensure that the final state's count is equal to the initial state's count minus 1. //
+///  13. Ensure that the final state's count is equal to the initial state's count plus 1. //
 ///  14. Verify that the final root hash of the final state is equal to the root hash in the merkle path. --
 ///  15. The Priority must be updated if the target leaf was the first leaf in the tree. //
 ///        - If the first leaf is being deleted, the priority becomes the next leaf's priority.
@@ -157,8 +157,8 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             mult.clone(),
         );
 
-        // ensure that the state count is updated correctly (decremented by 1)
-        eval.add_constraint(op.initial_state.n.clone() - op.final_state.n.clone() - E::F::one());
+        // ensure that the state count is updated correctly (incremented by 1)
+        eval.add_constraint(op.final_state.n.clone() - op.initial_state.n.clone() - E::F::one());
 
         match S::side() {
             Side::Buy => {
