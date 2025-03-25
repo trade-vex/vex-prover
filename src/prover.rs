@@ -431,7 +431,7 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 10;
+        let n = 1 << 11;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;

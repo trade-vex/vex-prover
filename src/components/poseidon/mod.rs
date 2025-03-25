@@ -1,3 +1,4 @@
+use itertools::chain;
 use itertools::Itertools;
 use num_traits::{One, Zero};
 use rayon::iter::IndexedParallelIterator;
@@ -10,13 +11,12 @@ use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
     constraint_framework::{
-        logup::LogupTraceGenerator, EvalAtRow, FrameworkComponent, FrameworkEval, Relation,
-        RelationEntry,
+        logup::LogupTraceGenerator, EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
     },
     core::{
         backend::simd::{
-            m31::{PackedBaseField, LOG_N_LANES, N_LANES},
-            qm31::{PackedQM31, PackedSecureField},
+            m31::{PackedBaseField, N_LANES},
+            qm31::PackedSecureField,
             SimdBackend,
         },
         fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
@@ -27,7 +27,9 @@ use stwo_prover::{
 };
 use tracing::{span, Level};
 
+use super::trace_utils::add_interaction_col;
 use super::{Claim, InteractionClaim, TraceSize};
+use crate::hash::N_HASH;
 use crate::{
     constants::{EXTERNAL_ROUND_CONSTS, INTERNAL_ROUND_CONSTS},
     hash::{
@@ -237,22 +239,20 @@ pub fn interaction_trace(
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
     for rep_i in 0..N_INSTANCES_PER_ROW {
-        let mut col_gen = logup_gen.new_col();
-        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
-            // fetch the initial state and the final hash from the trace.
-            let values: [PackedBaseField; N_ELEMENTS] = array::from_fn(|i| {
-                if i < 16 {
-                    trace[N_COLUMNS_PER_REP * rep_i + 1 + i].data[vec_row]
-                } else {
-                    trace[N_COLUMNS_PER_REP * rep_i + 143 + i - 16].data[vec_row]
-                }
-            });
-            let is_real = trace[N_COLUMNS_PER_REP * rep_i].data[vec_row];
-            let denom0: PackedSecureField = poseidon_elements.combine(&values);
-            // the multiplicity is negative as the output is "yielded".
-            col_gen.write_frac(vec_row, -PackedQM31::one() * (is_real), denom0);
-        }
-        col_gen.finalize_col();
+        let state: [&Vec<PackedBaseField>; N_STATE] =
+            array::from_fn(|i| &trace[N_COLUMNS_PER_REP * rep_i + 1 + i].data);
+        let hash: [&Vec<PackedBaseField>; N_HASH] =
+            array::from_fn(|i| &trace[N_COLUMNS_PER_REP * rep_i + 143 + i].data);
+        let is_real = &trace[N_COLUMNS_PER_REP * rep_i].data;
+        let state_elements = chain!(state.into_iter(), hash.into_iter()).collect_vec();
+        add_interaction_col(
+            &mut logup_gen,
+            &state_elements,
+            is_real,
+            log_size,
+            poseidon_elements,
+            -PackedSecureField::one(),
+        );
     }
     let (trace, claimed_sum) = logup_gen.finalize_last();
     (trace, InteractionClaim::new(claimed_sum))
