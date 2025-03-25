@@ -237,7 +237,7 @@ pub fn interaction_trace(
 
     for rep_i in 0..N_INSTANCES_PER_ROW {
         let mut col_gen = logup_gen.new_col();
-        for vec_row in 0..(1 << log_size - LOG_N_LANES) {
+        for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
             // fetch the initial state and the final hash from the trace.
             let values: [PackedBaseField; N_ELEMENTS] = array::from_fn(|i| {
                 if i < 16 {
