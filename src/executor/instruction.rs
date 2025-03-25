@@ -32,7 +32,7 @@ pub struct Instruction<F> {
     pub low_index: IndexBits<F>,
     // @todo:rename this field
     /// Additional Data for Instruction
-    /// Insertions: Contains Actual Low Leaf 
+    /// Insertions: Contains Actual Low Leaf
     /// Updates: First N_U64_FELTS contain new Volume, rest zero
     /// PartialMatch: First N_U64_FELTS contain Filled Volume,
     ///               Next N_U64_FELTS contain Remaining Volume,

@@ -3,7 +3,8 @@ use crate::{
     executor::{flatten_single, instruction::IMTOperation},
     imt::{
         leaf::Leaf,
-        side::{MatchType, OrderMatchType}, N_LEAF_FELTS,
+        side::{MatchType, OrderMatchType},
+        N_LEAF_FELTS,
     },
 };
 use std::{array, marker::PhantomData};
@@ -39,18 +40,18 @@ pub struct MatchEval<S, T: OrderMatchType> {
 
 /// This implementation of the `FrameworkEval` trait for `MatchEval` provides methods to evaluate
 /// constraints on Order Matches to Buy and Sell IMT;
-/// 
+///
 /// The Implementation is Generic over the Order Side and Order Match Type.
 ///
 /// # Constaint Evaluation
 ///
 /// - `evaluate<E: EvalAtRow>(&self, mut eval: E) -> E`:
-/// 
-/// The Constraint Evaluation is done for 
+///
+/// The Constraint Evaluation is done for
 ///  1. The Initial State must be in sync with the merkle proofs.
 ///  1. The Merkle Proofs must be verified correctly.
 ///  2. The Final State must be updated correctly.
-/// 
+///
 ///  Order Match Operation within a Single IMT:
 ///  1) Updating the 0th Leaf's next value to point to the next leaf of the matched leaf.
 ///  2) Switch the active flag of the matched leaf to 0.
@@ -321,8 +322,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 // the final root hash for sell IMT must be equal to the initial root hash
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.sell_root[i].clone()
-                            - op.initial_state.sell_root[i].clone(),
+                        op.final_state.sell_root[i].clone() - op.initial_state.sell_root[i].clone(),
                     );
                 }
 
@@ -354,8 +354,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 // the final root hash for buy IMT must be equal to the initial root hash
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.buy_root[i].clone()
-                            - op.initial_state.buy_root[i].clone(),
+                        op.final_state.buy_root[i].clone() - op.initial_state.buy_root[i].clone(),
                     );
                 }
 

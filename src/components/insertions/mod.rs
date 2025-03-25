@@ -42,7 +42,7 @@ impl TraceSize for InsertionsColumn {
     ///     - 1 for updated leaf
     /// 4*MERKLE_HEIGHT for merkle paths verification
     /// Total Poseidon Interactions: 4 + 4*MERKLE_HEIGHT
-    /// inserted time < low_time, low.next_time => 2 strict less than checks
+    /// low_time, low.next_time < inserted time => 2 strict less than checks
     /// inserted price checks for low and next => 1 strict and 1 non-strict less than checks
     /// Total Strict Less Than Interactions: 3
     /// Total Non Strict Less Than Interactions: 1

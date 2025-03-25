@@ -164,7 +164,7 @@ pub fn interaction_trace<S: OrderSide>(
     );
 
     // Constraint 3 in constraints.rs
-    // low_time < next_time
+    // next_time < inserted_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &next_time,
@@ -266,7 +266,7 @@ pub fn interaction_trace<S: OrderSide>(
                     is_real,
                     log_size,
                     poseidon_elements,
-                    PackedSecureField::one()
+                    PackedSecureField::one(),
                 );
                 curr = hash.clone();
             }

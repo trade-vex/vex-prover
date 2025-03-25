@@ -15,7 +15,7 @@ pub use trace::{interaction_trace, preprocessed_trace, trace};
 pub type ProcessorComponent = FrameworkComponent<ProcessorEval>;
 
 /// Processor Column
-/// Each row of the trace is a Instruction field elements arranged as per the `InstructionColumn`
+/// Each row of the trace is an array of instruction field elements arranged as per the `InstructionColumn`
 /// The last field is a flag to indicate if the row is real or padded
 #[derive(Debug, Clone)]
 pub struct ProcessorColumn;

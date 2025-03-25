@@ -26,7 +26,7 @@ pub const ELEMENT_BITS: u32 = 8;
 pub const LOG_SIZE: u32 = 2 * ELEMENT_BITS;
 
 /// Number of PreProcessed Columns for Bytes Component.
-pub const N_PREPROCESSED_COLUMNS: usize = 4;
+pub const N_PREPROCESSED_COLUMNS: usize = 5;
 
 /// Bytes Component is the PreProcessed Table for Binary Operations b/w pair of ELEMENT_BITS elements.
 #[derive(Debug, Clone)]
@@ -35,6 +35,7 @@ pub enum BytesPreProcessedColumn {
     B = 1,
     CAnd = 2,
     CLessThanU8 = 3,
+    IsFirst = 4,
 }
 
 impl TraceSize for BytesPreProcessedColumn {
@@ -59,6 +60,7 @@ impl BytesPreProcessedColumn {
             Self::B => 1,
             Self::CAnd => 2,
             Self::CLessThanU8 => 3,
+            Self::IsFirst => 4,
         }
     }
 }

@@ -208,7 +208,7 @@ impl OrderBook {
 
             self.trace
                 .borrow_mut()
-                .add_less_than_event(order.price().to_felts(),match_leaf.price().to_felts())?;
+                .add_less_than_event(order.price().to_felts(), match_leaf.price().to_felts())?;
             if order.volume == Volume::zero() {
                 let proof = self.sell_imt.match_order()?;
                 self.finalize_match(proof, true)?;

@@ -173,8 +173,7 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
             let trade_price = match S::SIDE {
                 Side::Buy => {
                     let trade_price: [&Vec<PackedBaseField>; N_U64_FELTS] = array::from_fn(|i| {
-                        &trace
-                            [InstructionColumn::INITIAL_STATE + StateColumn::BEST_SELL_PRICE + i]
+                        &trace[InstructionColumn::INITIAL_STATE + StateColumn::BEST_SELL_PRICE + i]
                             .data
                     });
                     add_less_than_interaction_col(
