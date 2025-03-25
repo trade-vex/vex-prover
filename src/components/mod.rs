@@ -57,7 +57,7 @@ pub struct Claim<T: TraceSize> {
 
 impl<T: TraceSize> Claim<T> {
     pub const fn new(log_size: u32) -> Self {
-        _ = T::ASSERT;
+        T::ASSERT;
 
         Self {
             log_size,
@@ -100,7 +100,7 @@ pub struct InteractionClaim<T: TraceSize> {
 
 impl<T: TraceSize> InteractionClaim<T> {
     pub const fn new(claimed_sum: SecureField) -> Self {
-        let _ = T::ASSERT;
+        T::ASSERT;
 
         Self {
             claimed_sum,

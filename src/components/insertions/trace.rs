@@ -129,7 +129,7 @@ pub fn interaction_trace<S: OrderSide>(
     let index: [&Vec<PackedBaseField>; MERKLE_HEIGHT] =
         array::from_fn(|i| &trace[InstructionColumn::INDEX + i].data);
 
-    let mut updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = low_leaf.clone();
+    let mut updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = low_leaf;
     updated_low_leaf[LeafColumn::NEXT..N_LEAF_FELTS]
         .copy_from_slice(&leaf[LeafColumn::LABEL..LeafColumn::NEXT]);
 
@@ -268,7 +268,7 @@ pub fn interaction_trace<S: OrderSide>(
                     poseidon_elements,
                     PackedSecureField::one(),
                 );
-                curr = hash.clone();
+                curr = *hash;
             }
         }
     }
