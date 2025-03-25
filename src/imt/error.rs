@@ -10,7 +10,7 @@ pub enum IMTError {
     OperationFailed(String),
     InsufficientVolumeToFill(u64, u64),
     InvalidU8Pair(u32, u32),
-    InvalidOrder,    
+    InvalidOrder,
 }
 
 impl fmt::Display for IMTError {

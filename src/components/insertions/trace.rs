@@ -266,7 +266,7 @@ pub fn interaction_trace<S: OrderSide>(
                     is_real,
                     log_size,
                     poseidon_elements,
-                    PackedSecureField::one()
+                    PackedSecureField::one(),
                 );
                 curr = hash.clone();
             }
