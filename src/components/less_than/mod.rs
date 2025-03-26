@@ -146,7 +146,7 @@ mod tests {
             |eval| {
                 component.evaluate(eval);
             },
-            interaction_claim.claimed_sum,
+            (interaction_claim.claimed_sum, None),
         );
     }
 

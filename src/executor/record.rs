@@ -329,7 +329,9 @@ impl ExecutionTrace<BaseField> {
             VexComponent::Poseidon => self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
             VexComponent::Bytes => 1 << N_U64_FELTS, // 2^8 * 2^8 combinations
         };
-        (len.max(1) - 1).ilog2() + 1
+        let log_size = (len.max(1) - 1).ilog2() + 1;
+        println!("log_size: {}", log_size);
+        log_size
     }
 
     /// Adds a Less Than Event by recording the corresponding Trace Row

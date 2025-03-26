@@ -1,7 +1,7 @@
 use itertools::{chain, Itertools};
 use num_traits::{One, Zero};
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
+    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::gen_is_first, Relation},
     core::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
@@ -19,7 +19,7 @@ use stwo_prover::{
 pub fn is_first(
     log_size: u32,
 ) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
-    vec![IsFirst::new(log_size).gen_column_simd()]
+    vec![gen_is_first(log_size)]
 }
 
 /// add_interaction_col adds an interaction column to the logup generator for the given lookup elements in the given columns

@@ -1,5 +1,6 @@
 use stwo_prover::constraint_framework::{
-    EvalAtRow, FrameworkComponent, FrameworkEval, RelationEntry,
+    preprocessed_columns::PreprocessedColumn, EvalAtRow, FrameworkComponent, FrameworkEval,
+    RelationEntry,
 };
 
 use crate::components::Claim;
@@ -57,11 +58,14 @@ impl FrameworkEval for BytesEval {
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Retrieve preprocessed columns
-        let a = eval.get_preprocessed_column(BytesPreProcessedColumn::A.preprocessed_id());
-        let b = eval.get_preprocessed_column(BytesPreProcessedColumn::B.preprocessed_id());
-        let c_and = eval.get_preprocessed_column(BytesPreProcessedColumn::CAnd.preprocessed_id());
+        let a = eval.get_preprocessed_column(PreprocessedColumn::XorTable(8, 1, 0));
+
+        let b = eval.get_preprocessed_column(PreprocessedColumn::XorTable(8, 1, 1));
+
+        let c_and = eval.get_preprocessed_column(PreprocessedColumn::XorTable(8, 1, 2));
+
         let c_less_than =
-            eval.get_preprocessed_column(BytesPreProcessedColumn::CLessThanU8.preprocessed_id());
+            eval.get_preprocessed_column(PreprocessedColumn::XorTable(8, 1, 3));
 
         // Retrieve Multiplicities
         let and_mult = eval.next_trace_mask();

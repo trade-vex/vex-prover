@@ -171,7 +171,7 @@ impl VexComponents {
                 less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
                 range_check_u8_elements: interaction_elements.range_check_u8_elements.clone(),
             },
-            interaction_claim.bytes_interaction_claim.claimed_sum,
+            (interaction_claim.bytes_interaction_claim.claimed_sum, None),
         );
 
         let poseidon = poseidon::PoseidonComponent::new(
@@ -180,7 +180,10 @@ impl VexComponents {
                 claim: claim.poseidon_claim.clone(),
                 poseidon_elements: interaction_elements.poseidon_elements.clone(),
             },
-            interaction_claim.poseidon_interaction_claim.claimed_sum,
+            (
+                interaction_claim.poseidon_interaction_claim.claimed_sum,
+                None,
+            ),
         );
 
         let strict_less_than = less_than::StrictLessThanComponent::new(
@@ -191,9 +194,12 @@ impl VexComponents {
                 strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
                 less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
             },
-            interaction_claim
-                .strict_less_than_interaction_claim
-                .claimed_sum,
+            (
+                interaction_claim
+                    .strict_less_than_interaction_claim
+                    .claimed_sum,
+                None,
+            ),
         );
 
         let less_than = LessThanComponent::new(
@@ -204,7 +210,10 @@ impl VexComponents {
                 strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
                 less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
             },
-            interaction_claim.less_than_interaction_claim.claimed_sum,
+            (
+                interaction_claim.less_than_interaction_claim.claimed_sum,
+                None,
+            ),
         );
 
         let processor = ProcessorComponent::new(
@@ -214,7 +223,10 @@ impl VexComponents {
                 instruction_elements: interaction_elements.instruction_elements.clone(),
                 state_elements: interaction_elements.state_elements.clone(),
             },
-            interaction_claim.processor_interaction_claim.claimed_sum,
+            (
+                interaction_claim.processor_interaction_claim.claimed_sum,
+                None,
+            ),
         );
 
         let buy_insert = BuyInsertionComponent::new(
@@ -227,7 +239,10 @@ impl VexComponents {
                 strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
                 _side: PhantomData::<Buy>,
             },
-            interaction_claim.buy_insert_interaction_claim.claimed_sum,
+            (
+                interaction_claim.buy_insert_interaction_claim.claimed_sum,
+                None,
+            ),
         );
 
         let sell_insert = SellInsertionComponent::new(
@@ -240,7 +255,10 @@ impl VexComponents {
                 strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
                 _side: PhantomData::<Sell>,
             },
-            interaction_claim.sell_insert_interaction_claim.claimed_sum,
+            (
+                interaction_claim.sell_insert_interaction_claim.claimed_sum,
+                None,
+            ),
         );
 
         Self {

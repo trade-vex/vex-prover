@@ -1,5 +1,4 @@
 use stwo_prover::{
-    constraint_framework::preprocessed_columns::PreProcessedColumnId,
     core::{backend::simd::column::BaseColumn, fields::secure_column::SECURE_EXTENSION_DEGREE},
     relation,
 };
@@ -48,11 +47,6 @@ impl TraceSize for BytesPreProcessedColumn {
 }
 
 impl BytesPreProcessedColumn {
-    pub fn preprocessed_id(&self) -> PreProcessedColumnId {
-        PreProcessedColumnId {
-            id: format!("preprocessed_bytes_column_{:?}", self),
-        }
-    }
 
     pub fn index(&self) -> usize {
         match self {
@@ -145,7 +139,7 @@ mod tests {
             |eval| {
                 component.evaluate(eval);
             },
-            interaction_claim.claimed_sum,
+            (interaction_claim.claimed_sum, None),
         )
     }
 }

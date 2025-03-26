@@ -23,7 +23,7 @@ use rayon::{
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst},
+    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::gen_is_first},
     core::{
         backend::{
             simd::{
@@ -48,7 +48,7 @@ use super::{Insertions, InsertionsColumn};
 pub fn preprocessed_trace(
     log_size: u32,
 ) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
-    vec![IsFirst::new(log_size).gen_column_simd()]
+    vec![gen_is_first(log_size)]
 }
 
 /// Trace for the Insertion Operations, each row consisting of a [BaseField; InstructionColumn::MAIN_COLS]

@@ -10,7 +10,7 @@ use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterato
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
+    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::gen_is_first, Relation},
     core::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
@@ -29,7 +29,7 @@ use tracing::{debug, span, Level};
 pub fn preprocessed_trace(
     log_size: u32,
 ) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
-    vec![IsFirst::new(log_size).gen_column_simd()]
+    vec![gen_is_first(log_size)]
 }
 
 /// Generates the main trace for addition operations.

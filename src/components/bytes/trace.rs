@@ -6,7 +6,7 @@ use crate::components::{Claim, InteractionClaim};
 use std::{array, simd::u32x16};
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
+    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::gen_is_first, Relation},
     core::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
@@ -76,7 +76,7 @@ pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField
                 }));
         });
     let mut constant_trace = trace.to_evals().to_vec();
-    constant_trace.push(IsFirst::new(LOG_SIZE).gen_column_simd());
+    constant_trace.push(gen_is_first(LOG_SIZE));
     constant_trace
 }
 

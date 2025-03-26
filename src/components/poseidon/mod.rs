@@ -281,7 +281,7 @@ mod tests {
     };
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, preprocessed_columns::IsFirst},
+        constraint_framework::{assert_constraints, preprocessed_columns::gen_is_first},
         core::{pcs::TreeVec, poly::circle::CanonicCoset},
     };
 
@@ -316,7 +316,7 @@ mod tests {
         let (interaction_trace, interaction_claim) = interaction_trace(&trace, &poseidon_elements);
 
         let traces = TreeVec::new(vec![
-            vec![IsFirst::new(log_size).gen_column_simd()],
+            vec![gen_is_first(log_size)],
             trace,
             interaction_trace,
         ]);
@@ -334,7 +334,7 @@ mod tests {
             |eval| {
                 component.evaluate(eval);
             },
-            interaction_claim.claimed_sum,
+            (interaction_claim.claimed_sum, None),
         );
     }
 }

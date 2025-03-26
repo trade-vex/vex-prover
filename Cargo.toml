@@ -6,13 +6,30 @@ edition = "2021"
 [profile.release]
 debug = 1
 
+[features]
+default = []
+icicle = [
+    "stwo-prover/icicle",
+    "stwo-prover/parallel",
+    "icicle-cuda-runtime",
+    "icicle-core",
+    "icicle-m31",
+    "icicle-hash",
+]
+
 [dependencies]
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad", features = ["parallel"] }
-stwo-air-utils = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad" }
+stwo-prover = { git = "https://github.com/ingonyama-zk/icicle-stwo.git", rev="434455e84f1246347bac81990716c52866e74afa", features = [
+    "parallel",
+]}
+stwo-air-utils = { git = "https://github.com/ingonyama-zk/icicle-stwo.git", rev="434455e84f1246347bac81990716c52866e74afa" }
 tracing = "0.1"
 itertools = "0.12.0"
 num-traits = "0.2.19"
 rayon = { version = "1.10.0" }
+icicle-cuda-runtime = { git = "https://github.com/ingonyama-zk/icicle.git", optional = true, rev = "133c33ac7a2c9c2392f3c419c0b06d919e529804" }
+icicle-core = { git = "https://github.com/ingonyama-zk/icicle.git", optional = true, rev = "133c33ac7a2c9c2392f3c419c0b06d919e529804" }
+icicle-m31 = { git = "https://github.com/ingonyama-zk/icicle.git", optional = true, rev = "133c33ac7a2c9c2392f3c419c0b06d919e529804" }
+icicle-hash = { git = "https://github.com/ingonyama-zk/icicle.git", optional = true, rev = "133c33ac7a2c9c2392f3c419c0b06d919e529804" }
 
 [dev-dependencies]
 tracing-subscriber = "0.3"

@@ -37,7 +37,7 @@ pub fn prove_vex(
 
     // precompute twiddles for low degree polynomial extension
     let twiddles = SimdBackend::precompute_twiddles(
-        CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 2)
+        CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 3)
             .circle_domain()
             .half_coset,
     );
@@ -176,6 +176,7 @@ pub fn prove_vex(
     let span = span!(Level::INFO, "Proof Generation").entered();
     let component_builder = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
     let components = component_builder.provers();
+    println!("claim :{:?}", claim.log_sizes());
     let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
     span.exit();
 
@@ -288,6 +289,7 @@ mod tests {
             std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
         execution_trace.final_state = order_book.state().to_felts();
         span.exit();
+        
         let proof = prove_vex(execution_trace).unwrap();
         verify_vex(proof).unwrap();
     }
