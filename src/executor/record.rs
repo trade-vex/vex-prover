@@ -324,7 +324,7 @@ impl ExecutionTrace<BaseField> {
             VexComponent::PartialMatchSellOrder => self.sell_order_partially_match.len(),
             VexComponent::Processor => self.instructions.len(),
             VexComponent::Addition => self.add_operations.len(),
-            VexComponent::LessThan => self.less_than_operations.len(),
+            VexComponent::LessThan => 2 * self.less_than_operations.len(), // fix for icicle stwo
             VexComponent::StrictLessThan => self.strict_less_than_operations.len(),
             VexComponent::Poseidon => self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
             VexComponent::Bytes => 1 << N_U64_FELTS, // 2^8 * 2^8 combinations

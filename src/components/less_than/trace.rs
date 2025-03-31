@@ -45,7 +45,10 @@ pub fn trace<const STRICT: bool>(
     // len must be greaer than 0
     debug_assert!(!less_than_operations.is_empty());
     // calculate shape of the trace table
-    let log_size = (less_than_operations.len() - 1).ilog2() + 1;
+    let mut log_size = (less_than_operations.len() - 1).ilog2() + 1;
+    if !STRICT {
+        log_size += 1; // fix for icicle stwo
+    }
     debug!("Log Size: {}", log_size);
     // pad less_than_operations to a power of 2
     let mut dummy = less_than_operations[0];
