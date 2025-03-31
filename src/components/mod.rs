@@ -150,7 +150,7 @@ pub struct VexComponents {
     sell_insert: SellInsertionComponent,
     poseidon: PoseidonComponent,
     strict_less_than: StrictLessThanComponent,
-    // less_than: LessThanComponent,
+    less_than: LessThanComponent,
     bytes: BytesComponent,
 }
 
@@ -202,19 +202,19 @@ impl VexComponents {
             ),
         );
 
-        // let less_than = LessThanComponent::new(
-        //     tree_span_provider,
-        //     less_than::LessThanEval {
-        //         claim: claim.less_than_claim.clone(),
-        //         less_than_elements: interaction_elements.less_than_elements.clone(),
-        //         strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
-        //         less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
-        //     },
-        //     (
-        //         interaction_claim.less_than_interaction_claim.claimed_sum,
-        //         None,
-        //     ),
-        // );
+        let less_than = LessThanComponent::new(
+            tree_span_provider,
+            less_than::LessThanEval {
+                claim: claim.less_than_claim.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
+                less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
+            },
+            (
+                interaction_claim.less_than_interaction_claim.claimed_sum,
+                None,
+            ),
+        );
 
         let processor = ProcessorComponent::new(
             tree_span_provider,
@@ -264,7 +264,7 @@ impl VexComponents {
         Self {
             processor,
             strict_less_than,
-            // less_than,
+            less_than,
             buy_insert,
             sell_insert,
             poseidon,
@@ -278,7 +278,7 @@ impl VexComponents {
             &self.bytes,
             &self.poseidon,
             &self.strict_less_than,
-            // &self.less_than,
+            &self.less_than,
             &self.processor,
             &self.buy_insert,
             &self.sell_insert,

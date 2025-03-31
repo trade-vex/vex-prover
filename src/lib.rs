@@ -74,7 +74,7 @@ impl VexClaim {
                 self.bytes_claim.log_sizes(),
                 self.poseidon_claim.log_sizes(),
                 self.strict_less_than_claim.log_sizes(),
-                // self.less_than_claim.log_sizes(),
+                self.less_than_claim.log_sizes(),
                 self.processor_claim.log_sizes(),
                 self.buy_insert_claim.log_sizes(),
                 self.sell_insert_claim.log_sizes(),

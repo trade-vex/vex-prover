@@ -54,7 +54,7 @@ pub fn prove_vex(
     tree_builder.extend_evals(bytes::preprocessed_trace());
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Poseidon)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::StrictLessThan)));
-    // tree_builder.extend_evals(is_first(trace.log_size(VexComponent::LessThan)));
+    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::LessThan)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Processor)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertBuyOrder)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertSellOrder)));
@@ -76,7 +76,7 @@ pub fn prove_vex(
     tree_builder.extend_evals(bytes_trace);
     tree_builder.extend_evals(poseidon_trace.clone());
     tree_builder.extend_evals(strict_less_than_trace.clone());
-    // tree_builder.extend_evals(less_than_trace.clone());
+    tree_builder.extend_evals(less_than_trace.clone());
     tree_builder.extend_evals(processor_trace.clone());
     tree_builder.extend_evals(buy_insert_trace.clone());
     tree_builder.extend_evals(sell_insert_trace.clone());
@@ -151,7 +151,7 @@ pub fn prove_vex(
     tree_builder.extend_evals(bytes_interaction_trace);
     tree_builder.extend_evals(poseidon_interaction_trace);
     tree_builder.extend_evals(strict_less_than_interaction_trace);
-    // tree_builder.extend_evals(less_than_interaction_trace);
+    tree_builder.extend_evals(less_than_interaction_trace);
     tree_builder.extend_evals(processor_interaction_trace);
     tree_builder.extend_evals(buy_insert_interaction_trace);
     tree_builder.extend_evals(sell_insert_interaction_trace);
