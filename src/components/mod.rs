@@ -11,6 +11,9 @@ use stwo_prover::{
     },
 };
 
+#[cfg(feature = "icicle")]
+use stwo_prover::core::backend::icicle::IcicleBackend;
+
 use crate::{
     executor::{instruction::InstructionElements, state::StateElements},
     imt::side::{Buy, Sell},
@@ -274,6 +277,20 @@ impl VexComponents {
 
     /// Returns the ComponentProver of each components whose log sizes are in decreasing order.
     pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
+        vec![
+            &self.bytes,
+            &self.poseidon,
+            &self.strict_less_than,
+            &self.less_than,
+            &self.processor,
+            &self.buy_insert,
+            &self.sell_insert,
+        ]
+    }
+
+    /// Returns the ComponentProver of each components whose log sizes are in decreasing order.
+    #[cfg(feature = "icicle")]
+    pub fn icicle_provers(&self) -> Vec<&dyn ComponentProver<IcicleBackend>> {
         vec![
             &self.bytes,
             &self.poseidon,

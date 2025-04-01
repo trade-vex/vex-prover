@@ -5,7 +5,7 @@ use stwo_prover::{
         Relation, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
     },
     core::{
-        backend::simd::SimdBackend,
+        backend::{simd::SimdBackend, Backend, Column},
         channel::Blake2sChannel,
         fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
@@ -404,9 +404,16 @@ pub fn prove_vex(
 
     let span = span!(Level::INFO, "Proof Generation").entered();
     let component_builder = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
-    let components = component_builder.provers();
-    println!("claim :{:?}", claim.log_sizes());
-    let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
+
+    cfg_if::cfg_if! {
+        if #[cfg(feature = "icicle")] {
+            let components = component_builder.icicle_provers();
+            let proof = prover::prove::<Backend, _>(&components, channel, commitment_scheme)?;
+        } else {
+            let components = component_builder.provers();
+            let proof = prover::prove::<Backend, _>(&components, channel, commitment_scheme)?;
+        }
+    }
     span.exit();
 
     Ok(VexProof {
