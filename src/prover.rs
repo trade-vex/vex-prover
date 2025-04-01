@@ -36,13 +36,41 @@ pub fn prove_vex(
     // default config
     let config = PcsConfig::default();
 
+    // Calculate all component traces once to avoid recalculation
+    let span = span!(Level::INFO, "Component Trace Calculation").entered();
+    let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
+    let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations.clone());
+    let (strict_less_than_trace, strict_less_than_claim) =
+        less_than::trace::<true>(trace.strict_less_than_operations.clone());
+    let (less_than_trace, less_than_claim) =
+        less_than::trace::<false>(trace.less_than_operations.clone());
+    let (processor_trace, processor_claim) = processor::trace(trace.instructions.clone());
+    let (buy_insert_trace, buy_insert_claim) =
+        insertions::trace::<Buy>(trace.buy_insert_order.clone());
+    let (sell_insert_trace, sell_insert_claim) =
+        insertions::trace::<Sell>(trace.sell_insert_order.clone());
+
+    // Create the claim once
+    let claim = VexClaim {
+        final_state: trace.final_state.clone(),
+        initial_state: trace.initial_state.clone(),
+        processor_claim,
+        buy_insert_claim,
+        sell_insert_claim,
+        poseidon_claim,
+        strict_less_than_claim,
+        less_than_claim,
+        bytes_claim,
+    };
+    span.exit();
+
     #[cfg(feature = "icicle")]
     {
         type Backend = SimdBackend;
 
         // precompute twiddles for low degree polynomial extension
         let twiddles = Box::new(Backend::precompute_twiddles(
-            CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 3)
+            CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 2)
                 .circle_domain()
                 .half_coset,
         ));
@@ -68,19 +96,8 @@ pub fn prove_vex(
 
         let span = span!(Level::INFO, "Main Trace").entered();
         let mut tree_builder = commitment_scheme.tree_builder();
-        let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
-        let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations);
-        let (strict_less_than_trace, strict_less_than_claim) =
-            less_than::trace::<true>(trace.strict_less_than_operations);
-        let (less_than_trace, less_than_claim) =
-            less_than::trace::<false>(trace.less_than_operations);
-        let (processor_trace, processor_claim) = processor::trace(trace.instructions);
-        let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
-        let (sell_insert_trace, sell_insert_claim) =
-            insertions::trace::<Sell>(trace.sell_insert_order);
-
         // Extend the main trace with the components
-        tree_builder.extend_evals(bytes_trace);
+        tree_builder.extend_evals(bytes_trace.clone());
         tree_builder.extend_evals(poseidon_trace.clone());
         tree_builder.extend_evals(strict_less_than_trace.clone());
         tree_builder.extend_evals(less_than_trace.clone());
@@ -89,18 +106,6 @@ pub fn prove_vex(
         tree_builder.extend_evals(sell_insert_trace.clone());
 
         // create the VexClaim
-        let claim = VexClaim {
-            final_state: trace.final_state,
-            initial_state: trace.initial_state,
-            processor_claim,
-            buy_insert_claim,
-            sell_insert_claim,
-            poseidon_claim,
-            strict_less_than_claim,
-            less_than_claim,
-            bytes_claim,
-        };
-
         // Mix the claim into the channel.
         claim.mix_into(channel);
         // Commit the main trace.
@@ -114,7 +119,7 @@ pub fn prove_vex(
 
         let mut tree_builder = commitment_scheme.tree_builder();
         let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
-            trace.byte_operations,
+            trace.byte_operations.clone(),
             &interaction_elements.and_elements,
             &interaction_elements.less_than_u8_elements,
             &interaction_elements.range_check_u8_elements,
@@ -225,8 +230,9 @@ pub fn prove_vex(
     }
 
     // precompute twiddles for low degree polynomial extension
+    let log_size = trace.max_log_size();
     let twiddles = Box::new(Backend::precompute_twiddles(
-        CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 3)
+        CanonicCoset::new(log_size + config.fri_config.log_blowup_factor + 2)
             .circle_domain()
             .half_coset,
     ));
@@ -277,14 +283,6 @@ pub fn prove_vex(
 
     let span = span!(Level::INFO, "Main Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
-    let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
-    let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations);
-    let (strict_less_than_trace, strict_less_than_claim) =
-        less_than::trace::<true>(trace.strict_less_than_operations);
-    let (less_than_trace, less_than_claim) = less_than::trace::<false>(trace.less_than_operations);
-    let (processor_trace, processor_claim) = processor::trace(trace.instructions);
-    let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
-    let (sell_insert_trace, sell_insert_claim) = insertions::trace::<Sell>(trace.sell_insert_order);
     let evals = chain!(
         bytes_trace,
         poseidon_trace.clone(),
@@ -305,17 +303,6 @@ pub fn prove_vex(
         }
     }
     tree_builder.extend_evals(evals);
-    let claim = VexClaim {
-        final_state: trace.final_state,
-        initial_state: trace.initial_state,
-        processor_claim,
-        buy_insert_claim,
-        sell_insert_claim,
-        poseidon_claim,
-        strict_less_than_claim,
-        less_than_claim,
-        bytes_claim,
-    };
     claim.mix_into(channel);
     tree_builder.commit(channel);
     span.exit();
@@ -407,6 +394,7 @@ pub fn prove_vex(
 
     cfg_if::cfg_if! {
         if #[cfg(feature = "icicle")] {
+            icicle_m31::fri::precompute_fri_twiddles(log_size).unwrap();
             let components = component_builder.icicle_provers();
             let proof = prover::prove::<Backend, _>(&components, channel, commitment_scheme)?;
         } else {
