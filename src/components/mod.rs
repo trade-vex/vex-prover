@@ -285,6 +285,19 @@ impl VexComponents {
         ]
     }
 
+    /// Returns the leak ComponentProver of each components whose log sizes are in decreasing order.
+    pub fn leak_provers(self) -> Vec<&'static dyn ComponentProver<SimdBackend>> {
+        vec![
+            Box::leak(Box::new(self.bytes)),
+            Box::leak(Box::new(self.poseidon)),
+            Box::leak(Box::new(self.strict_less_than)),
+            Box::leak(Box::new(self.less_than)),
+            Box::leak(Box::new(self.processor)),
+            Box::leak(Box::new(self.buy_insert)),
+            Box::leak(Box::new(self.sell_insert)),
+        ]
+    }
+
     /// Returns the Component of each components whose log sizes are in decreasing order.
     pub fn components(&self) -> Vec<&dyn Component> {
         self.provers()
