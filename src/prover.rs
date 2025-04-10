@@ -64,170 +64,9 @@ pub fn prove_vex(
     };
     span.exit();
 
-    #[cfg(feature = "icicle")]
-    {
-        type Backend = SimdBackend;
-
-        // precompute twiddles for low degree polynomial extension
-        let twiddles = Box::new(Backend::precompute_twiddles(
-            CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 2)
-                .circle_domain()
-                .half_coset,
-        ));
-
-        // blake2s channel and commitment scheme used in merkle tree
-        let channel = &mut Blake2sChannel::default();
-        let mut commitment_scheme =
-            CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, Box::leak(twiddles));
-
-        let span = span!(Level::INFO, "Preprocessed Trace").entered();
-        let mut tree_builder = commitment_scheme.tree_builder();
-
-        // Extend the preprocessed trace with the components
-        tree_builder.extend_evals(bytes::preprocessed_trace());
-        tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Poseidon)));
-        tree_builder.extend_evals(is_first(trace.log_size(VexComponent::StrictLessThan)));
-        tree_builder.extend_evals(is_first(trace.log_size(VexComponent::LessThan)));
-        tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Processor)));
-        tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertBuyOrder)));
-        tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertSellOrder)));
-        tree_builder.commit(channel);
-        span.exit();
-
-        let span = span!(Level::INFO, "Main Trace").entered();
-        let mut tree_builder = commitment_scheme.tree_builder();
-        // Extend the main trace with the components
-        tree_builder.extend_evals(bytes_trace.clone());
-        tree_builder.extend_evals(poseidon_trace.clone());
-        tree_builder.extend_evals(strict_less_than_trace.clone());
-        tree_builder.extend_evals(less_than_trace.clone());
-        tree_builder.extend_evals(processor_trace.clone());
-        tree_builder.extend_evals(buy_insert_trace.clone());
-        tree_builder.extend_evals(sell_insert_trace.clone());
-
-        // create the VexClaim
-        // Mix the claim into the channel.
-        claim.mix_into(channel);
-        // Commit the main trace.
-        tree_builder.commit(channel);
-        span.exit();
-
-        let span = span!(Level::INFO, "Interaction Trace").entered();
-
-        // Draw interaction elements
-        let interaction_elements = VexInteractionElements::draw(channel);
-
-        let mut tree_builder = commitment_scheme.tree_builder();
-        let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
-            trace.byte_operations.clone(),
-            &interaction_elements.and_elements,
-            &interaction_elements.less_than_u8_elements,
-            &interaction_elements.range_check_u8_elements,
-        );
-        let (poseidon_interaction_trace, poseidon_interaction_claim) =
-            poseidon::interaction_trace(&poseidon_trace, &interaction_elements.poseidon_elements);
-        let (processor_interaction_trace, processor_interaction_claim) =
-            processor::interaction_trace(
-                &processor_trace,
-                &interaction_elements.state_elements,
-                &interaction_elements.instruction_elements,
-            );
-        let (strict_less_than_interaction_trace, strict_less_than_interaction_claim) =
-            less_than::interaction_trace::<true, _>(
-                &strict_less_than_trace,
-                &interaction_elements.less_than_u8_elements,
-                &interaction_elements.strict_less_than_elements,
-            );
-        let (less_than_interaction_trace, less_than_interaction_claim) =
-            less_than::interaction_trace::<false, _>(
-                &less_than_trace,
-                &interaction_elements.less_than_u8_elements,
-                &interaction_elements.less_than_elements,
-            );
-        let (buy_insert_interaction_trace, buy_insert_interaction_claim) =
-            insertions::interaction_trace::<Buy>(
-                &buy_insert_trace,
-                &interaction_elements.poseidon_elements,
-                &interaction_elements.less_than_elements,
-                &interaction_elements.strict_less_than_elements,
-                &interaction_elements.instruction_elements,
-            );
-        let (sell_insert_interaction_trace, sell_insert_interaction_claim) =
-            insertions::interaction_trace::<Sell>(
-                &sell_insert_trace,
-                &interaction_elements.poseidon_elements,
-                &interaction_elements.less_than_elements,
-                &interaction_elements.strict_less_than_elements,
-                &interaction_elements.instruction_elements,
-            );
-
-        tree_builder.extend_evals(bytes_interaction_trace);
-        tree_builder.extend_evals(poseidon_interaction_trace);
-        tree_builder.extend_evals(strict_less_than_interaction_trace);
-        tree_builder.extend_evals(less_than_interaction_trace);
-        tree_builder.extend_evals(processor_interaction_trace);
-        tree_builder.extend_evals(buy_insert_interaction_trace);
-        tree_builder.extend_evals(sell_insert_interaction_trace);
-
-        let interaction_claim = VexInteractionClaim {
-            processor_interaction_claim,
-            buy_insert_interaction_claim,
-            sell_insert_interaction_claim,
-            poseidon_interaction_claim,
-            strict_less_than_interaction_claim,
-            less_than_interaction_claim,
-            bytes_interaction_claim,
-        };
-
-        // Mix the interaction claim into the channel.
-        interaction_claim.mix_into(channel);
-
-        // Commit interaction trace.
-        tree_builder.commit(channel);
-        span.exit();
-
-        let span = span!(Level::INFO, "Proof Generation").entered();
-        let component_builder =
-            VexComponents::new(&claim, &interaction_elements, &interaction_claim);
-        let components = component_builder.leak_provers();
-        use stwo_prover::core::prover::SIMD_COMPONENTS;
-        let mut map = SIMD_COMPONENTS
-            .write()
-            .expect("Failed to acquire write lock");
-
-        let n_preprocessed_columns = commitment_scheme.trees[PREPROCESSED_TRACE_IDX]
-            .polynomials
-            .len();
-
-        let simd_component_provers = ComponentProvers {
-            components,
-            n_preprocessed_columns,
-        };
-
-        // Insert into the map
-        let simd_trace = Box::leak(Box::new(commitment_scheme)).trace();
-        map.insert("icicle", (simd_component_provers, simd_trace)); // TODO: hash key
-    }
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            use icicle_cuda_runtime::memory::HostSlice;
-            use stwo_prover::core::backend::icicle::IcicleBackend;
-            use stwo_prover::core::backend::icicle::column::DeviceColumn;
-            type Backend = IcicleBackend;
-            nvtx::name_thread!("stark_prover");
-            icicle_cuda_runtime::memory::set_mempool_threshold();
-            use stwo_prover::core::poly::circle::{CanonicCoset, CircleEvaluation};
-            use stwo_prover::core::poly::BitReversedOrder;
-            use stwo_prover::core::fields::m31::M31;
-            use stwo_prover::constraint_framework::PREPROCESSED_TRACE_IDX;
-            use stwo_prover::core::air::{ComponentProver, ComponentProvers};
-        } else {
-            type Backend = SimdBackend;
-            use stwo_prover::core::poly::circle::CircleEvaluation;
-            use stwo_prover::core::poly::BitReversedOrder;
-        }
-    }
+    type Backend = SimdBackend;
+    use stwo_prover::core::poly::circle::CircleEvaluation;
+    use stwo_prover::core::poly::BitReversedOrder;
 
     // precompute twiddles for low degree polynomial extension
     let log_size = trace.max_log_size();
@@ -256,30 +95,9 @@ pub fn prove_vex(
         is_first(trace.log_size(VexComponent::InsertSellOrder))
     )
     .collect_vec();
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            let evals = evals.iter().map(|c| {
-                let mut values = DeviceVec::cuda_malloc(c.values.len()).unwrap();
-                values.copy_from_host(HostSlice::from_slice(&c.values.to_cpu())).unwrap();
-                IcicleCircleEvaluation::new(c.domain, DeviceColumn { data: values })
-            }).collect_vec();
-        }
-    }
     tree_builder.extend_evals(evals);
     tree_builder.commit(channel);
     span.exit();
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            nvtx::range_pop!();
-            use icicle_cuda_runtime::memory::DeviceVec;
-        }
-    }
-
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            type IcicleCircleEvaluation = CircleEvaluation<Backend, M31, BitReversedOrder>;
-        }
-    }
 
     let span = span!(Level::INFO, "Main Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
@@ -293,15 +111,6 @@ pub fn prove_vex(
         sell_insert_trace.clone()
     )
     .collect_vec();
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            let evals = evals.iter().map(|c| {
-                let mut values = DeviceVec::cuda_malloc(c.values.len()).unwrap();
-                values.copy_from_host(HostSlice::from_slice(&c.values.to_cpu())).unwrap();
-                IcicleCircleEvaluation::new(c.domain, DeviceColumn { data: values })
-            }).collect_vec();
-        }
-    }
     tree_builder.extend_evals(evals);
     claim.mix_into(channel);
     tree_builder.commit(channel);
@@ -362,15 +171,6 @@ pub fn prove_vex(
         sell_insert_interaction_trace
     )
     .collect_vec();
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            let evals = evals.iter().map(|c| {
-                let mut values = DeviceVec::cuda_malloc(c.values.len()).unwrap();
-                values.copy_from_host(HostSlice::from_slice(&c.values.to_cpu())).unwrap();
-                IcicleCircleEvaluation::new(c.domain, DeviceColumn { data: values })
-            }).collect_vec();
-        }
-    }
     tree_builder.extend_evals(evals);
     let interaction_claim = VexInteractionClaim {
         processor_interaction_claim,
@@ -392,16 +192,8 @@ pub fn prove_vex(
     let span = span!(Level::INFO, "Proof Generation").entered();
     let component_builder = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
 
-    cfg_if::cfg_if! {
-        if #[cfg(feature = "icicle")] {
-            icicle_m31::fri::precompute_fri_twiddles(log_size).unwrap();
-            let components = component_builder.icicle_provers();
-            let proof = prover::prove::<Backend, _>(&components, channel, commitment_scheme)?;
-        } else {
-            let components = component_builder.provers();
-            let proof = prover::prove::<Backend, _>(&components, channel, commitment_scheme)?;
-        }
-    }
+    let components = component_builder.provers();
+    let proof = prover::prove::<Backend, _>(&components, channel, commitment_scheme)?;
     span.exit();
 
     Ok(VexProof {
