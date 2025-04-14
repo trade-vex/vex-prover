@@ -91,7 +91,7 @@ pub fn interaction_trace<S: OrderSide>(
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
     // Extract the columns from the trace used for the interaction trace
-    let prev_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] =
+    let low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] =
         array::from_fn(|i| &trace[InstructionColumn::LOW_LEAF + i].data);
     let prev_merkle_proof: [[&Vec<PackedBaseField>; N_HASH]; MERKLE_HEIGHT] = array::from_fn(|i| {
         array::from_fn(|j| &trace[InstructionColumn::LOW_MERKLE_PROOF + i * N_HASH + j].data)
@@ -125,18 +125,18 @@ pub fn interaction_trace<S: OrderSide>(
     let target_index: [&Vec<PackedBaseField>; MERKLE_HEIGHT] =
         array::from_fn(|i| &trace[InstructionColumn::INDEX + i].data);
 
-    // Create a properly updated copy of the prev_leaf with target's NEXT values
-    let mut updated_prev_leaf_vec: [Vec<PackedBaseField>; N_LEAF_FELTS] = 
-        array::from_fn(|i| prev_leaf[i].clone());
+    // Create a properly updated copy of the low_leaf with target's NEXT values
+    let mut updated_low_leaf_vec: [Vec<PackedBaseField>; N_LEAF_FELTS] = 
+        array::from_fn(|i| low_leaf[i].clone());
     
-    // Copy the target leaf's NEXT values to the updated prev_leaf's NEXT field
+    // Copy the target leaf's NEXT values to the updated low_leaf's NEXT field
     for i in 0..2 * N_U64_FELTS {
-        updated_prev_leaf_vec[LeafColumn::NEXT + i] = target_leaf[LeafColumn::NEXT + i].clone();
+        updated_low_leaf_vec[LeafColumn::NEXT + i] = target_leaf[LeafColumn::NEXT + i].clone();
     }
     
     // Convert to reference slices for the interaction calculation
-    let updated_prev_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = 
-        array::from_fn(|i| &updated_prev_leaf_vec[i]);
+    let updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = 
+        array::from_fn(|i| &updated_low_leaf_vec[i]);
 
     let is_real = &trace[InstructionColumn::IS_REAL].data;
 
@@ -150,8 +150,8 @@ pub fn interaction_trace<S: OrderSide>(
     for (index, leaf, updated_leaf, proof, path, updated_path) in [
         (
             prev_index,
-            prev_leaf,
-            updated_prev_leaf,
+            low_leaf,
+            updated_low_leaf,
             prev_merkle_proof,
             prev_merkle_path,
             updated_prev_merkle_path,

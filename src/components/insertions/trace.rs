@@ -61,9 +61,6 @@ pub fn trace<S: OrderSide>(
     // calculate shape of the trace table
     let log_size = (insertions.len() - 1).ilog2() + 1;
     debug!("Log Size: {}", log_size);
-    println!("Log Size: {}", log_size);
-    println!("LOG_N_LANES: {}", LOG_N_LANES);
-    println!("Insertions length: {:?}", insertions.len());
     // pad insertions to a power of 2
     let mut dummy = insertions[0];
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();

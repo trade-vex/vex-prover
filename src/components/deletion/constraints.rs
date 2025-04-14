@@ -84,7 +84,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
         eval.add_constraint(op.opcode.clone() - E::F::from(S::op_code(IMTOperation::Deletion)));
         let mult = E::EF::from(op.is_real.clone());
 
-        // prev_leaf (low_leaf) must be active
+        // low_leaf must be active
         eval.add_constraint(E::F::one() - op.low_leaf[0].clone());
         // target_leaf (leaf) must be active
         eval.add_constraint(E::F::one() - op.leaf[0].clone());
@@ -97,7 +97,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             );
         }
 
-        // eval prev_leaf's merkle proof
+        // eval low_leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
             op.low_merkle_proof.clone(),
@@ -108,22 +108,22 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             mult.clone(),
         );
 
-        // Create updated prev_leaf with next pointer updated to target's next pointer
-        let mut updated_prev_leaf = op.low_leaf.clone();
-        updated_prev_leaf[LeafColumn::NEXT..].clone_from_slice(&op.leaf[25..41]);
+        // Create updated low_leaf with next pointer updated to target's next pointer
+        let mut updated_low_leaf = op.low_leaf.clone();
+        updated_low_leaf[LeafColumn::NEXT..].clone_from_slice(&op.leaf[25..41]);
 
-        // eval updated prev_leaf's merkle proof
+        // eval updated low_leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
             op.low_merkle_proof.clone(),
             op.updated_low_merkle_path.clone(),
-            updated_prev_leaf,
+            updated_low_leaf,
             op.low_index.clone(),
             &self.poseidon_elements,
             mult.clone(),
         );
 
-        // the resultant root hash from updating prev_leaf must be equal the path of deleted leaf
+        // the resultant root hash from updating low_leaf must be equal the path of deleted leaf
         // this ensures that both leaf updates are consistent
         for i in 0..N_HASH {
             eval.add_constraint(
