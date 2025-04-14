@@ -57,12 +57,20 @@ pub fn trace<S: OrderSide>(
 ) {
     let _span = span!(Level::INFO, "Deletions: Main Trace", "{}", S::NAME).entered();
     // calculate shape of the trace table
-    // pad deletions to a power of 2
-    let mut dummy = deletions[0];
+    // pad deletions to the next power of 2
+
+    // Create a dummy row based on the first instruction, marking it as not real.
+    let mut dummy = deletions[0].clone();
     dummy[InstructionColumn::IS_REAL] = BaseField::zero();
-    while deletions.len() < pow(2, LOG_N_LANES.try_into().unwrap()) {
-        deletions.push(deletions[0]);
-    }
+
+    // --- Corrected Padding Logic ---
+    let original_len = deletions.len();
+    // Calculate the target length: the next power of two >= original length.
+    let target_len = original_len.next_power_of_two();
+
+    // Pad the vector efficiently using resize.
+    deletions.resize(target_len, dummy);
+    // --- End Corrected Padding Logic ---
     let log_size = (deletions.len() - 1).ilog2() + 1;
     let mut trace = ComponentTrace::<{ DeletionsColumn::MAIN_COLS }>::zeroed(log_size);
     trace
