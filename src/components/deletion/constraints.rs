@@ -110,7 +110,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
         // Create updated low_leaf with next pointer updated to target's next pointer
         let mut updated_low_leaf = op.low_leaf.clone();
-        updated_low_leaf[LeafColumn::NEXT..].clone_from_slice(&op.leaf[25..41]);
+        updated_low_leaf[LeafColumn::NEXT..].clone_from_slice(&op.leaf[LeafColumn::NEXT..]);
 
         // eval updated low_leaf's merkle proof
         eval_merkle_proof(
@@ -143,18 +143,18 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             mult.clone(),
         );
 
-        // Create empty leaf to replace the deleted leaf
-        let empty_leaf: [E::F; N_LEAF_FELTS] = array::from_fn(|_| E::F::zero());
+        let mut inactive_target_leaf = op.leaf.clone();
+        inactive_target_leaf[LeafColumn::ACTIVE] = E::F::zero(); // Set active flag to false (0)
 
-        // eval empty leaf's merkle proof (replacing the deleted leaf)
+        // 13. eval inactive target leaf's merkle proof (replacing the original target leaf)
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.updated_merkle_path.clone(),
-            empty_leaf,
+            op.merkle_proof.clone(),        // Proof uses the same slot
+            op.updated_merkle_path.clone(), // Path reflecting the inactive leaf state
+            inactive_target_leaf,           // The modified (inactive) target leaf
             op.index.clone(),
             &self.poseidon_elements,
-            mult.clone(),
+            mult.clone().into(), // Pass EF type
         );
 
         // ensure that the state count is updated correctly (incremented by 1)

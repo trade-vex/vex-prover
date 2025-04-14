@@ -88,6 +88,7 @@ pub fn interaction_trace<S: OrderSide>(
 ) {
     let _span = span!(Level::INFO, "Deletions: Interaction Trace", "{}", S::NAME).entered();
     let log_size = trace[0].domain.log_size();
+    let trace_len = 1 << (log_size - LOG_N_LANES); // Number of packed rows
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
     // Extract the columns from the trace used for the interaction trace
@@ -140,8 +141,15 @@ pub fn interaction_trace<S: OrderSide>(
 
     let is_real = &trace[InstructionColumn::IS_REAL].data;
 
-    let empty_leaf_data = BaseColumn::zeros(1 << log_size).data;
-    let empty_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = array::from_fn(|_| &empty_leaf_data);
+    let mut inactive_target_leaf_vec: [Vec<PackedBaseField>; N_LEAF_FELTS] =
+        array::from_fn(|i| target_leaf[i].clone());
+    // Create a column of zeros with the correct length
+    let zero_packed_col = vec![PackedBaseField::zero(); trace_len];
+    // Set the ACTIVE column (at LeafColumn::ACTIVE index) to zeros
+    inactive_target_leaf_vec[LeafColumn::ACTIVE] = zero_packed_col;
+    // Convert back to reference slices for the interaction calculation
+    let inactive_target_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] =
+        array::from_fn(|i| &inactive_target_leaf_vec[i]);
 
     // A Total of 2 leaf updates are performed
     // for each update
@@ -159,7 +167,7 @@ pub fn interaction_trace<S: OrderSide>(
         (
             target_index,
             target_leaf,
-            empty_leaf,
+            inactive_target_leaf,
             target_merkle_proof,
             target_merkle_path,
             updated_target_merkle_path,
