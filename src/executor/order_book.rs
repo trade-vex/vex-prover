@@ -149,9 +149,9 @@ impl OrderBook {
 
         // Get the index of the order to cancel
         let index = self.buy_imt.find(&price_time)?;
-        let initial_state = self.state.clone();
+        let initial_state = self.state;
         let proof = self.buy_imt.cancel_at_index(index)?;
-        assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
         
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
@@ -194,9 +194,9 @@ impl OrderBook {
 
         // Get the index of the order to cancel
         let index = self.sell_imt.find(&price_time)?;
-        let initial_state = self.state.clone();
+        let initial_state = self.state;
         let proof = self.sell_imt.cancel_at_index(index)?;
-        assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
         
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
