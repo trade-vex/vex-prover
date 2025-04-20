@@ -13,6 +13,7 @@ pub type Deletions = Vec<[BaseField; DeletionsColumn::MAIN_COLS]>;
 pub struct DeletionsColumn;
 
 impl TraceSize for DeletionsColumn {
+    const PREPROCESSED_COLS: usize = 1;
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
     /// number of poseidon hashes: 4 times for leaf hashes
     ///     - 1 for target_merkle_proof

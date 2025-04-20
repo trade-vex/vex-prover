@@ -13,7 +13,7 @@ use crate::{
     imt::{side::OrderSide, MERKLE_HEIGHT, N_LEAF_FELTS},
 };
 use itertools::Itertools;
-use num_traits::{One, Zero, pow};
+use num_traits::{One, Zero};
 use rayon::{
     iter::{IndexedParallelIterator, ParallelIterator},
     slice::ParallelSlice,
@@ -23,14 +23,10 @@ use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
     constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
     core::{
-        backend::{
-            simd::{
-                column::BaseColumn,
-                m31::{PackedBaseField, LOG_N_LANES, N_LANES},
-                qm31::PackedSecureField,
-                SimdBackend,
-            },
-            Column,
+        backend::simd::{
+            m31::{PackedBaseField, LOG_N_LANES, N_LANES},
+            qm31::PackedSecureField,
+            SimdBackend,
         },
         fields::m31::BaseField,
         poly::{circle::CircleEvaluation, BitReversedOrder},
@@ -135,16 +131,16 @@ pub fn interaction_trace<S: OrderSide>(
         array::from_fn(|i| &trace[InstructionColumn::INDEX + i].data);
 
     // Create a properly updated copy of the low_leaf with target's NEXT values
-    let mut updated_low_leaf_vec: [Vec<PackedBaseField>; N_LEAF_FELTS] = 
+    let mut updated_low_leaf_vec: [Vec<PackedBaseField>; N_LEAF_FELTS] =
         array::from_fn(|i| low_leaf[i].clone());
-    
+
     // Copy the target leaf's NEXT values to the updated low_leaf's NEXT field
     for i in 0..2 * N_U64_FELTS {
         updated_low_leaf_vec[LeafColumn::NEXT + i] = target_leaf[LeafColumn::NEXT + i].clone();
     }
-    
+
     // Convert to reference slices for the interaction calculation
-    let updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = 
+    let updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] =
         array::from_fn(|i| &updated_low_leaf_vec[i]);
 
     let is_real = &trace[InstructionColumn::IS_REAL].data;

@@ -18,12 +18,12 @@ use crate::{
     imt::{
         leaf::LeafColumn,
         side::{OrderSide, Side},
-        IndexBits, LeafFelts, MerklePath, MerkleProof, MERKLE_HEIGHT, N_LEAF_FELTS, N_U64_FELTS,
+        IndexBits, LeafFelts, MerklePath, MerkleProof, MERKLE_HEIGHT, N_U64_FELTS,
     },
 };
 
 use super::DeletionsColumn;
-     
+
 /// Deletions evaluation helper
 pub struct DeletionsEval<S: OrderSide> {
     pub poseidon_elements: PoseidonElements,
@@ -188,7 +188,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // For the Buy side
                 let first_leaf_price_time = Leaf::<E::F, Buy>::first_price_time_felts();
-                let low_leaf_is_first:  [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
+                let low_leaf_is_first: [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
                     op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone()
                 });
 
@@ -237,7 +237,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // For the Sell side
                 let first_leaf_price_time = Leaf::<E::F, Sell>::first_price_time_felts();
-                let low_leaf_is_first:  [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
+                let low_leaf_is_first: [E::F; 2 * N_U64_FELTS] = array::from_fn(|i| {
                     op.low_leaf[LeafColumn::PRICE + i].clone() - first_leaf_price_time[i].clone()
                 });
 
