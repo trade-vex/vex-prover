@@ -1,6 +1,11 @@
-use crate::{executor::instruction::IMTOperation, types::Price};
 use std::fmt::Debug;
+
 use stwo_prover::core::fields::m31::BaseField;
+
+use crate::{
+    executor::instruction::{IMTOperation, Opcode},
+    types::Price,
+};
 
 /// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
@@ -15,7 +20,7 @@ pub enum Side {
 }
 
 /// Order side marker trait with compile-time constants
-pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Copy + Debug {
+pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Debug {
     /// Associated constant for side name
     const NAME: &'static str;
     /// Associated constant for side variant
@@ -30,10 +35,7 @@ pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Copy + Debug {
     fn op_code(op: IMTOperation) -> BaseField;
     /// get the name of the side
     fn name() -> &'static str {
-        match Self::side() {
-            Side::Buy => "Buy",
-            Side::Sell => "Sell",
-        }
+        Self::NAME
     }
 }
 
@@ -52,6 +54,7 @@ impl OrderSide for Buy {
             IMTOperation::Update => BaseField::from_u32_unchecked(2),
             IMTOperation::Match => BaseField::from_u32_unchecked(6),
             IMTOperation::PartialMatch => BaseField::from_u32_unchecked(8),
+
         }
     }
 }

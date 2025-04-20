@@ -30,7 +30,7 @@ pub struct Leaf<F, S> {
     pub next: PriceTime<F, S>,
 }
 
-impl<F: Copy, S: Clone> Copy for Leaf<F, S> {}
+impl<F: Copy, S: Copy> Copy for Leaf<F, S> {}
 
 impl<F: Copy + Default, S> Default for Leaf<F, S> {
     fn default() -> Self {
@@ -159,7 +159,7 @@ impl<S: OrderSide> std::fmt::Debug for Leaf<BaseField, S> {
 }
 
 impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
-    /// from_eval_felts returns a LessThanOp instance from a given EvalAtRow instance
+    /// from_eval_felts returns a Leaf instance from a given EvalAtRow instance
     pub fn from_eval_felts<E: EvalAtRow>(eval: &mut E) -> Leaf<E::F, S> {
         let active = eval.next_trace_mask();
         let volume = array::from_fn(|_| eval.next_trace_mask());
@@ -202,7 +202,7 @@ pub struct PriceTime<F, S> {
     _marker: PhantomData<S>,
 }
 
-impl<F: Copy, S: Clone> Copy for PriceTime<F, S> {}
+impl<F: Copy, S: Copy> Copy for PriceTime<F, S> {}
 impl<F: Ord, S: OrderSide> Eq for PriceTime<F, S> {}
 
 impl<F: Copy + Default, S> Default for PriceTime<F, S> {

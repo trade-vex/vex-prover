@@ -1,10 +1,12 @@
-use itertools::{chain, Itertools};
+use itertools::Itertools;
 use num_traits::{One, Zero};
-use rayon::iter::{
-    IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::ParallelSlice,
 };
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use stwo_prover::core::backend::simd::m31::N_LANES;
 use stwo_prover::{
     constraint_framework::{
         logup::LogupTraceGenerator, EvalAtRow, FrameworkComponent, FrameworkEval, Relation,
@@ -12,15 +14,12 @@ use stwo_prover::{
     },
     core::{
         backend::simd::{
-            m31::{PackedBaseField, N_LANES},
+            m31::{PackedBaseField, LOG_N_LANES},
             qm31::{PackedQM31, PackedSecureField},
             SimdBackend,
         },
         fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
-        poly::{
-            circle::{CanonicCoset, CircleEvaluation},
-            BitReversedOrder,
-        },
+        poly::{circle::CircleEvaluation, BitReversedOrder},
         ColumnVec,
     },
     relation,
@@ -29,7 +28,6 @@ use tracing::{span, Level};
 
 use super::{Claim, InteractionClaim, TraceSize};
 use crate::{
-    components::is_real_col,
     constants::{EXTERNAL_ROUND_CONSTS, INTERNAL_ROUND_CONSTS},
     hash::{
         apply_external_round_matrix, apply_internal_round_matrix, pow5, N_ELEMENTS, N_FULL_ROUNDS,
@@ -43,14 +41,15 @@ pub const N_INSTANCES_PER_ROW: usize = 1 << N_LOG_INSTANCES_PER_ROW;
 /// Index: 16-80: First 4 Full Rounds End: 16 + 4 * 16 = 80
 /// Index: 80-94: 14 Partial Rounds End Applied to state[0]: 80 + 14 = 94
 /// Index: 94-158: Last 4 Full Rounds End: 94 + 4 * 16 = 158
-const N_COLUMNS_PER_REP: usize = N_STATE + N_STATE * N_FULL_ROUNDS + N_PARTIAL_ROUNDS;
-// N_INSTANCES_PER_ROW * N_COLUMNS_PER_REP + 1 (is_real)
-const N_COLUMNS: usize = N_INSTANCES_PER_ROW * N_COLUMNS_PER_REP + 1;
+/// Index: 158: Is Real Column
+const N_COLUMNS_PER_REP: usize = N_STATE + N_STATE * N_FULL_ROUNDS + N_PARTIAL_ROUNDS + 1;
+// N_INSTANCES_PER_ROW * N_COLUMNS_PER_REP
+const N_COLUMNS: usize = N_INSTANCES_PER_ROW * N_COLUMNS_PER_REP;
 pub const LOG_EXPAND: u32 = 2;
 
 /// Poseidon Operations
-/// Contains Initial State before the permutation.
-pub type PoseidonOperations = Vec<[BaseField; N_STATE]>;
+/// Contains Initial State before the permutation + IsReal to indicate if the operation is real or padded.
+pub type PoseidonOperations = Vec<[BaseField; N_STATE + 1]>;
 
 /// PoseidonComponent is a component that evaluates the Poseidon2 Permutation.
 pub type PoseidonComponent = FrameworkComponent<PoseidonEval>;
@@ -77,13 +76,13 @@ impl FrameworkEval for PoseidonEval {
     }
 
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
-        // is_real determines if the operation is from a non-padded row.
-        let is_real = eval.next_trace_mask();
-
-        // is_real must be a boolean.
-        eval.add_constraint(is_real.clone() * (is_real.clone() - E::F::one()));
-
         for _ in 0..N_INSTANCES_PER_ROW {
+            // is_real determines if the operation is padded or not.
+            let is_real = eval.next_trace_mask();
+
+            // is_real must be a boolean.
+            eval.add_constraint(is_real.clone() * (is_real.clone() - E::F::one()));
+
             let mut state: [_; N_STATE] = std::array::from_fn(|_| eval.next_trace_mask());
 
             // Initial state is added to the relation.
@@ -151,34 +150,31 @@ pub fn trace(
     let _span = span!(Level::INFO, "Poseidon: Main Trace").entered();
     let log_size = (poseidon_operations.len() / N_INSTANCES_PER_ROW - 1).ilog2() + 1;
 
-    // is_real column is used to determine if the operation is from a non-padded row.
-    let is_real = is_real_col(poseidon_operations.len() / N_INSTANCES_PER_ROW);
-
     // pad the operations to the next power of 2.
     for _ in 0..(1 << log_size) * N_INSTANCES_PER_ROW - poseidon_operations.len() {
-        poseidon_operations.push([BaseField::zero(); N_STATE]);
+        poseidon_operations.push([BaseField::zero(); N_STATE + 1]);
     }
 
-    // the number of columns is 1 less than the number of operations.
-    // as the is_real column is not included in the operations
-    // it is added separately.
-    let mut trace = ComponentTrace::<{ PoseidonColumn::MAIN_COLS - 1 }>::zeroed(log_size);
+    let mut trace = ComponentTrace::<{ PoseidonColumn::MAIN_COLS }>::zeroed(log_size);
 
     trace
         .par_iter_mut()
-        .zip(
-            poseidon_operations
-                .par_iter()
-                .chunks(N_LANES * N_INSTANCES_PER_ROW)
-                .into_par_iter(),
-        )
+        .zip(poseidon_operations.par_chunks_exact(N_LANES * N_INSTANCES_PER_ROW))
         .for_each(|(mut row, data)| {
             let mut col_index = 0;
             for rep_i in 0..N_INSTANCES_PER_ROW {
                 // Initial state.
                 let mut state: [PackedBaseField; N_STATE] = array::from_fn(|j| {
-                    PackedBaseField::from_array(array::from_fn(|i| data[N_LANES * rep_i + i][j]))
+                    PackedBaseField::from_array(array::from_fn(|i| {
+                        data[N_INSTANCES_PER_ROW * i + rep_i][j]
+                    }))
                 });
+
+                // Is Real Column.
+                *row[col_index] = PackedBaseField::from_array(array::from_fn(|i| {
+                    data[N_INSTANCES_PER_ROW * i + rep_i][N_STATE]
+                }));
+                col_index += 1;
 
                 state.iter().copied().for_each(|s| {
                     *row[col_index] = s;
@@ -224,13 +220,7 @@ pub fn trace(
             }
         });
 
-    let is_real_eval = CircleEvaluation::<SimdBackend, BaseField, BitReversedOrder>::new(
-        CanonicCoset::new(log_size).circle_domain(),
-        is_real,
-    );
-
-    let trace = chain!([is_real_eval], trace.to_evals()).collect_vec();
-    (trace, Claim::new(log_size))
+    (trace.to_evals().to_vec(), Claim::new(log_size))
 }
 
 /// Poseidon Interaction Trace
@@ -242,14 +232,12 @@ pub fn interaction_trace(
     InteractionClaim<PoseidonColumn>,
 ) {
     let _span = span!(Level::INFO, "Poseidon: Interaction Trace").entered();
-
     let log_size = trace[0].domain.log_size();
-    let is_real_col = &trace[0].data;
     let mut logup_gen = LogupTraceGenerator::new(log_size);
 
     for rep_i in 0..N_INSTANCES_PER_ROW {
         let mut col_gen = logup_gen.new_col();
-        for (vec_row, is_real) in is_real_col.iter().enumerate() {
+        for vec_row in 0..(1 << log_size - LOG_N_LANES) {
             // fetch the initial state and the final hash from the trace.
             let values: [PackedBaseField; N_ELEMENTS] = array::from_fn(|i| {
                 if i < 16 {
@@ -258,9 +246,10 @@ pub fn interaction_trace(
                     trace[N_COLUMNS_PER_REP * rep_i + 143 + i - 16].data[vec_row]
                 }
             });
+            let is_real = trace[N_COLUMNS_PER_REP * rep_i].data[vec_row];
             let denom0: PackedSecureField = poseidon_elements.combine(&values);
             // the multiplicity is negative as the output is "yielded".
-            col_gen.write_frac(vec_row, -PackedQM31::one() * (*is_real), denom0);
+            col_gen.write_frac(vec_row, -PackedQM31::one() * is_real, denom0);
         }
         col_gen.finalize_col();
     }
@@ -272,8 +261,13 @@ pub fn interaction_trace(
 pub struct PoseidonColumn;
 
 impl TraceSize for PoseidonColumn {
+    // is_first column
+    const PREPROCESSED_COLS: usize = 1;
+    // initial state + state transitions for each round + final state + is_real
     const MAIN_COLS: usize = N_COLUMNS;
-    const INTERACTION_COLS: usize = N_INSTANCES_PER_ROW * N_ELEMENTS * SECURE_EXTENSION_DEGREE;
+    // initial state + final hash is combined in 1 interaction column for 1 instance
+    // per row => N_INSTANCES_PER_ROW interaction columns
+    const INTERACTION_COLS: usize = N_INSTANCES_PER_ROW * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]
@@ -300,7 +294,7 @@ mod tests {
         let mut sell_imt = SellIMT::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 48;
+        let n = 1_000;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;

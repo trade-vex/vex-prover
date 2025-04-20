@@ -47,6 +47,7 @@ impl OrderBook {
             sell_imt.root(),
             PriceTime::<BaseField, Sell>::last().to_felts(),
         );
+        trace.borrow_mut().initial_state = state.to_felts();
         OrderBook {
             buy_imt,
             sell_imt,
@@ -64,7 +65,7 @@ impl OrderBook {
         }
         let initial_state = self.state.clone();
         let proof = self.buy_imt.insert(order)?;
-        assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
         final_state.buy_root_hash = self.buy_imt.root();
@@ -99,6 +100,10 @@ impl OrderBook {
         Ok(())
     }
 
+    pub fn state(&self) -> State<BaseField> {
+        self.state
+    }
+
     /// Place a sell order in the order book
     /// Returns an error if the volume is zero, or the price_time is zero
     pub fn place_sell_order(&mut self, order: Order<BaseField, Sell>) -> Result<(), IMTError> {
@@ -108,7 +113,7 @@ impl OrderBook {
         }
         let initial_state = self.state.clone();
         let proof = self.sell_imt.insert(order)?;
-        assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
         final_state.sell_root_hash = self.sell_imt.root();

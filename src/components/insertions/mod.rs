@@ -1,14 +1,26 @@
-use stwo_prover::core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE};
+use stwo_prover::{
+    constraint_framework::FrameworkComponent,
+    core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
+};
 
-use crate::{executor::instruction::N_INSTRUCTION_FELTS, imt::MERKLE_HEIGHT};
+use crate::{
+    executor::instruction::N_INSTRUCTION_FELTS,
+    imt::{
+        side::{Buy, Sell},
+        MERKLE_HEIGHT,
+    },
+};
+
 use super::TraceSize;
 
 mod constraints;
 mod trace;
 
+pub use constraints::InsertionsEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
-// pub use trace::{interaction_trace, preprocessed_trace, trace};
+pub type BuyInsertionComponent = FrameworkComponent<InsertionsEval<Buy>>;
+pub type SellInsertionComponent = FrameworkComponent<InsertionsEval<Sell>>;
 
 /// Insertion Instructions
 pub type Insertions = Vec<[BaseField; InsertionsColumn::MAIN_COLS]>;
@@ -20,6 +32,8 @@ pub type Insertions = Vec<[BaseField; InsertionsColumn::MAIN_COLS]>;
 pub struct InsertionsColumn;
 
 impl TraceSize for InsertionsColumn {
+    /// is_first column
+    const PREPROCESSED_COLS: usize = 1;
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
     /// number of poseidon hashes: 4 times for leaf hashes
     ///     - 1 for low_merkle_proof

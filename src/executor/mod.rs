@@ -1,3 +1,4 @@
+pub mod error;
 pub mod instruction;
 pub mod order_book;
 pub mod record;
@@ -18,7 +19,15 @@ macro_rules! flatten {
             flatten_single(&mut result, $x);
         )*
 
-        result.try_into().unwrap()
+        // Capture the length before moving `result`
+        let len = result.len();
+        match result.try_into() {
+            Ok(arr) => arr,
+            Err(e) => panic!(
+                "Failed to flatten array: vector size {} doesn't match the expected array size. Error: {:?}",
+                len, e
+            ),
+        }
     }};
 }
 

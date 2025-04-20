@@ -12,6 +12,7 @@ pub enum IMTError {
     InvalidU8Pair(u32, u32),
     InvalidOrder,
     CannotCancelInactive,
+
 }
 
 impl fmt::Display for IMTError {
