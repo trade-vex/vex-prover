@@ -10,7 +10,9 @@ pub enum IMTError {
     OperationFailed(String),
     InsufficientVolumeToFill(u64, u64),
     InvalidU8Pair(u32, u32),
-    InvalidOrder,    
+    InvalidOrder,
+    CannotCancelInactive,
+
 }
 
 impl fmt::Display for IMTError {
@@ -27,6 +29,7 @@ impl fmt::Display for IMTError {
             }
             IMTError::InvalidU8Pair(a, b) => write!(f, "Invalid u8 pair: {} {}", a, b),
             IMTError::InvalidOrder => write!(f, "Volume, Price, Time cannot be zero"),
+            IMTError::CannotCancelInactive => write!(f, "Cannot cancel the inactive leaf"),
         }
     }
 }

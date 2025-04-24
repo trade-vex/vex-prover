@@ -27,9 +27,11 @@ use processor::{ProcessorComponent, ProcessorEval};
 
 pub mod addition;
 pub mod bytes;
+pub mod deletion;
 pub mod insertions;
 pub mod less_than;
 pub mod poseidon;
+
 pub mod processor;
 pub(crate) mod trace_utils;
 
