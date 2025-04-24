@@ -32,10 +32,12 @@ use processor::{ProcessorComponent, ProcessorEval};
 pub mod addition;
 pub mod bytes;
 pub(crate) mod constraints_utils;
+pub mod deletion;
 pub mod insertions;
 pub mod less_than;
 pub mod order_match;
 pub mod poseidon;
+
 pub mod processor;
 pub(crate) mod trace_utils;
 pub use trace_utils::is_first;
