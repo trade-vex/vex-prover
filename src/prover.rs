@@ -431,7 +431,7 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 10;
+        let n = 1 << 12;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
@@ -451,10 +451,15 @@ mod tests {
 
         let mut execution_trace =
             std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
-        println!("shape: {:#?}", execution_trace.sizes());
         execution_trace.final_state = order_book.state().to_felts();
         span.exit();
+        let shape = execution_trace.sizes();
+        let start = std::time::Instant::now();
         let proof = prove_vex(execution_trace).unwrap();
+        let end = start.elapsed();
+        // println!("Time taken for prove_vex: {:?}", end.duration_since(start));
+        println!("Proof Generated, Summary: {shape:#?}");
+        println!("Instructions proved per second: {}", shape.instructions as f64 / end.as_secs_f64());
         verify_vex(proof).unwrap();
     }
 }
