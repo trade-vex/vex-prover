@@ -44,7 +44,7 @@ pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField
     trace
         .iter_mut()
         .zip(values.chunks_exact(N_LANES))
-        .for_each(|(row, input)| {
+        .for_each(|(mut row, input)| {
             // a: higher bits
             *row[BytesPreProcessedColumn::A as usize] =
                 PackedBaseField::from_array(array::from_fn(|i| {

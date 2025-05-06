@@ -281,7 +281,7 @@ mod tests {
     };
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, preprocessed_columns::IsFirst},
+        constraint_framework::{assert_constraints_on_polys, preprocessed_columns::IsFirst},
         core::{pcs::TreeVec, poly::circle::CanonicCoset},
     };
 
@@ -328,7 +328,7 @@ mod tests {
             poseidon_elements,
             claim,
         };
-        assert_constraints(
+        assert_constraints_on_polys(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {
