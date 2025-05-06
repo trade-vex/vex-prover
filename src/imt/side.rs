@@ -2,10 +2,7 @@ use std::fmt::Debug;
 
 use stwo_prover::core::fields::m31::BaseField;
 
-use crate::{
-    executor::instruction::{IMTOperation, Opcode},
-    types::Price,
-};
+use crate::{executor::instruction::IMTOperation, types::Price};
 
 /// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
@@ -49,11 +46,11 @@ impl OrderSide for Buy {
     }
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
-            IMTOperation::Insertion => Opcode::InsertBuyOrder.to_field(),
-            IMTOperation::Update => Opcode::UpdateBuyOrder.to_field(),
-            IMTOperation::Deletion => Opcode::CancelBuyOrder.to_field(),
-            IMTOperation::Match => Opcode::MatchBuyOrder.to_field(),
-            IMTOperation::PartialMatch => Opcode::PartialMatchBuyOrder.to_field(),
+            IMTOperation::Insertion => BaseField::from_u32_unchecked(0),
+            IMTOperation::Deletion => BaseField::from_u32_unchecked(4),
+            IMTOperation::Update => BaseField::from_u32_unchecked(2),
+            IMTOperation::Match => BaseField::from_u32_unchecked(6),
+            IMTOperation::PartialMatch => BaseField::from_u32_unchecked(8),
         }
     }
 }
@@ -67,11 +64,11 @@ impl OrderSide for Sell {
     }
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
-            IMTOperation::Insertion => Opcode::InsertSellOrder.to_field(),
-            IMTOperation::Update => Opcode::UpdateSellOrder.to_field(),
-            IMTOperation::Deletion => Opcode::CancelSellOrder.to_field(),
-            IMTOperation::Match => Opcode::MatchSellOrder.to_field(),
-            IMTOperation::PartialMatch => Opcode::PartialMatchSellOrder.to_field(),
+            IMTOperation::Insertion => BaseField::from_u32_unchecked(1),
+            IMTOperation::Deletion => BaseField::from_u32_unchecked(5),
+            IMTOperation::Update => BaseField::from_u32_unchecked(3),
+            IMTOperation::Match => BaseField::from_u32_unchecked(7),
+            IMTOperation::PartialMatch => BaseField::from_u32_unchecked(9),
         }
     }
 }
