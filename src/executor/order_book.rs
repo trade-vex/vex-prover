@@ -63,10 +63,10 @@ impl OrderBook {
         if order.is_invalid() {
             return Err(IMTError::InvalidOrder);
         }
-        let initial_state = self.state.clone();
+        let initial_state = self.state;
         let proof = self.buy_imt.insert(order)?;
         debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
-        let mut final_state = initial_state.clone();
+        let mut final_state = initial_state;
         final_state.n += BaseField::one();
         final_state.buy_root_hash = self.buy_imt.root();
         final_state.buy_imt_priority = self.buy_imt.best_price_time();
@@ -111,10 +111,10 @@ impl OrderBook {
         if order.is_invalid() {
             return Err(IMTError::InvalidOrder);
         }
-        let initial_state = self.state.clone();
+        let initial_state = self.state;
         let proof = self.sell_imt.insert(order)?;
         debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
-        let mut final_state = initial_state.clone();
+        let mut final_state = initial_state;
         final_state.n += BaseField::one();
         final_state.sell_root_hash = self.sell_imt.root();
         final_state.sell_imt_priority = self.sell_imt.best_price_time();
@@ -382,8 +382,8 @@ mod test {
         let sell_order = Order::new(15, 110, 2);
 
         // Place buy and sell orders
-        assert!(machine.place_buy_order(buy_order.clone()).is_ok());
-        assert!(machine.place_sell_order(sell_order.clone()).is_ok());
+        assert!(machine.place_buy_order(buy_order).is_ok());
+        assert!(machine.place_sell_order(sell_order).is_ok());
 
         // Retrieve the leaves from the IMTs and check their properties
         let buy_leaf = machine.buy_imt.get_leaf_by_price_time(100, 1).unwrap();
@@ -405,8 +405,8 @@ mod test {
         let sell_order = Order::new(10, 100, 2);
 
         // Place sell and buy orders that should exactly match
-        assert!(machine.place_sell_order(sell_order.clone()).is_ok());
-        assert!(machine.place_buy_order(buy_order.clone()).is_ok());
+        assert!(machine.place_sell_order(sell_order).is_ok());
+        assert!(machine.place_buy_order(buy_order).is_ok());
 
         // Retrieve the leaves from the IMTs and check their properties
         let buy_leaf = machine.buy_imt.get_leaf_by_index(2).unwrap();
@@ -426,8 +426,8 @@ mod test {
         let sell_order = Order::new(10, 100, 2);
 
         // Place sell and buy orders that should partially match
-        assert!(machine.place_sell_order(sell_order.clone()).is_ok());
-        assert!(machine.place_buy_order(buy_order.clone()).is_ok());
+        assert!(machine.place_sell_order(sell_order).is_ok());
+        assert!(machine.place_buy_order(buy_order).is_ok());
 
         // Retrieve the leaves from the IMTs and check their properties
         let buy_leaf = machine.buy_imt.get_leaf_by_index(2).unwrap();
@@ -449,9 +449,9 @@ mod test {
         let buy3 = Order::new(10, 110, 3); // Higher price
 
         // Place buy orders with different prices and timestamps
-        assert!(machine.place_buy_order(buy1.clone()).is_ok());
-        assert!(machine.place_buy_order(buy2.clone()).is_ok());
-        assert!(machine.place_buy_order(buy3.clone()).is_ok());
+        assert!(machine.place_buy_order(buy1).is_ok());
+        assert!(machine.place_buy_order(buy2).is_ok());
+        assert!(machine.place_buy_order(buy3).is_ok());
 
         // Check that the highest price order is prioritized
         assert_eq!(machine.buy_imt.best_price(), Price::from_u64(110)); // Highest price wins
@@ -487,11 +487,11 @@ mod test {
             let sell_order = generate_random_order::<Sell>(time, base_price);
             // Place random buy and sell orders
             assert!(machine
-                .place_buy_order(buy_order.clone())
+                .place_buy_order(buy_order)
                 .map_err(|e| println!("Error placing buy order: {:?}", e))
                 .is_ok());
             assert!(machine
-                .place_sell_order(sell_order.clone())
+                .place_sell_order(sell_order)
                 .map_err(|e| println!("Error placing sell order: {:?}", e))
                 .is_ok());
             // Retrieve the leaves from the IMTs and check their properties
