@@ -102,7 +102,7 @@ mod tests {
     use constraints::AddEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
+        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -153,7 +153,7 @@ mod tests {
 
         // Panics if the constraints are not satisfied
         let _span = span!(Level::INFO, "Constraint Assertion").entered();
-        assert_constraints(
+        assert_constraints_on_polys(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {
