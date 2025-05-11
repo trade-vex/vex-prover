@@ -65,7 +65,7 @@ mod tests {
     use constraints::PartialMatchEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
+        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
         core::{
             channel::Blake2sChannel, fields::m31::BaseField, pcs::TreeVec,
             poly::circle::CanonicCoset,
@@ -130,7 +130,7 @@ mod tests {
         };
 
         // panics if the constraints are not satisfied
-        assert_constraints(
+        assert_constraints_on_polys(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {

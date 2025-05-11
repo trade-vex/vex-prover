@@ -13,6 +13,7 @@ pub enum IMTError {
     InvalidOrder,
     NotAPartialMatch,
     CannotCancelInactive,
+    AdditionOverflow,
 }
 
 impl fmt::Display for IMTError {
@@ -31,6 +32,7 @@ impl fmt::Display for IMTError {
             IMTError::InvalidOrder => write!(f, "Volume, Price, Time cannot be zero"),
             IMTError::NotAPartialMatch => write!(f, "Not a partial match"),
             IMTError::CannotCancelInactive => write!(f, "Cannot cancel the inactive leaf"),
+            IMTError::AdditionOverflow  => write!(f, "Addition Overflow for u64"),
         }
     }
 }

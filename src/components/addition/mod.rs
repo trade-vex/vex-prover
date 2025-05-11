@@ -125,8 +125,10 @@ mod tests {
         let n = 11000;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
-            let a: Price<BaseField> = Price::from_u64(rng.gen());
-            let b: Price<BaseField> = Price::from_u64(rng.gen());
+            let a_u64 = rng.gen::<u64>();
+            let b_u64 = rng.gen::<u64>();
+            let a: Price<BaseField> = Price::from_u64(a_u64 / 2);
+            let b: Price<BaseField> = Price::from_u64(b_u64 / 2);
             record.add_add_event(a.to_felts(), b.to_felts()).unwrap();
         }
         let log_size = (record.add_operations.len() - 1).ilog2() + 1;

@@ -168,7 +168,7 @@ impl ExecutionTrace<BaseField> {
         &mut self,
         a: [BaseField; N_U64_LIMBS],
         b: [BaseField; N_U64_LIMBS],
-    ) -> Result<(), RangeCheckError> {
+    ) -> Result<(), IMTError> {
         let mut row = [BaseField::zero(); AddColumn::MAIN_COLS];
 
         let mut carry = [BaseField::zero(); N_U64_LIMBS - 1];
@@ -194,6 +194,9 @@ impl ExecutionTrace<BaseField> {
         // Compute the final limb
         let last_sum = a[7] + b[7] + carry[6];
         c[7] = last_sum;
+        if c[7] > BaseField::from(255) {
+            return Err(IMTError::AdditionOverflow);
+        }
 
         // Dispatch range check events in the same order as in constraints.rs
         let values: Vec<BaseField> = chain!(a.into_iter(), b.into_iter(), c.into_iter()).collect();
@@ -295,9 +298,9 @@ impl ExecutionTrace<BaseField> {
     ///
     /// # Errors
     /// Returns a `RangeCheckError::InputLimbExceedsRange` if `a` or `b` is greater than 255.
-    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), RangeCheckError> {
+    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
         if a >= 256 || b >= 256 {
-            return Err(RangeCheckError::InputLimbExceedsRange);
+            return Err(IMTError::InvalidU8Pair(a, b));
         }
         let offset = (a << 8) + b;
         self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
@@ -330,7 +333,7 @@ impl ExecutionTrace<BaseField> {
             1 << (2 * N_U64_FELTS), // 2^8 * 2^8 combinations
         ])
         .unwrap();
-        
+
         (n - 1).ilog2() + 1
     }
 
