@@ -73,17 +73,17 @@ pub struct VexClaim {
 impl VexClaim {
     /// mix all components log sizes and public inputs into the channel
     pub fn mix_into(&self, channel: &mut impl Channel) {
-        self.bytes_claim.mix_into(channel); //16
-        self.poseidon_claim.mix_into(channel); //16
-        self.strict_less_than_claim.mix_into(channel); // 10
-        self.less_than_claim.mix_into(channel); // 9
-        self.processor_claim.mix_into(channel); // 9
-        self.buy_insert_claim.mix_into(channel); // 7
-        self.sell_insert_claim.mix_into(channel); // 7
-        self.buy_aggressive_match_claim.mix_into(channel); // 6
-        self.sell_aggressive_match_claim.mix_into(channel); // 6
-        self.buy_passive_match_claim.mix_into(channel); // 6
-        self.sell_passive_match_claim.mix_into(channel); // 6
+        self.bytes_claim.mix_into(channel);
+        self.poseidon_claim.mix_into(channel);
+        self.strict_less_than_claim.mix_into(channel);
+        self.less_than_claim.mix_into(channel);
+        self.processor_claim.mix_into(channel);
+        self.buy_insert_claim.mix_into(channel);
+        self.sell_insert_claim.mix_into(channel);
+        self.buy_aggressive_match_claim.mix_into(channel);
+        self.sell_aggressive_match_claim.mix_into(channel);
+        self.buy_passive_match_claim.mix_into(channel);
+        self.sell_passive_match_claim.mix_into(channel);
     }
 
     /// Returns the total log size of all components
