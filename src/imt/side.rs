@@ -23,7 +23,7 @@ pub enum MatchType {
 }
 
 /// Order match type marker trait with compile-time constants
-pub trait OrderMatchType: 'static + Copy + Send + Sync + Clone + Copy + Debug {
+pub trait OrderMatchType: 'static + Copy + Send + Sync + Clone + Debug {
     /// Associated constant for match type name
     const NAME: &'static str;
     /// Associated constant for match type variant
