@@ -432,7 +432,6 @@ impl ExecutionTrace<BaseField> {
 ///
 /// let trace = ExecutionTrace::new();
 /// let shape = trace.sizes();
-/// let log_shape = trace.log_sizes();
 /// ```
 #[derive(Debug)]
 pub struct ExecutionTraceShape<T: Copy> {
@@ -481,32 +480,6 @@ impl<F> ExecutionTrace<F> {
             strict_less_than_operations: self.strict_less_than_operations.len(),
             comparison_operations: self.comparison_operations.len(),
             poseidon_operations: self.poseidon_operations.len(),
-        }
-    }
-
-    pub fn log_sizes(&self) -> ExecutionTraceShape<u32> {
-        ExecutionTraceShape {
-            buy_insert_order: (self.buy_insert_order.len() - 1).ilog2() + 1,
-            buy_delete_order: (self.buy_delete_order.len() - 1).ilog2() + 1,
-            buy_modify_order: (self.buy_modify_order.len() - 1).ilog2() + 1,
-            buy_aggressive_match: (self.buy_aggressive_match.len() - 1).ilog2() + 1,
-            buy_passive_match: (self.buy_passive_match.len() - 1).ilog2() + 1,
-            buy_aggressive_partial_match: (self.buy_aggressive_partial_match.len() - 1).ilog2() + 1,
-            buy_passive_partial_match: (self.buy_passive_partial_match.len() - 1).ilog2() + 1,
-            sell_insert_order: (self.sell_insert_order.len() - 1).ilog2() + 1,
-            sell_delete_order: (self.sell_delete_order.len() - 1).ilog2() + 1,
-            sell_modify_order: (self.sell_modify_order.len() - 1).ilog2() + 1,
-            sell_aggressive_match: (self.sell_aggressive_match.len() - 1).ilog2() + 1,
-            sell_passive_match: (self.sell_passive_match.len() - 1).ilog2() + 1,
-            sell_aggressive_partial_match: (self.sell_aggressive_partial_match.len() - 1).ilog2()
-                + 1,
-            sell_passive_partial_match: (self.sell_passive_partial_match.len() - 1).ilog2() + 1,
-            instructions: (self.instructions.len() - 1).ilog2() + 1,
-            add_operations: (self.add_operations.len() - 1).ilog2() + 1,
-            less_than_operations: (self.less_than_operations.len() - 1).ilog2() + 1,
-            strict_less_than_operations: (self.strict_less_than_operations.len() - 1).ilog2() + 1,
-            comparison_operations: (self.comparison_operations.len() - 1).ilog2() + 1,
-            poseidon_operations: (self.poseidon_operations.len() - 1).ilog2() + 1,
         }
     }
 }
