@@ -10,7 +10,7 @@ pub struct Buy;
 #[derive(Debug, Clone, Copy)]
 pub struct Sell;
 
-/// Type markers for Buy and Sell sides
+/// Type markers for Match Types
 #[derive(Debug, Clone, Copy)]
 pub struct Aggressive;
 #[derive(Debug, Clone, Copy)]
