@@ -27,7 +27,7 @@ use super::{record::ExecutionTrace, state::State};
 /// The State consists of the current root hashes and the best price time for buy and sell orders
 /// OrderBook Records the Execution Trace of the IMT Instructions every time there is a state transition
 pub struct OrderBook {
-    /// Buy Re
+    /// Buy IMT
     buy_imt: BuyIMT,
     /// Sell IMT
     sell_imt: SellIMT,
