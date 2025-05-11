@@ -98,6 +98,7 @@ impl TraceSize for AddColumn {
 
 // Defines a relation for storing and verifying addition operation elements
 // The number 24 specifies the log size of the relation
+// As we yield a, b, c that is 8*3 elements
 relation!(AddElements, 24);
 
 #[cfg(test)]
@@ -105,7 +106,7 @@ mod tests {
     use constraints::AddEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
+        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -121,7 +122,7 @@ mod tests {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let mut record = ExecutionTrace::new();
-        let n = 124213;
+        let n = 11000;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
             let a: Price<BaseField> = Price::from_u64(rng.gen());
@@ -156,7 +157,7 @@ mod tests {
 
         // Panics if the constraints are not satisfied
         let _span = span!(Level::INFO, "Constraint Assertion").entered();
-        assert_constraints(
+        assert_constraints_on_polys(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {

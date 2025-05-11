@@ -21,7 +21,7 @@ mod trace;
 pub use constraints::MatchEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
-pub type BuyAgessiveMatchComponent = FrameworkComponent<MatchEval<Buy, Aggressive>>;
+pub type BuyAggressiveMatchComponent = FrameworkComponent<MatchEval<Buy, Aggressive>>;
 pub type BuyPassiveMatchComponent = FrameworkComponent<MatchEval<Buy, Passive>>;
 
 pub type SellAggressiveMatchComponent = FrameworkComponent<MatchEval<Sell, Aggressive>>;
@@ -67,7 +67,7 @@ mod tests {
     use constraints::MatchEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
+        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
         core::{
             channel::Blake2sChannel, fields::m31::BaseField, pcs::TreeVec,
             poly::circle::CanonicCoset,
@@ -126,7 +126,7 @@ mod tests {
         };
 
         // panics if the constraints are not satisfied
-        assert_constraints(
+        assert_constraints_on_polys(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {
@@ -184,7 +184,6 @@ mod tests {
             &instruction_elements,
         );
 
-        
         evaluate_trace::<Sell, Aggressive>(
             execution_trace.sell_aggressive_match,
             &poseidon_elements,

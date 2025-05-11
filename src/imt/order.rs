@@ -73,7 +73,7 @@ impl Order<BaseField, Buy> {
 }
 
 impl Order<BaseField, Sell> {
-    /// Creates a new Buy Order.
+    /// Creates a new Sell Order.
     pub fn new_sell(volume: u64, price: u64, time: u64) -> Self {
         Order::<BaseField, Sell>::new(volume, price, time)
     }

@@ -12,6 +12,7 @@ pub enum IMTError {
     InvalidU8Pair(u32, u32),
     InvalidOrder,
     NotAPartialMatch,
+    CannotCancelInactive,
 }
 
 impl fmt::Display for IMTError {
@@ -29,6 +30,7 @@ impl fmt::Display for IMTError {
             IMTError::InvalidU8Pair(a, b) => write!(f, "Invalid u8 pair: {} {}", a, b),
             IMTError::InvalidOrder => write!(f, "Volume, Price, Time cannot be zero"),
             IMTError::NotAPartialMatch => write!(f, "Not a partial match"),
+            IMTError::CannotCancelInactive => write!(f, "Cannot cancel the inactive leaf"),
         }
     }
 }

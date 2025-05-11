@@ -129,7 +129,7 @@ pub fn interaction_trace<S: OrderSide>(
     let index: [&Vec<PackedBaseField>; MERKLE_HEIGHT] =
         array::from_fn(|i| &trace[InstructionColumn::INDEX + i].data);
 
-    let mut updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = low_leaf.clone();
+    let mut updated_low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = low_leaf;
     updated_low_leaf[LeafColumn::NEXT..N_LEAF_FELTS]
         .copy_from_slice(&leaf[LeafColumn::LABEL..LeafColumn::NEXT]);
 
@@ -164,7 +164,7 @@ pub fn interaction_trace<S: OrderSide>(
     );
 
     // Constraint 3 in constraints.rs
-    // low_time < next_time
+    // next_time < inserted_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &next_time,
@@ -266,9 +266,9 @@ pub fn interaction_trace<S: OrderSide>(
                     is_real,
                     log_size,
                     poseidon_elements,
-                    PackedSecureField::one()
+                    PackedSecureField::one(),
                 );
-                curr = hash.clone();
+                curr = *hash;
             }
         }
     }

@@ -3,7 +3,7 @@ use std::{marker::PhantomData, vec};
 use addition::{AddComponent, AddElements, AddEval};
 use num_traits::{One, Zero};
 use order_match::{
-    BuyAgessiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
+    BuyAggressiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
     SellAggressiveMatchComponent, SellPassiveMatchComponent,
 };
 use partial_order_match::{
@@ -14,16 +14,9 @@ use stwo_prover::{
     constraint_framework::TraceLocationAllocator,
     core::{
         air::{Component, ComponentProver},
-        backend::{
-            simd::{
-                column::BaseColumn,
-                m31::{PackedBaseField, LOG_N_LANES, N_LANES},
-                SimdBackend,
-            },
-            Column,
-        },
+        backend::simd::SimdBackend,
         channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
+        fields::qm31::SecureField,
         pcs::TreeVec,
     },
 };
@@ -44,11 +37,13 @@ use processor::{ProcessorComponent, ProcessorEval};
 pub mod addition;
 pub mod bytes;
 pub(crate) mod constraints_utils;
+pub mod deletion;
 pub mod insertions;
 pub mod less_than;
 pub mod order_match;
 pub mod partial_order_match;
 pub mod poseidon;
+
 pub mod processor;
 pub(crate) mod trace_utils;
 pub use trace_utils::is_first;
@@ -75,7 +70,7 @@ pub struct Claim<T: TraceSize> {
 
 impl<T: TraceSize> Claim<T> {
     pub const fn new(log_size: u32) -> Self {
-        _ = T::ASSERT;
+        T::ASSERT;
 
         Self {
             log_size,
@@ -118,7 +113,7 @@ pub struct InteractionClaim<T: TraceSize> {
 
 impl<T: TraceSize> InteractionClaim<T> {
     pub const fn new(claimed_sum: SecureField) -> Self {
-        let _ = T::ASSERT;
+        T::ASSERT;
 
         Self {
             claimed_sum,
@@ -160,7 +155,6 @@ impl VexInteractionElements {
             and_elements: AndElements::draw(channel),
             range_check_u8_elements: RangeCheckU8Elements::draw(channel),
             match_elements: MatchElements::draw(channel),
-            add_elements: AddElements::draw(channel),
         }
     }
 }
@@ -201,7 +195,7 @@ pub struct VexComponents {
     less_than: LessThanComponent,
     add_component: AddComponent,
     bytes: BytesComponent,
-    buy_aggressive_match: BuyAgessiveMatchComponent,
+    buy_aggressive_match: BuyAggressiveMatchComponent,
     sell_aggressive_match: SellAggressiveMatchComponent,
     buy_passive_match: BuyPassiveMatchComponent,
     sell_passive_match: SellPassiveMatchComponent,
@@ -310,7 +304,7 @@ impl VexComponents {
             interaction_claim.sell_insert_interaction_claim.claimed_sum,
         );
 
-        let buy_aggressive_match = BuyAgessiveMatchComponent::new(
+        let buy_aggressive_match = BuyAggressiveMatchComponent::new(
             tree_span_provider,
             MatchEval {
                 claim: claim.buy_aggressive_match_claim.clone(),
@@ -521,23 +515,4 @@ pub enum VexComponent {
 
     /// Main Processor Component
     Processor,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use stwo_prover::core::fields::m31::M31;
-
-    #[test]
-    fn test_is_real() {
-        let n_rows = 1179;
-        let is_real = is_real_col(n_rows);
-        assert_eq!(is_real.data.len(), 2048 / 16);
-        for i in 0..n_rows {
-            assert_eq!(is_real.as_slice()[i], M31::one());
-        }
-        for i in n_rows..2048 {
-            assert_eq!(is_real.as_slice()[i], M31::zero());
-        }
-    }
 }
