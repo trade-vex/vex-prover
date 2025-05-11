@@ -326,7 +326,7 @@ impl OrderBook {
     fn finalize_match<S: OrderSide>(
         &mut self,
         proof: MatchProof<S>,
-        is_aggresive: bool,
+        is_aggressive: bool,
     ) -> Result<(), IMTError> {
         let initial_state = self.state;
         let mut final_state = initial_state;
@@ -335,7 +335,7 @@ impl OrderBook {
                 debug_assert_eq!(proof.initial_root, initial_state.buy_root);
                 final_state.buy_root = self.buy_imt.root();
                 final_state.best_buy_price = self.buy_imt.best_price_felts();
-                if is_aggresive {
+                if is_aggressive {
                     Opcode::MatchAggressiveBuy
                 } else {
                     Opcode::MatchPassiveBuy
@@ -345,7 +345,7 @@ impl OrderBook {
                 debug_assert_eq!(proof.initial_root, initial_state.sell_root);
                 final_state.sell_root = self.sell_imt.root();
                 final_state.best_sell_price = self.sell_imt.best_price_felts();
-                if is_aggresive {
+                if is_aggressive {
                     Opcode::MatchAggressiveSell
                 } else {
                     Opcode::MatchPassiveSell
@@ -385,7 +385,7 @@ impl OrderBook {
     fn finalize_partial_match<S: OrderSide>(
         &mut self,
         proof: PartialMatchProof<S>,
-        is_aggresive: bool,
+        is_aggressive: bool,
     ) -> Result<(), IMTError> {
         let initial_state = self.state;
         let mut final_state = initial_state;
@@ -394,7 +394,7 @@ impl OrderBook {
                 debug_assert_eq!(proof.initial_root, initial_state.buy_root);
                 final_state.buy_root = self.buy_imt.root();
                 final_state.best_buy_price = self.buy_imt.best_price_felts();
-                if is_aggresive {
+                if is_aggressive {
                     Opcode::PartialMatchAggressiveBuy
                 } else {
                     Opcode::PartialMatchPassiveBuy
@@ -404,7 +404,7 @@ impl OrderBook {
                 debug_assert_eq!(proof.initial_root, initial_state.sell_root);
                 final_state.sell_root = self.sell_imt.root();
                 final_state.best_sell_price = self.sell_imt.best_price_felts();
-                if is_aggresive {
+                if is_aggressive {
                     Opcode::PartialMatchAggressiveSell
                 } else {
                     Opcode::PartialMatchPassiveSell

@@ -1,7 +1,7 @@
 use std::{marker::PhantomData, vec};
 
 use order_match::{
-    BuyAgessiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
+    BuyAggressiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
     SellAggressiveMatchComponent, SellPassiveMatchComponent,
 };
 use stwo_prover::{
@@ -161,7 +161,7 @@ pub struct VexComponents {
     strict_less_than: StrictLessThanComponent,
     less_than: LessThanComponent,
     bytes: BytesComponent,
-    buy_aggressive_match: BuyAgessiveMatchComponent,
+    buy_aggressive_match: BuyAggressiveMatchComponent,
     sell_aggressive_match: SellAggressiveMatchComponent,
     buy_passive_match: BuyPassiveMatchComponent,
     sell_passive_match: SellPassiveMatchComponent,
@@ -256,7 +256,7 @@ impl VexComponents {
             interaction_claim.sell_insert_interaction_claim.claimed_sum,
         );
 
-        let buy_aggressive_match = BuyAgessiveMatchComponent::new(
+        let buy_aggressive_match = BuyAggressiveMatchComponent::new(
             tree_span_provider,
             MatchEval {
                 claim: claim.buy_aggressive_match_claim.clone(),

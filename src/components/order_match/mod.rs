@@ -21,7 +21,7 @@ mod trace;
 pub use constraints::MatchEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
-pub type BuyAgessiveMatchComponent = FrameworkComponent<MatchEval<Buy, Aggressive>>;
+pub type BuyAggressiveMatchComponent = FrameworkComponent<MatchEval<Buy, Aggressive>>;
 pub type BuyPassiveMatchComponent = FrameworkComponent<MatchEval<Buy, Passive>>;
 
 pub type SellAggressiveMatchComponent = FrameworkComponent<MatchEval<Sell, Aggressive>>;
