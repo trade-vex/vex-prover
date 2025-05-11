@@ -593,7 +593,7 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
         self.leaves[0].next.price()
     }
 
-    /// Returns the best price in the tree.
+    /// Returns the felts representing best price in the tree.
     pub fn best_price_felts(&self) -> PriceFelts<BaseField> {
         self.leaves[0].next.price().to_felts()
     }
