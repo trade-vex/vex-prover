@@ -2,12 +2,12 @@ use std::array;
 
 use stwo_prover::{constraint_framework::EvalAtRow, core::fields::m31::BaseField, relation};
 
+use super::state::{State, N_STATE_FELTS};
 use crate::{
     hash::N_HASH,
     imt::{IndexBits, LeafFelts, MerklePath, MerkleProof, MERKLE_HEIGHT, N_LEAF_FELTS},
 };
-
-use super::state::{State, N_STATE_FELTS};
+use num_traits::FromPrimitive;
 
 pub const N_INSTRUCTION_FELTS: usize = InstructionColumn::N_INSTRUCTION_FELTS;
 
@@ -30,7 +30,14 @@ pub struct Instruction<F> {
     pub updated_low_merkle_path: MerklePath<F>,
     /// Low Leafs Index in the IMT
     pub low_index: IndexBits<F>,
-    /// Low Leaf
+    // @todo:rename this field
+    /// Additional Data for Instruction
+    /// Insertions: Contains Actual Low Leaf
+    /// Updates: First N_U64_FELTS contain new Volume, rest zero
+    /// PartialMatch: First N_U64_FELTS contain Filled Volume,
+    ///               Next N_U64_FELTS contain Remaining Volume,
+    /// this is because we dont need low leaf when verifying constraints
+    /// the low leaf can be constructed from side and leaf.
     pub low_leaf: LeafFelts<F>,
     /// Merkle Proof of the leaf to which the instruction applies
     pub merkle_proof: MerkleProof<F>,
@@ -113,7 +120,8 @@ relation!(InstructionElements, {
 });
 
 /// The Higher Level Operation to be performed in both the IMTs
-#[derive(Clone, Copy)]
+#[repr(u32)]
+#[derive(Clone, Copy, Debug)]
 pub enum Opcode {
     InsertBuyOrder,
     InsertSellOrder,
@@ -121,52 +129,57 @@ pub enum Opcode {
     UpdateSellOrder,
     CancelBuyOrder,
     CancelSellOrder,
-    MatchBuyOrder,
-    MatchSellOrder,
-    PartialMatchBuyOrder,
-    PartialMatchSellOrder,
+    MatchAggressiveBuy,
+    MatchPassiveBuy,
+    MatchAggressiveSell,
+    MatchPassiveSell,
+    PartialMatchAggressiveBuy,
+    PartialMatchPassiveBuy,
+    PartialMatchAggressiveSell,
+    PartialMatchPassiveSell,
 }
 
 impl Opcode {
-    /// from field returns an Opcode instance from a given field
-    pub fn from_field(felt: BaseField) -> Opcode {
-        match felt.0 {
-            0 => Opcode::InsertBuyOrder,
-            1 => Opcode::InsertSellOrder,
-            2 => Opcode::UpdateBuyOrder,
-            3 => Opcode::UpdateSellOrder,
-            4 => Opcode::CancelBuyOrder,
-            5 => Opcode::CancelSellOrder,
-            6 => Opcode::MatchBuyOrder,
-            7 => Opcode::MatchSellOrder,
-            8 => Opcode::PartialMatchBuyOrder,
-            9 => Opcode::PartialMatchSellOrder,
-            _ => panic!("Invalid Opcode"),
-        }
+    pub fn from_field(f: BaseField) -> Opcode {
+        FromPrimitive::from_u32(f.0).expect("invalid opcode")
     }
-
-    /// to_field returns a field instance from a given Opcode
-    pub fn to_field(&self) -> BaseField {
-        match self {
-            Opcode::InsertBuyOrder => BaseField::from_u32_unchecked(0),
-            Opcode::InsertSellOrder => BaseField::from_u32_unchecked(1),
-            Opcode::UpdateBuyOrder => BaseField::from_u32_unchecked(2),
-            Opcode::UpdateSellOrder => BaseField::from_u32_unchecked(3),
-            Opcode::CancelBuyOrder => BaseField::from_u32_unchecked(4),
-            Opcode::CancelSellOrder => BaseField::from_u32_unchecked(5),
-            Opcode::MatchBuyOrder => BaseField::from_u32_unchecked(6),
-            Opcode::MatchSellOrder => BaseField::from_u32_unchecked(7),
-            Opcode::PartialMatchBuyOrder => BaseField::from_u32_unchecked(8),
-            Opcode::PartialMatchSellOrder => BaseField::from_u32_unchecked(9),
-        }
+    pub fn to_field(self) -> BaseField {
+        BaseField::from_u32_unchecked(self as u32)
     }
 }
 
+impl FromPrimitive for Opcode {
+    fn from_u64(num: u64) -> Option<Opcode> {
+        match num {
+            0 => Some(Opcode::InsertBuyOrder),
+            1 => Some(Opcode::InsertSellOrder),
+            2 => Some(Opcode::UpdateBuyOrder),
+            3 => Some(Opcode::UpdateSellOrder),
+            4 => Some(Opcode::CancelBuyOrder),
+            5 => Some(Opcode::CancelSellOrder),
+            6 => Some(Opcode::MatchAggressiveBuy),
+            7 => Some(Opcode::MatchPassiveBuy),
+            8 => Some(Opcode::MatchAggressiveSell),
+            9 => Some(Opcode::MatchPassiveSell),
+            10 => Some(Opcode::PartialMatchAggressiveBuy),
+            11 => Some(Opcode::PartialMatchPassiveBuy),
+            12 => Some(Opcode::PartialMatchAggressiveSell),
+            13 => Some(Opcode::PartialMatchPassiveSell),
+            _ => None,
+        }
+    }
+
+    fn from_i64(num: i64) -> Option<Opcode> {
+        Self::from_u64(num as u64)
+    }
+}
 /// 5 Types of IMT Operations
 pub enum IMTOperation {
     Insertion,
     Update,
     Deletion,
-    Match,
-    PartialMatch,
+    MatchAggressive,
+    MatchPassive,
+    PartialMatchAggressive,
+    PartialMatchPassive,
 }

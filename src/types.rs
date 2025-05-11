@@ -192,10 +192,10 @@ implement_field_array_type!(Volume);
 
 #[cfg(test)]
 mod tests {
-    use std::u64::MAX;
-
     use super::*;
     use stwo_prover::core::fields::m31::M31;
+
+    const MAX: u64 = u64::MAX;
 
     #[test]
     fn test_price_with_m31() {

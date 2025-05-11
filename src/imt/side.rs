@@ -2,13 +2,59 @@ use std::fmt::Debug;
 
 use stwo_prover::core::fields::m31::BaseField;
 
-use crate::{executor::instruction::IMTOperation, types::Price};
+use crate::{executor::instruction::{IMTOperation, Opcode}, types::Price};
 
 /// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
 pub struct Buy;
 #[derive(Debug, Clone, Copy)]
 pub struct Sell;
+
+/// Type markers for Match Types
+#[derive(Debug, Clone, Copy)]
+pub struct Aggressive;
+#[derive(Debug, Clone, Copy)]
+pub struct Passive;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MatchType {
+    Aggressive,
+    Passive,
+}
+
+/// Order match type marker trait with compile-time constants
+pub trait OrderMatchType: 'static + Copy + Send + Sync + Clone + Debug {
+    /// Associated constant for match type name
+    const NAME: &'static str;
+    /// Associated constant for match type variant
+    /// Match Invariant is only checked for Aggressive Side
+    /// The Match Elements are yielded for Aggressive Side and used for Passive Side
+    const MATCHTYPE: MatchType;
+    /// Indicates number of LessThan interaction columns
+    const LESSTHANCOL: usize;
+    /// get the name of the match type
+    fn name() -> &'static str {
+        match Self::MATCHTYPE {
+            MatchType::Aggressive => "Aggressive",
+            MatchType::Passive => "Passive",
+        }
+    }
+    /// get the type of the match
+    fn match_type() -> MatchType {
+        Self::MATCHTYPE
+    }
+}
+
+impl OrderMatchType for Aggressive {
+    const NAME: &'static str = "Aggressive";
+    const MATCHTYPE: MatchType = MatchType::Aggressive;
+    const LESSTHANCOL: usize = 1;
+}
+impl OrderMatchType for Passive {
+    const NAME: &'static str = "Passive";
+    const MATCHTYPE: MatchType = MatchType::Passive;
+    const LESSTHANCOL: usize = 0;
+}
 
 /// IMT side marker
 pub enum Side {
@@ -46,11 +92,13 @@ impl OrderSide for Buy {
     }
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
-            IMTOperation::Insertion => BaseField::from_u32_unchecked(0),
-            IMTOperation::Deletion => BaseField::from_u32_unchecked(4),
-            IMTOperation::Update => BaseField::from_u32_unchecked(2),
-            IMTOperation::Match => BaseField::from_u32_unchecked(6),
-            IMTOperation::PartialMatch => BaseField::from_u32_unchecked(8),
+            IMTOperation::Insertion => Opcode::InsertBuyOrder.to_field(),
+            IMTOperation::Update => Opcode::UpdateBuyOrder.to_field(),
+            IMTOperation::Deletion => Opcode::CancelBuyOrder.to_field(),
+            IMTOperation::MatchAggressive => Opcode::MatchAggressiveBuy.to_field(),
+            IMTOperation::MatchPassive => Opcode::MatchPassiveBuy.to_field(),
+            IMTOperation::PartialMatchAggressive => Opcode::PartialMatchAggressiveBuy.to_field(),
+            IMTOperation::PartialMatchPassive => Opcode::PartialMatchPassiveBuy.to_field(),
         }
     }
 }
@@ -64,11 +112,13 @@ impl OrderSide for Sell {
     }
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
-            IMTOperation::Insertion => BaseField::from_u32_unchecked(1),
-            IMTOperation::Deletion => BaseField::from_u32_unchecked(5),
-            IMTOperation::Update => BaseField::from_u32_unchecked(3),
-            IMTOperation::Match => BaseField::from_u32_unchecked(7),
-            IMTOperation::PartialMatch => BaseField::from_u32_unchecked(9),
+            IMTOperation::Insertion => Opcode::InsertSellOrder.to_field(),
+            IMTOperation::Update => Opcode::UpdateSellOrder.to_field(),
+            IMTOperation::Deletion => Opcode::CancelSellOrder.to_field(),
+            IMTOperation::MatchAggressive => Opcode::MatchAggressiveSell.to_field(),
+            IMTOperation::MatchPassive => Opcode::MatchPassiveSell.to_field(),
+            IMTOperation::PartialMatchAggressive => Opcode::PartialMatchAggressiveSell.to_field(),
+            IMTOperation::PartialMatchPassive => Opcode::PartialMatchPassiveSell.to_field(),
         }
     }
 }

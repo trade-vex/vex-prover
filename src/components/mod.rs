@@ -1,5 +1,9 @@
 use std::{marker::PhantomData, vec};
 
+use order_match::{
+    BuyAggressiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
+    SellAggressiveMatchComponent, SellPassiveMatchComponent,
+};
 use stwo_prover::{
     constraint_framework::TraceLocationAllocator,
     core::{
@@ -13,7 +17,7 @@ use stwo_prover::{
 
 use crate::{
     executor::{instruction::InstructionElements, state::StateElements},
-    imt::side::{Buy, Sell},
+    imt::side::{Aggressive, Buy, Passive, Sell},
     VexClaim, VexInteractionClaim,
 };
 
@@ -27,14 +31,15 @@ use processor::{ProcessorComponent, ProcessorEval};
 
 pub mod addition;
 pub mod bytes;
+pub(crate) mod constraints_utils;
 pub mod deletion;
 pub mod insertions;
 pub mod less_than;
+pub mod order_match;
 pub mod poseidon;
 
 pub mod processor;
 pub(crate) mod trace_utils;
-
 pub use trace_utils::is_first;
 
 /// Const trait that defines the number of columns in the trace table
@@ -121,12 +126,13 @@ impl<T: TraceSize> InteractionClaim<T> {
 pub struct VexInteractionElements {
     pub instruction_elements: InstructionElements,
     pub state_elements: StateElements,
-    pub poseidon_elements: poseidon::PoseidonElements,
-    pub less_than_elements: less_than::LessThanElements,
-    pub strict_less_than_elements: less_than::StrictLessThanElements,
+    pub poseidon_elements: PoseidonElements,
+    pub less_than_elements: LessThanElements,
+    pub strict_less_than_elements: StrictLessThanElements,
     pub less_than_u8_elements: LessThanU8Elements,
-    pub and_elements: bytes::AndElements,
-    pub range_check_u8_elements: bytes::RangeCheckU8Elements,
+    pub and_elements: AndElements,
+    pub range_check_u8_elements: RangeCheckU8Elements,
+    pub match_elements: MatchElements,
 }
 
 impl VexInteractionElements {
@@ -141,6 +147,7 @@ impl VexInteractionElements {
             less_than_u8_elements: LessThanU8Elements::draw(channel),
             and_elements: AndElements::draw(channel),
             range_check_u8_elements: RangeCheckU8Elements::draw(channel),
+            match_elements: MatchElements::draw(channel),
         }
     }
 }
@@ -154,6 +161,10 @@ pub struct VexComponents {
     strict_less_than: StrictLessThanComponent,
     less_than: LessThanComponent,
     bytes: BytesComponent,
+    buy_aggressive_match: BuyAggressiveMatchComponent,
+    sell_aggressive_match: SellAggressiveMatchComponent,
+    buy_passive_match: BuyPassiveMatchComponent,
+    sell_passive_match: SellPassiveMatchComponent,
 }
 
 impl VexComponents {
@@ -245,6 +256,70 @@ impl VexComponents {
             interaction_claim.sell_insert_interaction_claim.claimed_sum,
         );
 
+        let buy_aggressive_match = BuyAggressiveMatchComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.buy_aggressive_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Buy>,
+                _type: PhantomData::<Aggressive>,
+            },
+            interaction_claim
+                .buy_aggressive_match_interaction_claim
+                .claimed_sum,
+        );
+
+        let sell_aggressive_match = SellAggressiveMatchComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.sell_aggressive_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Sell>,
+                _type: PhantomData::<Aggressive>,
+            },
+            interaction_claim
+                .sell_aggressive_match_interaction_claim
+                .claimed_sum,
+        );
+
+        let buy_passive_match = BuyPassiveMatchComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.buy_passive_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Buy>,
+                _type: PhantomData::<Passive>,
+            },
+            interaction_claim
+                .buy_passive_match_interaction_claim
+                .claimed_sum,
+        );
+
+        let sell_passive_match = SellPassiveMatchComponent::new(
+            tree_span_provider,
+            MatchEval {
+                claim: claim.sell_passive_match_claim.clone(),
+                poseidon_elements: interaction_elements.poseidon_elements.clone(),
+                less_than_elements: interaction_elements.less_than_elements.clone(),
+                match_elements: interaction_elements.match_elements.clone(),
+                instruction_elements: interaction_elements.instruction_elements.clone(),
+                _side: PhantomData::<Sell>,
+                _type: PhantomData::<Passive>,
+            },
+            interaction_claim
+                .sell_passive_match_interaction_claim
+                .claimed_sum,
+        );
+
         Self {
             processor,
             strict_less_than,
@@ -253,6 +328,10 @@ impl VexComponents {
             sell_insert,
             poseidon,
             bytes,
+            buy_aggressive_match,
+            sell_aggressive_match,
+            buy_passive_match,
+            sell_passive_match,
         }
     }
 
@@ -266,6 +345,10 @@ impl VexComponents {
             &self.processor,
             &self.buy_insert,
             &self.sell_insert,
+            &self.buy_aggressive_match,
+            &self.sell_aggressive_match,
+            &self.buy_passive_match,
+            &self.sell_passive_match,
         ]
     }
 
@@ -288,10 +371,14 @@ pub enum VexComponent {
     UpdateSellOrder,
     CancelBuyOrder,
     CancelSellOrder,
-    MatchBuyOrder,
-    MatchSellOrder,
-    PartialMatchBuyOrder,
-    PartialMatchSellOrder,
+    MatchAggressiveBuy,
+    MatchPassiveBuy,
+    MatchAggressiveSell,
+    MatchPassiveSell,
+    PartialMatchAggressiveBuy,
+    PartialMatchPassiveBuy,
+    PartialMatchAggressiveSell,
+    PartialMatchPassiveSell,
 
     /// Sub Operations Components
     LessThan,

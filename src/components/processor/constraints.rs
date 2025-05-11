@@ -54,10 +54,10 @@ impl FrameworkEval for ProcessorEval {
 
         let initial_state: Vec<E::F> = flatten!(
             op.initial_state.n.clone(),
-            op.initial_state.buy_root_hash.clone(),
-            op.initial_state.buy_imt_priority.clone(),
-            op.initial_state.sell_root_hash.clone(),
-            op.initial_state.sell_imt_priority.clone()
+            op.initial_state.buy_root.clone(),
+            op.initial_state.best_buy_price.clone(),
+            op.initial_state.sell_root.clone(),
+            op.initial_state.best_sell_price.clone()
         );
 
         // use the initial state
@@ -69,10 +69,10 @@ impl FrameworkEval for ProcessorEval {
 
         let values: Vec<E::F> = flatten!(
             op.initial_state.n.clone(),
-            op.initial_state.buy_root_hash,
-            op.initial_state.buy_imt_priority,
-            op.initial_state.sell_root_hash,
-            op.initial_state.sell_imt_priority,
+            op.initial_state.buy_root,
+            op.initial_state.best_buy_price,
+            op.initial_state.sell_root,
+            op.initial_state.best_sell_price,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -85,10 +85,10 @@ impl FrameworkEval for ProcessorEval {
             op.index,
             op.leaf,
             op.final_state.n.clone(),
-            op.final_state.buy_root_hash.clone(),
-            op.final_state.buy_imt_priority.clone(),
-            op.final_state.sell_root_hash.clone(),
-            op.final_state.sell_imt_priority.clone(),
+            op.final_state.buy_root.clone(),
+            op.final_state.best_buy_price.clone(),
+            op.final_state.sell_root.clone(),
+            op.final_state.best_sell_price.clone(),
             op.is_real
         );
         // use the instruction elements to update the state to the final state
@@ -103,10 +103,10 @@ impl FrameworkEval for ProcessorEval {
 
         let final_state: Vec<E::F> = flatten!(
             op.final_state.n,
-            op.final_state.buy_root_hash,
-            op.final_state.buy_imt_priority,
-            op.final_state.sell_root_hash,
-            op.final_state.sell_imt_priority
+            op.final_state.buy_root,
+            op.final_state.best_buy_price,
+            op.final_state.sell_root,
+            op.final_state.best_sell_price
         );
 
         // yield the final state

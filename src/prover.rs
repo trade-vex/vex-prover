@@ -1,15 +1,13 @@
 use num_traits::Zero;
 use stwo_prover::{
-    constraint_framework::{
-        Relation, INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX,
-    },
+    constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
     core::{
         backend::simd::SimdBackend,
         channel::Blake2sChannel,
-        fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
+        fields::m31::BaseField,
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
         poly::circle::{CanonicCoset, PolyOps},
-        prover::{self, verify, ProvingError},
+        prover::{self, verify},
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
     },
 };
@@ -17,19 +15,22 @@ use tracing::{span, Level};
 
 use crate::{
     components::{
-        bytes, insertions, is_first, less_than, poseidon, processor, VexComponent, VexComponents,
-        VexInteractionElements,
+        bytes, insertions, is_first, less_than, order_match, poseidon, processor, VexComponent,
+        VexComponents, VexInteractionElements,
     },
-    error::VexVerificationError,
+    error::{VexProvingError, VexVerificationError},
     executor::record::ExecutionTrace,
-    imt::side::{Buy, Sell},
+    imt::side::{Aggressive, Buy, Passive, Sell},
     VexClaim, VexInteractionClaim, VexProof,
 };
+
+#[cfg(feature = "relation-tracker")]
+use crate::relation_tracker::track_vex_relations;
 
 /// Prove the Vex Execution Trace
 pub fn prove_vex(
     trace: ExecutionTrace<BaseField>,
-) -> Result<VexProof<Blake2sMerkleHasher>, ProvingError> {
+) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError> {
     let _span = span!(Level::INFO, "Prove Vex").entered();
 
     // default config
@@ -58,6 +59,10 @@ pub fn prove_vex(
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Processor)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertBuyOrder)));
     tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertSellOrder)));
+    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveBuy)));
+    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveSell)));
+    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveBuy)));
+    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveSell)));
     tree_builder.commit(channel);
     span.exit();
 
@@ -71,6 +76,14 @@ pub fn prove_vex(
     let (processor_trace, processor_claim) = processor::trace(trace.instructions);
     let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
     let (sell_insert_trace, sell_insert_claim) = insertions::trace::<Sell>(trace.sell_insert_order);
+    let (match_aggressive_buy_trace, buy_aggressive_match_claim) =
+        order_match::trace::<Buy, Aggressive>(trace.buy_aggressive_match);
+    let (match_aggressive_sell_trace, sell_aggressive_match_claim) =
+        order_match::trace::<Sell, Aggressive>(trace.sell_aggressive_match);
+    let (match_passive_buy_trace, buy_passive_match_claim) =
+        order_match::trace::<Buy, Passive>(trace.buy_passive_match);
+    let (match_passive_sell_trace, sell_passive_match_claim) =
+        order_match::trace::<Sell, Passive>(trace.sell_passive_match);
 
     // Extend the main trace with the components
     tree_builder.extend_evals(bytes_trace);
@@ -80,6 +93,10 @@ pub fn prove_vex(
     tree_builder.extend_evals(processor_trace.clone());
     tree_builder.extend_evals(buy_insert_trace.clone());
     tree_builder.extend_evals(sell_insert_trace.clone());
+    tree_builder.extend_evals(match_aggressive_buy_trace.clone());
+    tree_builder.extend_evals(match_aggressive_sell_trace.clone());
+    tree_builder.extend_evals(match_passive_buy_trace.clone());
+    tree_builder.extend_evals(match_passive_sell_trace.clone());
 
     // create the VexClaim
     let claim = VexClaim {
@@ -92,6 +109,10 @@ pub fn prove_vex(
         strict_less_than_claim,
         less_than_claim,
         bytes_claim,
+        buy_aggressive_match_claim,
+        sell_aggressive_match_claim,
+        buy_passive_match_claim,
+        sell_passive_match_claim,
     };
 
     // Mix the claim into the channel.
@@ -99,6 +120,9 @@ pub fn prove_vex(
     // Commit the main trace.
     tree_builder.commit(channel);
     span.exit();
+
+    #[cfg(feature = "relation-tracker")]
+    track_vex_relations(&commitment_scheme, &claim);
 
     let span = span!(Level::INFO, "Interaction Trace").entered();
 
@@ -147,6 +171,38 @@ pub fn prove_vex(
             &interaction_elements.strict_less_than_elements,
             &interaction_elements.instruction_elements,
         );
+    let (buy_aggressive_match_interaction_trace, buy_aggressive_match_interaction_claim) =
+        order_match::interaction_trace::<Buy, Aggressive>(
+            &match_aggressive_buy_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (sell_aggressive_match_interaction_trace, sell_aggressive_match_interaction_claim) =
+        order_match::interaction_trace::<Sell, Aggressive>(
+            &match_aggressive_sell_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (buy_passive_match_interaction_trace, buy_passive_match_interaction_claim) =
+        order_match::interaction_trace::<Buy, Passive>(
+            &match_passive_buy_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (sell_passive_match_interaction_trace, sell_passive_match_interaction_claim) =
+        order_match::interaction_trace::<Sell, Passive>(
+            &match_passive_sell_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
 
     tree_builder.extend_evals(bytes_interaction_trace);
     tree_builder.extend_evals(poseidon_interaction_trace);
@@ -155,6 +211,10 @@ pub fn prove_vex(
     tree_builder.extend_evals(processor_interaction_trace);
     tree_builder.extend_evals(buy_insert_interaction_trace);
     tree_builder.extend_evals(sell_insert_interaction_trace);
+    tree_builder.extend_evals(buy_aggressive_match_interaction_trace);
+    tree_builder.extend_evals(sell_aggressive_match_interaction_trace);
+    tree_builder.extend_evals(buy_passive_match_interaction_trace);
+    tree_builder.extend_evals(sell_passive_match_interaction_trace);
 
     let interaction_claim = VexInteractionClaim {
         processor_interaction_claim,
@@ -164,7 +224,19 @@ pub fn prove_vex(
         strict_less_than_interaction_claim,
         less_than_interaction_claim,
         bytes_interaction_claim,
+        buy_aggressive_match_interaction_claim,
+        sell_aggressive_match_interaction_claim,
+        buy_passive_match_interaction_claim,
+        sell_passive_match_interaction_claim,
     };
+
+    // Validate the Lookup Sum
+    if !(interaction_claim
+        .logup_sum(&claim, &interaction_elements.state_elements)
+        .is_zero())
+    {
+        return Err(VexProvingError::InvalidLogupSum);
+    }
 
     // Mix the interaction claim into the channel.
     interaction_claim.mix_into(channel);
@@ -176,7 +248,8 @@ pub fn prove_vex(
     let span = span!(Level::INFO, "Proof Generation").entered();
     let component_builder = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
     let components = component_builder.provers();
-    let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)?;
+    let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)
+        .map_err(VexProvingError::Stark)?;
     span.exit();
 
     Ok(VexProof {
@@ -220,14 +293,9 @@ pub fn verify_vex(
 
     // interaction trace
     let interaction_elements = VexInteractionElements::draw(channel);
-    let initial_state_comb: SecureField = interaction_elements
-        .state_elements
-        .combine(&claim.initial_state);
-    let final_state_comb: SecureField = interaction_elements
-        .state_elements
-        .combine(&claim.final_state);
     // Check that the lookup sum is valid
-    if !(interaction_claim.logup_sum() + final_state_comb.inverse() - initial_state_comb.inverse())
+    if !interaction_claim
+        .logup_sum(&claim, &interaction_elements.state_elements)
         .is_zero()
     {
         return Err(VexVerificationError::InvalidLogupSum);
@@ -257,7 +325,7 @@ mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     use rand::Rng;
-    use tracing::{span, Level};
+    use tracing::{debug, span, Level};
 
     use crate::{
         executor::{order_book::OrderBook, record::ExecutionTrace},
@@ -274,18 +342,20 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 8;
+        let n = 1 << 7;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
-            let buy_order = Order::new(rng.gen_range(1..=50), rng.gen_range(51..=100), time);
-            let sell_order = Order::new(rng.gen_range(101..=150), rng.gen_range(151..=200), time);
+            // using volume as 100, because partial matching is not implemented
+            let buy_order = Order::new(100, rng.gen_range(100..=105), time);
+            let sell_order = Order::new(100, rng.gen_range(100..=105), time);
             order_book.place_buy_order(buy_order).unwrap();
             order_book.place_sell_order(sell_order).unwrap();
         }
 
         let mut execution_trace =
             std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
+        debug!("shape: {:#?}", execution_trace.sizes());
         execution_trace.final_state = order_book.state().to_felts();
         span.exit();
         let proof = prove_vex(execution_trace).unwrap();

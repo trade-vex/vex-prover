@@ -165,7 +165,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
                 // initial state's buy root hash must be equal to the root hash of the merkle tree
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.initial_state.buy_root_hash[i].clone()
+                        op.initial_state.buy_root[i].clone()
                             - op.merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
@@ -173,16 +173,16 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
                 // final state's buy root hash must be equal to the root in the updated merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.buy_root_hash[i].clone()
+                        op.final_state.buy_root[i].clone()
                             - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
 
                 // the sell IMT priority must remain unchanged
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.sell_imt_priority[i].clone()
-                            - op.final_state.sell_imt_priority[i].clone(),
+                        op.initial_state.best_sell_price[i].clone()
+                            - op.final_state.best_sell_price[i].clone(),
                     );
                 }
 
@@ -194,10 +194,10 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // If the low_leaf is the first leaf (i.e., target leaf is next of first leaf),
                 // the priority must be updated to the target leaf's next
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     // Check if priority changed
-                    let priority_changed = op.final_state.buy_imt_priority[i].clone()
-                        - op.initial_state.buy_imt_priority[i].clone();
+                    let priority_changed = op.final_state.best_buy_price[i].clone()
+                        - op.initial_state.best_buy_price[i].clone();
 
                     // If priority changed, then low_leaf must be the first leaf
                     eval.add_constraint(priority_changed.clone() * low_leaf_is_first[i].clone());
@@ -205,7 +205,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
                     // If priority changed, new priority must be the target's next
                     eval.add_constraint(
                         priority_changed.clone()
-                            * (op.final_state.buy_imt_priority[i].clone()
+                            * (op.final_state.best_buy_price[i].clone()
                                 - op.leaf[LeafColumn::NEXT_PRICE + i].clone()),
                     );
                 }
@@ -214,7 +214,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
                 // initial state's sell root hash must be equal to the root hash of the merkle tree
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.initial_state.sell_root_hash[i].clone()
+                        op.initial_state.sell_root[i].clone()
                             - op.merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
@@ -222,16 +222,16 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
                 // final state's sell root hash must be equal to the root in the updated merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
-                        op.final_state.sell_root_hash[i].clone()
+                        op.final_state.sell_root[i].clone()
                             - op.updated_merkle_path[MERKLE_HEIGHT][i].clone(),
                     );
                 }
 
                 // the buy IMT priority must remain unchanged
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.buy_imt_priority[i].clone()
-                            - op.final_state.buy_imt_priority[i].clone(),
+                        op.initial_state.best_buy_price[i].clone()
+                            - op.final_state.best_buy_price[i].clone(),
                     );
                 }
 
@@ -243,10 +243,10 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
                 // If the low_leaf is the first leaf (i.e., target leaf is next of first leaf),
                 // the priority must be updated to the target leaf's next
-                for i in 0..2 * N_U64_FELTS {
+                for i in 0..N_U64_FELTS {
                     // Check if priority changed
-                    let priority_changed = op.final_state.sell_imt_priority[i].clone()
-                        - op.initial_state.sell_imt_priority[i].clone();
+                    let priority_changed = op.final_state.best_sell_price[i].clone()
+                        - op.initial_state.best_sell_price[i].clone();
 
                     // If priority changed, then low_leaf must be the first leaf
                     eval.add_constraint(priority_changed.clone() * low_leaf_is_first[i].clone());
@@ -254,7 +254,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
                     // If priority changed, new priority must be the target's next
                     eval.add_constraint(
                         priority_changed.clone()
-                            * (op.final_state.sell_imt_priority[i].clone()
+                            * (op.final_state.best_sell_price[i].clone()
                                 - op.leaf[LeafColumn::NEXT_PRICE + i].clone()),
                     );
                 }
@@ -263,10 +263,10 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
 
         let values: Vec<E::F> = flatten!(
             op.initial_state.n,
-            op.initial_state.buy_root_hash,
-            op.initial_state.buy_imt_priority,
-            op.initial_state.sell_root_hash,
-            op.initial_state.sell_imt_priority,
+            op.initial_state.buy_root,
+            op.initial_state.best_buy_price,
+            op.initial_state.sell_root,
+            op.initial_state.best_sell_price,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -279,10 +279,10 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             op.index,
             op.leaf,
             op.final_state.n,
-            op.final_state.buy_root_hash,
-            op.final_state.buy_imt_priority,
-            op.final_state.sell_root_hash,
-            op.final_state.sell_imt_priority,
+            op.final_state.buy_root,
+            op.final_state.best_buy_price,
+            op.final_state.sell_root,
+            op.final_state.best_sell_price,
             op.is_real
         );
         // yield the results

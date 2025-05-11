@@ -13,8 +13,9 @@ use crate::{
         error::IMTError,
         leaf::PriceTime,
         order::Order,
-        side::{Buy, Sell},
-        BuyIMT, SellIMT,
+        side::{Buy, OrderSide, Sell, Side},
+        BuyIMT, IndexBits, MatchProof, MerklePath, PartialMatchProof, SellIMT, N_LEAF_FELTS,
+        N_U64_FELTS,
     },
     types::Volume,
 };
@@ -43,9 +44,9 @@ impl OrderBook {
         let state = State::new(
             BaseField::zero(),
             buy_imt.root(),
-            PriceTime::<BaseField, Buy>::last().to_felts(),
+            PriceTime::<BaseField, Buy>::last().price().to_felts(),
             sell_imt.root(),
-            PriceTime::<BaseField, Sell>::last().to_felts(),
+            PriceTime::<BaseField, Sell>::last().price().to_felts(),
         );
         trace.borrow_mut().initial_state = state.to_felts();
         OrderBook {
@@ -65,18 +66,18 @@ impl OrderBook {
         }
         let initial_state = self.state;
         let proof = self.buy_imt.insert(order)?;
-        debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.buy_root, proof.initial_root);
         let mut final_state = initial_state;
         final_state.n += BaseField::one();
-        final_state.buy_root_hash = self.buy_imt.root();
-        final_state.buy_imt_priority = self.buy_imt.best_price_time();
+        final_state.buy_root = self.buy_imt.root();
+        final_state.best_buy_price = self.buy_imt.best_price_felts();
         self.state = final_state;
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
-            initial_state.buy_root_hash,
-            initial_state.buy_imt_priority,
-            initial_state.sell_root_hash,
-            initial_state.sell_imt_priority,
+            initial_state.buy_root,
+            initial_state.best_buy_price,
+            initial_state.sell_root,
+            initial_state.best_sell_price,
             Opcode::InsertBuyOrder.to_field(),
             proof.low_merkle_proof,
             proof.low_merkle_path,
@@ -89,10 +90,10 @@ impl OrderBook {
             proof.inactive_index,
             proof.leaf.to_felts(),
             final_state.n,
-            final_state.buy_root_hash,
-            final_state.buy_imt_priority,
-            final_state.sell_root_hash,
-            final_state.sell_imt_priority,
+            final_state.buy_root,
+            final_state.best_buy_price,
+            final_state.sell_root,
+            final_state.best_sell_price,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -113,18 +114,18 @@ impl OrderBook {
         }
         let initial_state = self.state;
         let proof = self.sell_imt.insert(order)?;
-        debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
+        debug_assert_eq!(initial_state.sell_root, proof.initial_root);
         let mut final_state = initial_state;
         final_state.n += BaseField::one();
-        final_state.sell_root_hash = self.sell_imt.root();
-        final_state.sell_imt_priority = self.sell_imt.best_price_time();
+        final_state.sell_root = self.sell_imt.root();
+        final_state.best_sell_price = self.sell_imt.best_price_felts();
         self.state = final_state;
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
-            initial_state.buy_root_hash,
-            initial_state.buy_imt_priority,
-            initial_state.sell_root_hash,
-            initial_state.sell_imt_priority,
+            initial_state.buy_root,
+            initial_state.best_buy_price,
+            initial_state.sell_root,
+            initial_state.best_sell_price,
             Opcode::InsertSellOrder.to_field(),
             proof.low_merkle_proof,
             proof.low_merkle_path,
@@ -137,10 +138,10 @@ impl OrderBook {
             proof.inactive_index,
             proof.leaf.to_felts(),
             final_state.n,
-            final_state.buy_root_hash,
-            final_state.buy_imt_priority,
-            final_state.sell_root_hash,
-            final_state.sell_imt_priority,
+            final_state.buy_root,
+            final_state.best_buy_price,
+            final_state.sell_root,
+            final_state.best_sell_price,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -149,27 +150,30 @@ impl OrderBook {
     }
     /// Cancel a buy order in the order book
     /// Returns an error if the order doesn't exist or other IMT errors occur
-    pub fn cancel_buy_order(&mut self, price_time: PriceTime<BaseField, Buy>) -> Result<(), IMTError> {
+    pub fn cancel_buy_order(
+        &mut self,
+        price_time: PriceTime<BaseField, Buy>,
+    ) -> Result<(), IMTError> {
         debug!("Canceling buy order with price_time: {:?}", price_time);
 
         // Get the index of the order to cancel
         let index = self.buy_imt.find(&price_time)?;
         let initial_state = self.state;
         let proof = self.buy_imt.cancel_at_index(index)?;
-        debug_assert_eq!(initial_state.buy_root_hash, proof.initial_root);
-        
+        debug_assert_eq!(initial_state.buy_root, proof.initial_root);
+
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
-        final_state.buy_root_hash = self.buy_imt.root();
-        final_state.buy_imt_priority = self.buy_imt.best_price_time();
+        final_state.buy_root = self.buy_imt.root();
+        final_state.best_buy_price = self.buy_imt.best_price().to_felts();
         self.state = final_state;
 
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
-            initial_state.buy_root_hash,
-            initial_state.buy_imt_priority,
-            initial_state.sell_root_hash,
-            initial_state.sell_imt_priority,
+            initial_state.buy_root,
+            initial_state.best_buy_price,
+            initial_state.sell_root,
+            initial_state.best_sell_price,
             Opcode::CancelBuyOrder.to_field(),
             proof.low_merkle_proof,
             proof.low_merkle_path,
@@ -182,10 +186,10 @@ impl OrderBook {
             proof.cancel_leaf_index,
             proof.cancel_leaf.to_felts(),
             final_state.n,
-            final_state.buy_root_hash,
-            final_state.buy_imt_priority,
-            final_state.sell_root_hash,
-            final_state.sell_imt_priority,
+            final_state.buy_root,
+            final_state.best_buy_price,
+            final_state.sell_root,
+            final_state.best_sell_price,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -194,27 +198,30 @@ impl OrderBook {
 
     /// Cancel a sell order in the order book
     /// Returns an error if the order doesn't exist or other IMT errors occur
-    pub fn cancel_sell_order(&mut self, price_time: PriceTime<BaseField, Sell>) -> Result<(), IMTError> {
+    pub fn cancel_sell_order(
+        &mut self,
+        price_time: PriceTime<BaseField, Sell>,
+    ) -> Result<(), IMTError> {
         debug!("Canceling sell order with price_time: {:?}", price_time);
 
         // Get the index of the order to cancel
         let index = self.sell_imt.find(&price_time)?;
         let initial_state = self.state;
         let proof = self.sell_imt.cancel_at_index(index)?;
-        debug_assert_eq!(initial_state.sell_root_hash, proof.initial_root);
-        
+        debug_assert_eq!(initial_state.sell_root, proof.initial_root);
+
         let mut final_state = initial_state.clone();
         final_state.n += BaseField::one();
-        final_state.sell_root_hash = self.sell_imt.root();
-        final_state.sell_imt_priority = self.sell_imt.best_price_time();
+        final_state.sell_root = self.sell_imt.root();
+        final_state.best_sell_price = self.sell_imt.best_price().to_felts();
         self.state = final_state;
 
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
-            initial_state.buy_root_hash,
-            initial_state.buy_imt_priority,
-            initial_state.sell_root_hash,
-            initial_state.sell_imt_priority,
+            initial_state.buy_root,
+            initial_state.best_buy_price,
+            initial_state.sell_root,
+            initial_state.best_sell_price,
             Opcode::CancelSellOrder.to_field(),
             proof.low_merkle_proof,
             proof.low_merkle_path,
@@ -227,59 +234,65 @@ impl OrderBook {
             proof.cancel_leaf_index,
             proof.cancel_leaf.to_felts(),
             final_state.n,
-            final_state.buy_root_hash,
-            final_state.buy_imt_priority,
-            final_state.sell_root_hash,
-            final_state.sell_imt_priority,
+            final_state.buy_root,
+            final_state.best_buy_price,
+            final_state.sell_root,
+            final_state.best_sell_price,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
         Ok(())
     }
 
-
-    // @todo: state transition
     fn match_buy(&mut self, mut order: Order<BaseField, Buy>) -> Result<(), IMTError> {
         let price = order.price();
         // debug!("best sell price: {:?}", self.sell_imt.best_price());
         // debug!("best buy price: {:?}", self.buy_imt.best_price());
         while order.volume > Volume::zero() && price >= self.sell_imt.best_price() {
-            debug!("best sell price: {:?}", self.sell_imt.best_price());
             let mut match_leaf = self.sell_imt.best_price_leaf();
-            debug!("Match leaf: {:?}", match_leaf);
             let volume = if order.volume < match_leaf.volume {
                 order.volume
             } else {
                 match_leaf.volume
             };
-            debug!("Filled volume: {:?}", volume.to_u64());
             order.volume -= volume;
             match_leaf.volume -= volume;
-
+            let initial_state = self.state;
+            // buy is aggressive here
+            // additional checks for the invariant
+            // best(buy) >= best(sell)
+            self.trace
+                .borrow_mut()
+                .add_less_than_event(match_leaf.price().to_felts(), order.price().to_felts())?;
             if order.volume == Volume::zero() {
-                self.buy_imt.match_order()?;
+                let proof = self.buy_imt.match_order()?;
+                self.finalize_match(proof, true)?;
             } else {
-                self.buy_imt.match_partially(volume)?;
+                let proof = self.buy_imt.match_partially(volume)?;
+                assert_eq!(initial_state.buy_root, proof.initial_root);
+                self.finalize_partial_match(proof, true)?;
             }
 
+            let initial_state = self.state;
             if match_leaf.volume == Volume::zero() {
-                self.sell_imt.match_order()?;
+                let proof = self.sell_imt.match_order()?;
+                assert_eq!(initial_state.sell_root, proof.initial_root);
+                self.finalize_match(proof, false)?;
             } else {
-                self.sell_imt.match_partially(volume)?;
+                let proof = self.sell_imt.match_partially(volume)?;
+                assert_eq!(initial_state.sell_root, proof.initial_root);
+                self.finalize_partial_match(proof, false)?;
             }
         }
         Ok(())
     }
 
-    // @todo: state transition
     fn match_sell(&mut self, mut order: Order<BaseField, Sell>) -> Result<(), IMTError> {
         let price = order.price();
         // debug!("best buy price: {:?}", self.buy_imt.best_price());
         // debug!("best sell price: {:?}", self.sell_imt.best_price());
         while order.volume > Volume::zero() && price <= self.buy_imt.best_price() {
-            debug!("best buy price: {:?}", self.buy_imt.best_price());
             let mut match_leaf = self.buy_imt.best_price_leaf();
-            debug!("Match leaf: {:?}", match_leaf);
             let volume = if order.volume < match_leaf.volume {
                 order.volume
             } else {
@@ -287,20 +300,146 @@ impl OrderBook {
             };
             order.volume -= volume;
             match_leaf.volume -= volume;
-            debug!("Filled volume: {:?}", volume.to_u64());
+
+            self.trace
+                .borrow_mut()
+                .add_less_than_event(order.price().to_felts(), match_leaf.price().to_felts())?;
             if order.volume == Volume::zero() {
-                self.sell_imt.match_order()?;
+                let proof = self.sell_imt.match_order()?;
+                self.finalize_match(proof, true)?;
             } else {
-                self.sell_imt.match_partially(volume)?;
+                let proof = self.sell_imt.match_partially(volume)?;
+                self.finalize_partial_match(proof, true)?;
             }
-            debug!("Filled volume1: {:?}", volume.to_u64());
+
             if match_leaf.volume == Volume::zero() {
-                self.buy_imt.match_order()?;
+                let proof = self.buy_imt.match_order()?;
+                self.finalize_match(proof, false)?;
             } else {
-                self.buy_imt.match_partially(volume)?;
+                let proof = self.buy_imt.match_partially(volume)?;
+                self.finalize_partial_match(proof, false)?;
             }
-            debug!("Filled volume2: {:?}", volume.to_u64());
         }
+        Ok(())
+    }
+
+    fn finalize_match<S: OrderSide>(
+        &mut self,
+        proof: MatchProof<S>,
+        is_aggressive: bool,
+    ) -> Result<(), IMTError> {
+        let initial_state = self.state;
+        let mut final_state = initial_state;
+        let opcode = match S::SIDE {
+            Side::Buy => {
+                debug_assert_eq!(proof.initial_root, initial_state.buy_root);
+                final_state.buy_root = self.buy_imt.root();
+                final_state.best_buy_price = self.buy_imt.best_price_felts();
+                if is_aggressive {
+                    Opcode::MatchAggressiveBuy
+                } else {
+                    Opcode::MatchPassiveBuy
+                }
+            }
+            Side::Sell => {
+                debug_assert_eq!(proof.initial_root, initial_state.sell_root);
+                final_state.sell_root = self.sell_imt.root();
+                final_state.best_sell_price = self.sell_imt.best_price_felts();
+                if is_aggressive {
+                    Opcode::MatchAggressiveSell
+                } else {
+                    Opcode::MatchPassiveSell
+                }
+            }
+        };
+        final_state.n += BaseField::one();
+        self.state = final_state;
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            initial_state.n,
+            initial_state.buy_root,
+            initial_state.best_buy_price,
+            initial_state.sell_root,
+            initial_state.best_sell_price,
+            opcode.to_field(),
+            proof.low_merkle_proof,
+            proof.low_merkle_path,
+            proof.low_merkle_updated_path,
+            IndexBits::<BaseField>::default(),
+            proof.low_leaf.to_felts(),
+            proof.match_leaf_proof,
+            proof.match_leaf_path,
+            proof.match_leaf_updated_path,
+            proof.match_leaf_index,
+            proof.match_leaf.to_felts(),
+            final_state.n,
+            final_state.buy_root,
+            final_state.best_buy_price,
+            final_state.sell_root,
+            final_state.best_sell_price,
+            BaseField::one()
+        );
+        self.trace.borrow_mut().add_instruction(instruction_felts);
+        Ok(())
+    }
+
+    fn finalize_partial_match<S: OrderSide>(
+        &mut self,
+        proof: PartialMatchProof<S>,
+        is_aggressive: bool,
+    ) -> Result<(), IMTError> {
+        let initial_state = self.state;
+        let mut final_state = initial_state;
+        let opcode = match S::SIDE {
+            Side::Buy => {
+                debug_assert_eq!(proof.initial_root, initial_state.buy_root);
+                final_state.buy_root = self.buy_imt.root();
+                final_state.best_buy_price = self.buy_imt.best_price_felts();
+                if is_aggressive {
+                    Opcode::PartialMatchAggressiveBuy
+                } else {
+                    Opcode::PartialMatchPassiveBuy
+                }
+            }
+            Side::Sell => {
+                debug_assert_eq!(proof.initial_root, initial_state.sell_root);
+                final_state.sell_root = self.sell_imt.root();
+                final_state.best_sell_price = self.sell_imt.best_price_felts();
+                if is_aggressive {
+                    Opcode::PartialMatchAggressiveSell
+                } else {
+                    Opcode::PartialMatchPassiveSell
+                }
+            }
+        };
+        final_state.n += BaseField::one();
+        self.state = final_state;
+        let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
+            initial_state.n,
+            initial_state.buy_root,
+            initial_state.best_buy_price,
+            initial_state.sell_root,
+            initial_state.best_sell_price,
+            opcode.to_field(),
+            proof.low_merkle_proof,
+            proof.low_merkle_path,
+            MerklePath::<BaseField>::default(),
+            IndexBits::<BaseField>::default(),
+            proof.filled_volume.to_felts(),
+            proof.remaining_volume.to_felts(),
+            [BaseField::zero(); N_LEAF_FELTS - 2 * N_U64_FELTS],
+            proof.match_leaf_proof,
+            proof.match_leaf_path,
+            proof.match_leaf_updated_path,
+            proof.match_leaf_index,
+            proof.match_leaf.to_felts(),
+            final_state.n,
+            final_state.buy_root,
+            final_state.best_buy_price,
+            final_state.sell_root,
+            final_state.best_sell_price,
+            BaseField::one()
+        );
+        self.trace.borrow_mut().add_instruction(instruction_felts);
         Ok(())
     }
 }
@@ -311,6 +450,8 @@ mod test {
     use tracing::{span, Level};
 
     use super::*;
+    use crate::executor::instruction::InstructionColumn;
+    use crate::imt::leaf::Leaf;
     use crate::{
         imt::{
             order::Order,
@@ -318,8 +459,6 @@ mod test {
         },
         types::{Price, Time},
     };
-    use crate::imt::leaf::Leaf;
-    use crate::executor::instruction::InstructionColumn;
 
     #[test]
     fn test_place_buy_order() {
@@ -467,10 +606,10 @@ mod test {
     fn generate_random_order<S: OrderSide>(time: u64, base_price: u64) -> Order<BaseField, S> {
         let mut rng = rand::thread_rng();
         let price = match S::side() {
-            Side::Buy => rng.gen_range(1..=50),
-            Side::Sell => rng.gen_range(101..=150),
+            Side::Buy => rng.gen_range(100..110),
+            Side::Sell => rng.gen_range(100..=110),
         };
-        let volume = rng.gen_range(1..100);
+        let volume = 100;
         Order::new(volume, base_price + price, time)
     }
 
@@ -506,15 +645,61 @@ mod test {
 
             time += 2;
         }
+        let trace = std::mem::replace(&mut *trace.borrow_mut(), ExecutionTrace::new());
+        debug!("Number of buy orders: {}", trace.buy_insert_order.len());
+        debug!("Number of sell orders: {}", trace.sell_insert_order.len());
+        debug!(
+            "Number of aggressive buy matches: {}",
+            trace.buy_aggressive_match.len()
+        );
+        debug!(
+            "Number of passive buy matches: {}",
+            trace.buy_passive_match.len()
+        );
+        debug!(
+            "Number of aggressive sell matches: {}",
+            trace.sell_aggressive_match.len()
+        );
+        debug!(
+            "Number of passive sell matches: {}",
+            trace.sell_passive_match.len()
+        );
+        debug!(
+            "Number of Aggressive partial buy matches: {}",
+            trace.buy_aggressive_partial_match.len()
+        );
+        debug!(
+            "Number of Passive partial buy matches: {}",
+            trace.buy_passive_partial_match.len()
+        );
+        debug!(
+            "Number of Aggressive partial sell matches: {}",
+            trace.sell_aggressive_partial_match.len()
+        );
+        debug!(
+            "Number of Passive partial sell matches: {}",
+            trace.sell_passive_partial_match.len()
+        );
+        debug!("Total number of instructions: {}", trace.instructions.len());
     }
-    fn get_buy_leaf_safely(machine: &OrderBook, pt: PriceTime<BaseField, Buy>) -> Result<Leaf<BaseField, Buy>, String> {
-        machine.buy_imt.get_leaf_by_price_time(pt.price().to_u64(), pt.time().to_u64())
+    fn get_buy_leaf_safely(
+        machine: &OrderBook,
+        pt: PriceTime<BaseField, Buy>,
+    ) -> Result<Leaf<BaseField, Buy>, String> {
+        machine
+            .buy_imt
+            .get_leaf_by_price_time(pt.price().to_u64(), pt.time().to_u64())
             .map_err(|e| format!("Failed to get buy leaf for {:?}: {:?}", pt, e))
     }
 
-    fn get_sell_leaf_safely(machine: &OrderBook, pt: PriceTime<BaseField, Sell>) -> Result<Leaf<BaseField, Sell>, String> {
-        machine.sell_imt.get_leaf_by_price_time(pt.price().to_u64(), pt.time().to_u64())
-             .map_err(|e| format!("Failed to get sell leaf for {:?}: {:?}", pt, e))
+    fn get_sell_leaf_safely(
+        machine: &OrderBook,
+        pt: PriceTime<BaseField, Sell>,
+    ) -> Result<Leaf<BaseField, Sell>, String> {
+        machine
+            .sell_imt
+            .get_leaf_by_price_time(pt.price().to_u64(), pt.time().to_u64())
+            .map_err(|e| format!("Failed to get sell leaf for {:?}: {:?}", pt, e))
     }
 
     #[test]
@@ -525,13 +710,18 @@ mod test {
         let pt = order.price_time; // Get PriceTime
 
         // Place the order
-        assert!(machine.place_buy_order(order.clone()).is_ok(), "Failed to place buy order");
+        assert!(
+            machine.place_buy_order(order.clone()).is_ok(),
+            "Failed to place buy order"
+        );
 
         // *** Check leaf exists AFTER insertion ***
-        let leaf_after_insert = get_buy_leaf_safely(&machine, pt)
-            .expect("Leaf MUST exist immediately after insertion");
-        assert!(leaf_after_insert.is_active(), "Leaf is inactive immediately after insertion");
-
+        let leaf_after_insert =
+            get_buy_leaf_safely(&machine, pt).expect("Leaf MUST exist immediately after insertion");
+        assert!(
+            leaf_after_insert.is_active(),
+            "Leaf is inactive immediately after insertion"
+        );
 
         let initial_state_before_cancel = machine.state.clone();
         let initial_root = machine.buy_imt.root();
@@ -541,8 +731,11 @@ mod test {
         // Cancel the order
         let cancel_result = machine.cancel_buy_order(pt);
         // *** Check cancel result explicitly ***
-        assert!(cancel_result.is_ok(), "cancel_buy_order failed: {:?}", cancel_result.err());
-
+        assert!(
+            cancel_result.is_ok(),
+            "cancel_buy_order failed: {:?}",
+            cancel_result.err()
+        );
 
         let final_state = machine.state.clone();
 
@@ -551,19 +744,34 @@ mod test {
         assert_eq!(trace.borrow().buy_delete_order.len(), 1);
 
         // Check state transition counter 'n'
-        assert_eq!(final_state.n, initial_state_before_cancel.n + BaseField::one());
+        assert_eq!(
+            final_state.n,
+            initial_state_before_cancel.n + BaseField::one()
+        );
 
         // Check root hash changed
-        assert_ne!(final_state.buy_root_hash, initial_root, "Root hash did not change");
+        assert_ne!(
+            final_state.buy_root, initial_root,
+            "Root hash did not change"
+        );
 
         // Check if priority updated
-        assert_eq!(final_state.buy_imt_priority, PriceTime::<BaseField, Buy>::last().to_felts(), "Priority not reset");
-
+        assert_eq!(
+            final_state.best_buy_price,
+            PriceTime::<BaseField, Buy>::last().price().to_felts(),
+            "Priority not reset"
+        );
 
         // Verify the correct opcode was added
         let binding = trace.borrow();
-        let last_instruction = binding.instructions.last().expect("Instruction trace empty");
-        assert_eq!(last_instruction[InstructionColumn::OPCODE], Opcode::CancelBuyOrder.to_field());
+        let last_instruction = binding
+            .instructions
+            .last()
+            .expect("Instruction trace empty");
+        assert_eq!(
+            last_instruction[InstructionColumn::OPCODE],
+            Opcode::CancelBuyOrder.to_field()
+        );
     }
 
     #[test]
@@ -574,13 +782,18 @@ mod test {
         let pt = order.price_time; // Get PriceTime
 
         // Place the order
-        assert!(machine.place_sell_order(order.clone()).is_ok(), "Failed to place sell order");
+        assert!(
+            machine.place_sell_order(order.clone()).is_ok(),
+            "Failed to place sell order"
+        );
 
         // *** Check leaf exists AFTER insertion ***
-         let leaf_after_insert = get_sell_leaf_safely(&machine, pt)
-             .expect("Leaf MUST exist immediately after insertion");
-         assert!(leaf_after_insert.is_active(), "Leaf is inactive immediately after insertion");
-
+        let leaf_after_insert = get_sell_leaf_safely(&machine, pt)
+            .expect("Leaf MUST exist immediately after insertion");
+        assert!(
+            leaf_after_insert.is_active(),
+            "Leaf is inactive immediately after insertion"
+        );
 
         let initial_state_before_cancel = machine.state.clone();
         let initial_root = machine.sell_imt.root();
@@ -590,8 +803,11 @@ mod test {
         // Cancel the order
         let cancel_result = machine.cancel_sell_order(pt);
         // *** Check cancel result explicitly ***
-        assert!(cancel_result.is_ok(), "cancel_sell_order failed: {:?}", cancel_result.err());
-
+        assert!(
+            cancel_result.is_ok(),
+            "cancel_sell_order failed: {:?}",
+            cancel_result.err()
+        );
 
         let final_state = machine.state.clone();
 
@@ -600,28 +816,42 @@ mod test {
         assert_eq!(trace.borrow().sell_delete_order.len(), 1);
 
         // Check state transition counter 'n'
-        assert_eq!(final_state.n, initial_state_before_cancel.n + BaseField::one());
+        assert_eq!(
+            final_state.n,
+            initial_state_before_cancel.n + BaseField::one()
+        );
 
         // Check root hash changed
-        assert_ne!(final_state.sell_root_hash, initial_root, "Root hash did not change");
+        assert_ne!(
+            final_state.sell_root, initial_root,
+            "Root hash did not change"
+        );
 
         // Check if priority updated
-        assert_eq!(final_state.sell_imt_priority, PriceTime::<BaseField, Sell>::last().to_felts(), "Priority not reset");
-
+        assert_eq!(
+            final_state.best_sell_price,
+            PriceTime::<BaseField, Sell>::last().price().to_felts(),
+            "Priority not reset"
+        );
 
         // Verify the correct opcode was added
         let binding = trace.borrow();
-        let last_instruction = binding.instructions.last().expect("Instruction trace empty");
-        assert_eq!(last_instruction[InstructionColumn::OPCODE], Opcode::CancelSellOrder.to_field());
+        let last_instruction = binding
+            .instructions
+            .last()
+            .expect("Instruction trace empty");
+        assert_eq!(
+            last_instruction[InstructionColumn::OPCODE],
+            Opcode::CancelSellOrder.to_field()
+        );
     }
-
 
     #[test]
     fn test_cancel_buy_order_updates_priority() {
         let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut machine = OrderBook::new(Rc::clone(&trace));
         let order1 = Order::new(10, 100, 1); // Lower priority
-        let order2 = Order::new(5, 110, 2);  // Highest priority
+        let order2 = Order::new(5, 110, 2); // Highest priority
         let pt1 = order1.price_time;
         let pt2 = order2.price_time;
 
@@ -630,33 +860,38 @@ mod test {
         assert!(machine.place_buy_order(order2.clone()).is_ok());
 
         // *** Check leaves exist AFTER insertion ***
-        let _leaf1_after_insert = get_buy_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
-        let _leaf2_after_insert = get_buy_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
-
+        let _leaf1_after_insert =
+            get_buy_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
+        let _leaf2_after_insert =
+            get_buy_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
 
         // Verify initial priority is order2
-        assert_eq!(machine.state.buy_imt_priority, pt2.to_felts());
+        assert_eq!(machine.state.best_buy_price, pt2.price().to_felts());
 
         // Cancel the highest priority order (order2)
         let cancel_result = machine.cancel_buy_order(pt2);
-        assert!(cancel_result.is_ok(), "cancel_buy_order failed for pt2: {:?}", cancel_result.err());
-
+        assert!(
+            cancel_result.is_ok(),
+            "cancel_buy_order failed for pt2: {:?}",
+            cancel_result.err()
+        );
 
         // Verify priority updated to order1
-        assert_eq!(machine.state.buy_imt_priority, pt1.to_felts());
+        assert_eq!(machine.state.best_buy_price, pt1.price().to_felts());
 
         // Verify leaves state
-        let leaf1 = get_buy_leaf_safely(&machine, pt1).expect("Leaf 1 should still exist after cancelling leaf 2");
+        let leaf1 = get_buy_leaf_safely(&machine, pt1)
+            .expect("Leaf 1 should still exist after cancelling leaf 2");
         assert!(leaf1.is_active());
         assert_eq!(trace.borrow().buy_delete_order.len(), 1);
     }
 
-     #[test]
+    #[test]
     fn test_cancel_sell_order_updates_priority() {
         let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut machine = OrderBook::new(Rc::clone(&trace));
         let order1 = Order::new(10, 100, 1); // Higher priority (lower price)
-        let order2 = Order::new(5, 110, 2);  // Lower priority
+        let order2 = Order::new(5, 110, 2); // Lower priority
         let pt1 = order1.price_time;
         let pt2 = order2.price_time;
 
@@ -665,33 +900,38 @@ mod test {
         assert!(machine.place_sell_order(order2.clone()).is_ok());
 
         // *** Check leaves exist AFTER insertion ***
-        let _leaf1_after_insert = get_sell_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
-        let _leaf2_after_insert = get_sell_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
+        let _leaf1_after_insert =
+            get_sell_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
+        let _leaf2_after_insert =
+            get_sell_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
 
         // Verify initial priority is order1
-        assert_eq!(machine.state.sell_imt_priority, pt1.to_felts());
+        assert_eq!(machine.state.best_sell_price, pt1.price().to_felts());
 
         // Cancel the highest priority order (order1)
         let cancel_result = machine.cancel_sell_order(pt1);
-        assert!(cancel_result.is_ok(), "cancel_sell_order failed for pt1: {:?}", cancel_result.err());
-
+        assert!(
+            cancel_result.is_ok(),
+            "cancel_sell_order failed for pt1: {:?}",
+            cancel_result.err()
+        );
 
         // Verify priority updated to order2
-        assert_eq!(machine.state.sell_imt_priority, pt2.to_felts());
+        assert_eq!(machine.state.best_sell_price, pt2.price().to_felts());
 
         // Verify leaves state
-        let leaf2 = get_sell_leaf_safely(&machine, pt2).expect("Leaf 2 should still exist after cancelling leaf 1");
+        let leaf2 = get_sell_leaf_safely(&machine, pt2)
+            .expect("Leaf 2 should still exist after cancelling leaf 1");
         assert!(leaf2.is_active());
         assert_eq!(trace.borrow().sell_delete_order.len(), 1);
     }
-
 
     #[test]
     fn test_cancel_buy_order_does_not_update_priority() {
         let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut machine = OrderBook::new(Rc::clone(&trace));
         let order1 = Order::new(10, 100, 1); // Lower priority - to be cancelled
-        let order2 = Order::new(5, 110, 2);  // Highest priority - remains
+        let order2 = Order::new(5, 110, 2); // Highest priority - remains
         let pt1 = order1.price_time;
         let pt2 = order2.price_time;
 
@@ -699,25 +939,31 @@ mod test {
         assert!(machine.place_buy_order(order1.clone()).is_ok());
         assert!(machine.place_buy_order(order2.clone()).is_ok());
 
-         // *** Check leaves exist AFTER insertion ***
-        let _leaf1_after_insert = get_buy_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
-        let _leaf2_after_insert = get_buy_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
+        // *** Check leaves exist AFTER insertion ***
+        let _leaf1_after_insert =
+            get_buy_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
+        let _leaf2_after_insert =
+            get_buy_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
 
         // Verify initial priority is order2
-        assert_eq!(machine.state.buy_imt_priority, pt2.to_felts());
-        let initial_priority = machine.state.buy_imt_priority.clone();
+        assert_eq!(machine.state.best_buy_price, pt2.price().to_felts());
+        let initial_priority = machine.state.best_buy_price.clone();
 
         // Cancel the lower priority order (order1)
         let cancel_result = machine.cancel_buy_order(pt1);
-        assert!(cancel_result.is_ok(), "cancel_buy_order failed for pt1: {:?}", cancel_result.err());
-
+        assert!(
+            cancel_result.is_ok(),
+            "cancel_buy_order failed for pt1: {:?}",
+            cancel_result.err()
+        );
 
         // Verify priority did NOT change
-        assert_eq!(machine.state.buy_imt_priority, initial_priority);
-        assert_eq!(machine.state.buy_imt_priority, pt2.to_felts()); // Still order2
+        assert_eq!(machine.state.best_buy_price, initial_priority);
+        assert_eq!(machine.state.best_buy_price, pt2.price().to_felts()); // Still order2
 
         // Verify leaves state
-        let leaf2 = get_buy_leaf_safely(&machine, pt2).expect("Leaf 2 should still exist after cancelling leaf 1");
+        let leaf2 = get_buy_leaf_safely(&machine, pt2)
+            .expect("Leaf 2 should still exist after cancelling leaf 1");
         assert!(leaf2.is_active());
         assert_eq!(trace.borrow().buy_delete_order.len(), 1);
     }
@@ -727,7 +973,7 @@ mod test {
         let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut machine = OrderBook::new(Rc::clone(&trace));
         let order1 = Order::new(10, 100, 1); // Highest priority - remains
-        let order2 = Order::new(5, 110, 2);  // Lower priority - to be cancelled
+        let order2 = Order::new(5, 110, 2); // Lower priority - to be cancelled
         let pt1 = order1.price_time;
         let pt2 = order2.price_time;
 
@@ -736,24 +982,30 @@ mod test {
         assert!(machine.place_sell_order(order2.clone()).is_ok());
 
         // *** Check leaves exist AFTER insertion ***
-        let _leaf1_after_insert = get_sell_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
-        let _leaf2_after_insert = get_sell_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
+        let _leaf1_after_insert =
+            get_sell_leaf_safely(&machine, pt1).expect("Leaf 1 MUST exist after insertion");
+        let _leaf2_after_insert =
+            get_sell_leaf_safely(&machine, pt2).expect("Leaf 2 MUST exist after insertion");
 
         // Verify initial priority is order1
-        assert_eq!(machine.state.sell_imt_priority, pt1.to_felts());
-        let initial_priority = machine.state.sell_imt_priority.clone();
+        assert_eq!(machine.state.best_sell_price, pt1.price().to_felts());
+        let initial_priority = machine.state.best_sell_price.clone();
 
         // Cancel the lower priority order (order2)
         let cancel_result = machine.cancel_sell_order(pt2);
-        assert!(cancel_result.is_ok(), "cancel_sell_order failed for pt2: {:?}", cancel_result.err());
-
+        assert!(
+            cancel_result.is_ok(),
+            "cancel_sell_order failed for pt2: {:?}",
+            cancel_result.err()
+        );
 
         // Verify priority did NOT change
-        assert_eq!(machine.state.sell_imt_priority, initial_priority);
-        assert_eq!(machine.state.sell_imt_priority, pt1.to_felts()); // Still order1
+        assert_eq!(machine.state.best_sell_price, initial_priority);
+        assert_eq!(machine.state.best_sell_price, pt1.price().to_felts()); // Still order1
 
         // Verify leaves state
-        let leaf1 = get_sell_leaf_safely(&machine, pt1).expect("Leaf 1 should still exist after cancelling leaf 2");
+        let leaf1 = get_sell_leaf_safely(&machine, pt1)
+            .expect("Leaf 1 should still exist after cancelling leaf 2");
         assert!(leaf1.is_active());
         assert_eq!(trace.borrow().sell_delete_order.len(), 1);
     }
@@ -769,17 +1021,20 @@ mod test {
         // Place an order
         assert!(machine.place_buy_order(order.clone()).is_ok());
         // Check it exists
-        let _leaf_after_insert = get_buy_leaf_safely(&machine, pt).expect("Leaf MUST exist after insertion");
+        let _leaf_after_insert =
+            get_buy_leaf_safely(&machine, pt).expect("Leaf MUST exist after insertion");
 
         let initial_state = machine.state.clone();
         let trace_len_before = trace.borrow().instructions.len();
 
         // Attempt to cancel a non-existent order
         let result = machine.cancel_buy_order(non_existent_pt);
-        assert!(result.is_err(), "Cancellation of non-existent order should fail");
+        assert!(
+            result.is_err(),
+            "Cancellation of non-existent order should fail"
+        );
         // Optionally check the specific error type if IMTError exposes it
         // assert!(matches!(result.unwrap_err(), IMTError::LeafNotFound));
-
 
         // Verify state hasn't changed
         assert_eq!(machine.state, initial_state);
@@ -789,28 +1044,30 @@ mod test {
         assert_eq!(trace.borrow().instructions.len(), trace_len_before);
     }
 
-     #[test]
+    #[test]
     fn test_cancel_non_existent_sell_order() {
         let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut machine = OrderBook::new(Rc::clone(&trace));
         let order = Order::new(10, 100, 1);
-         let pt = order.price_time;
+        let pt = order.price_time;
         let non_existent_pt = PriceTime::<BaseField, Sell>::new(999, 999);
 
         // Place an order
         assert!(machine.place_sell_order(order.clone()).is_ok());
         // Check it exists
-        let _leaf_after_insert = get_sell_leaf_safely(&machine, pt).expect("Leaf MUST exist after insertion");
-
+        let _leaf_after_insert =
+            get_sell_leaf_safely(&machine, pt).expect("Leaf MUST exist after insertion");
 
         let initial_state = machine.state.clone();
         let trace_len_before = trace.borrow().instructions.len();
 
         // Attempt to cancel a non-existent order
         let result = machine.cancel_sell_order(non_existent_pt);
-        assert!(result.is_err(), "Cancellation of non-existent order should fail");
+        assert!(
+            result.is_err(),
+            "Cancellation of non-existent order should fail"
+        );
         // assert!(matches!(result.unwrap_err(), IMTError::LeafNotFound));
-
 
         // Verify state hasn't changed
         assert_eq!(machine.state, initial_state);
@@ -820,7 +1077,7 @@ mod test {
         assert_eq!(trace.borrow().instructions.len(), trace_len_before);
     }
 
-     #[test]
+    #[test]
     fn test_cancel_already_inactive_buy_order() {
         let trace = Rc::new(RefCell::new(ExecutionTrace::new()));
         let mut machine = OrderBook::new(Rc::clone(&trace));
@@ -829,25 +1086,34 @@ mod test {
 
         // Place and immediately cancel the order
         assert!(machine.place_buy_order(order.clone()).is_ok());
-         let cancel1_result = machine.cancel_buy_order(pt);
-         assert!(cancel1_result.is_ok(), "First cancel failed: {:?}", cancel1_result.err());
+        let cancel1_result = machine.cancel_buy_order(pt);
+        assert!(
+            cancel1_result.is_ok(),
+            "First cancel failed: {:?}",
+            cancel1_result.err()
+        );
 
         let state_after_first_cancel = machine.state.clone();
         let trace_len_after_first_cancel = trace.borrow().instructions.len();
 
         // Attempt to cancel the already cancelled (inactive) order again
         let cancel2_result = machine.cancel_buy_order(pt);
-        assert!(cancel2_result.is_err(), "Second cancellation of same order should fail");
+        assert!(
+            cancel2_result.is_err(),
+            "Second cancellation of same order should fail"
+        );
         // Check specific error if possible, e.g., CannotCancelInactive
         // assert!(matches!(cancel2_result.unwrap_err(), IMTError::CannotCancelInactive));
-
 
         // Verify state hasn't changed since the first cancel
         assert_eq!(machine.state, state_after_first_cancel);
 
         // Verify no *additional* cancel instruction was added
         assert_eq!(trace.borrow().buy_delete_order.len(), 1); // Still 1 cancel
-        assert_eq!(trace.borrow().instructions.len(), trace_len_after_first_cancel);
+        assert_eq!(
+            trace.borrow().instructions.len(),
+            trace_len_after_first_cancel
+        );
     }
 
     #[test]
@@ -859,25 +1125,32 @@ mod test {
 
         // Place and immediately cancel the order
         assert!(machine.place_sell_order(order.clone()).is_ok());
-         let cancel1_result = machine.cancel_sell_order(pt);
-         assert!(cancel1_result.is_ok(), "First cancel failed: {:?}", cancel1_result.err());
-
+        let cancel1_result = machine.cancel_sell_order(pt);
+        assert!(
+            cancel1_result.is_ok(),
+            "First cancel failed: {:?}",
+            cancel1_result.err()
+        );
 
         let state_after_first_cancel = machine.state.clone();
         let trace_len_after_first_cancel = trace.borrow().instructions.len();
 
         // Attempt to cancel the already cancelled (inactive) order again
         let cancel2_result = machine.cancel_sell_order(pt);
-        assert!(cancel2_result.is_err(), "Second cancellation of same order should fail");
+        assert!(
+            cancel2_result.is_err(),
+            "Second cancellation of same order should fail"
+        );
         // assert!(matches!(cancel2_result.unwrap_err(), IMTError::CannotCancelInactive));
-
 
         // Verify state hasn't changed since the first cancel
         assert_eq!(machine.state, state_after_first_cancel);
 
         // Verify no *additional* cancel instruction was added
         assert_eq!(trace.borrow().sell_delete_order.len(), 1); // Still 1 cancel
-        assert_eq!(trace.borrow().instructions.len(), trace_len_after_first_cancel);
+        assert_eq!(
+            trace.borrow().instructions.len(),
+            trace_len_after_first_cancel
+        );
     }
-    
 }
