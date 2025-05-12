@@ -17,6 +17,22 @@ pub enum IMTError {
 }
 
 impl fmt::Display for IMTError {
+    /// Formats the `IMTError` enum into a human-readable error message.
+    ///
+    /// Converts each error variant into a descriptive string, including any associated data, for display purposes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use crate::imt::error::IMTError;
+    /// use std::fmt;
+    ///
+    /// let err = IMTError::LeafNotFound;
+    /// assert_eq!(format!("{}", err), "Leaf not found");
+    ///
+    /// let err = IMTError::OperationFailed("timeout".to_string());
+    /// assert_eq!(format!("{}", err), "Operation failed: timeout");
+    /// ```
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             IMTError::CannotCancelFirstLeaf => write!(f, "Cannot cancel the first leaf"),

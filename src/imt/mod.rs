@@ -401,6 +401,32 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
 
     /// Partial Matches an order of highest priority.
     #[inline]
+    /// Partially matches the highest priority order by reducing its volume.
+    ///
+    /// Decreases the volume of the best-priced active order by the specified `filled_volume`.
+    /// Returns an error if the filled volume exceeds the available volume or if the match would fully deplete the order (i.e., not a partial match).
+    /// Produces a `PartialMatchProof` containing all relevant Merkle proofs and updated paths for cryptographic verification.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IMTError::InsufficientVolumeToFill` if the filled volume is greater than the order's available volume.
+    /// Returns `IMTError::NotAPartialMatch` if the filled volume would fully deplete the order.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// # use your_crate::{IndexedMerkleTree, Order, Volume, Buy};
+    /// # use std::rc::Rc;
+    /// # use std::cell::RefCell;
+    /// # use your_crate::ExecutionTrace;
+    /// let trace = Rc::new(RefCell::new(ExecutionTrace::default()));
+    /// let mut tree = IndexedMerkleTree::<Buy>::new(trace);
+    /// let order = Order::new(100, 1, 50); // price, time, volume
+    /// tree.insert(order).unwrap();
+    /// let filled = Volume::from_u64(20);
+    /// let proof = tree.match_partially(filled).unwrap();
+    /// assert_eq!(proof.remaining_volume.to_u64(), 30);
+    /// ```
     pub fn match_partially(
         &mut self,
         filled_volume: Volume<BaseField>,

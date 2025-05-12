@@ -382,6 +382,26 @@ impl OrderBook {
         Ok(())
     }
 
+    /// Finalizes a partial match for a buy or sell order, updating the order book state and execution trace.
+    ///
+    /// Updates the relevant IMT root and best price for the matched side, increments the state counter,
+    /// and records the partial match event and instruction in the execution trace. The opcode reflects
+    /// whether the match was aggressive or passive and which side was matched.
+    ///
+    /// # Parameters
+    /// - `proof`: The proof data for the partial match, including filled and remaining volumes.
+    /// - `is_aggressive`: Indicates if the match was initiated by an aggressive order.
+    ///
+    /// # Returns
+    /// Returns `Ok(())` if the partial match is finalized successfully, or an `IMTError` if trace recording fails.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `order_book` is a mutable OrderBook instance and `proof` is a valid PartialMatchProof.
+    /// let result = order_book.finalize_partial_match(proof, true);
+    /// assert!(result.is_ok());
+    /// ```
     fn finalize_partial_match<S: OrderSide>(
         &mut self,
         proof: PartialMatchProof<S>,
@@ -605,6 +625,7 @@ mod test {
         );
     }
 
+    /// ```
     fn generate_random_order<S: OrderSide>(time: u64, base_price: u64) -> Order<BaseField, S> {
         let mut rng = rand::thread_rng();
         let price = match S::side() {

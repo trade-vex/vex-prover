@@ -53,8 +53,17 @@ use tracing::{debug, span, Level};
 use super::PartialMatchColumn;
 
 /// Preprocessed Trace for Partial Order Matches, each row consisting of a single field element
-/// First row is M31(1), rest are M31(0)
-pub fn preprocessed_trace(
+/// Generates a preprocessed trace column for partial order matches, with the first row set to one and all subsequent rows set to zero.
+///
+/// The resulting column vector contains a single field element per row, where the first row is initialized to the field element representing one, and all other rows are zero. This is typically used as an indicator column in cryptographic trace generation.
+///
+/// # Examples
+///
+/// ```
+/// let trace = preprocessed_trace(4);
+/// assert_eq!(trace[0][0], M31(1));
+/// assert!(trace[0][1..].iter().all(|&x| x == M31(0)));
+/// ```pub fn preprocessed_trace(
     log_size: u32,
 ) -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>> {
     vec![IsFirst::new(log_size).gen_column_simd()]
@@ -62,8 +71,7 @@ pub fn preprocessed_trace(
 
 /// Trace for the Order Match Operations, each row consisting of a [BaseField; InstructionColumn::MAIN_COLS]
 /// Generic over the Order Side and Order Match Type
-/// This Function does not check the validity of the instructions
-pub fn trace<S: OrderSide, T: OrderMatchType>(
+/// ```pub fn trace<S: OrderSide, T: OrderMatchType>(
     mut partial_matches: Instructions<BaseField>,
 ) -> (
     ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
@@ -103,8 +111,31 @@ pub fn trace<S: OrderSide, T: OrderMatchType>(
 /// Partial Order Match Interaction Trace
 /// Generic over the Order Side and Order Match Type
 /// Note: The trace must consist the same type of instructions as the generic
-/// This Function does not check the validity of the instructions
-pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
+/// Constructs the interaction trace for partial order match operations in a zero-knowledge proof system.
+///
+/// This function generates the interaction trace required for verifying cryptographic constraints of partial order matches, including price comparisons, volume updates, and Merkle tree verifications. It is generic over the order side and match type, and operates on SIMD-packed trace columns. The function extracts relevant columns from the input trace, computes interaction columns for various cryptographic operations (such as Poseidon hashing, less-than comparisons, and additions), and accumulates them using the provided element sets. The resulting interaction trace and a claim containing the aggregated sum are returned.
+///
+/// # Parameters
+/// - `trace`: The main trace column vector containing packed field elements for each instruction.
+/// - `poseidon_elements`, `less_than_elements`, `instruction_elements`, `match_elements`, `add_elements`: Element sets used for constructing interaction columns corresponding to cryptographic operations.
+///
+/// # Returns
+/// A tuple containing the interaction trace column vector and an interaction claim for the partial match column.
+///
+/// # Examples
+///
+/// ```
+/// let (main_trace, _) = trace::<Buy, Aggressive>(partial_matches);
+/// let (interaction_trace, claim) = interaction_trace::<Buy, Aggressive>(
+///     &main_trace,
+///     &poseidon_elements,
+///     &less_than_elements,
+///     &instruction_elements,
+///     &match_elements,
+///     &add_elements,
+/// );
+/// assert_eq!(interaction_trace.len(), main_trace.len());
+/// ```pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
     trace: &ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     poseidon_elements: &PoseidonElements,
     less_than_elements: &LessThanElements,

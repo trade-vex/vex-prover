@@ -92,6 +92,23 @@ mod tests {
 
     use super::*;
 
+    /// Evaluates and verifies polynomial constraints for a partial match trace in the order matching proof system.
+    ///
+    /// Generates preprocessed, main, and interaction traces for a given order side and match type, interpolates them into polynomials, and asserts that all cryptographic and arithmetic constraints are satisfied for the provided partial match instructions and elements. Panics if any constraint is violated.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Example usage within a test context:
+    /// evaluate_trace::<Buy, Aggressive>(
+    ///     partial_matches,
+    ///     &poseidon_elements,
+    ///     &less_than_elements,
+    ///     &match_elements,
+    ///     &instruction_elements,
+    ///     &add_elements,
+    /// );
+    /// ```
     fn evaluate_trace<S: OrderSide, T: OrderMatchType>(
         partial_matches: Instructions<BaseField>,
         poseidon_elements: &PoseidonElements,
@@ -141,6 +158,16 @@ mod tests {
     }
 
     #[test_log::test]
+    /// Simulates randomized order book activity and verifies that partial match constraints hold for all order side and match type combinations.
+    ///
+    /// This test generates a sequence of random buy and sell orders, executes them in an order book, extracts the resulting execution trace, and evaluates the cryptographic constraints for aggressive and passive partial matches on both buy and sell sides. The test asserts that all constraints are satisfied for the generated traces.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_partial_match_table();
+    /// // Panics if any partial match constraint is violated.
+    /// ```
     fn test_partial_match_table() {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();

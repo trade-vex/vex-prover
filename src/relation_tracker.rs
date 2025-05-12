@@ -24,6 +24,19 @@ use crate::executor::state::StateElements;
 use crate::imt::side::{Aggressive, Buy, Passive, Sell};
 use crate::VexClaim;
 
+/// Aggregates and summarizes relation tracking entries for all components of a VexClaim.
+///
+/// This function evaluates the trace polynomials from the provided commitment scheme over the canonical coset domain,
+/// constructs relation tracker components for each claim type in the VexClaim, and collects their relation entries.
+/// It then logs a cleaned summary of all relations for diagnostic or verification purposes.
+///
+/// # Examples
+///
+/// ```
+/// // Assuming `commitment_scheme` and `claim` are properly initialized:
+/// track_vex_relations(&commitment_scheme, &claim);
+/// // Logs a summary of all tracked relations.
+/// ```
 pub fn track_vex_relations<MC: MerkleChannel>(
     commitment_scheme: &CommitmentSchemeProver<'_, SimdBackend, MC>,
     claim: &VexClaim,

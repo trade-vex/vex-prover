@@ -179,8 +179,19 @@ impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
         }
     }
 
-    /// first price time of the leaf
-    pub fn first_price_time_felts() -> PriceTimeFelts<F> {
+    /// Returns the initial price-time felts array for the first leaf, with buy side prices set to the maximum value and sell side prices set to zero.
+    ///
+    /// For the buy side, the price fields are initialized to the maximum possible value, representing the highest price priority. For the sell side, both price and time fields are set to zero.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let buy_first = BuyLeaf::<BaseField>::first_price_time_felts();
+    /// assert!(buy_first[0] == BaseField::from(M31(255)));
+    ///
+    /// let sell_first = SellLeaf::<BaseField>::first_price_time_felts();
+    /// assert!(sell_first.iter().all(|&x| x.is_zero()));
+    /// ```    pub fn first_price_time_felts() -> PriceTimeFelts<F> {
         let mut price_time = array::from_fn(|_| F::zero());
         match S::side() {
             Side::Buy => {
@@ -193,8 +204,24 @@ impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
         price_time
     }
 
-    /// first price time cols of the first leaf
-    pub fn first_price_time_cols(log_size: u32) -> [Vec<PackedBaseField>; 2 * N_U64_FELTS] {
+    /// Returns columnar SIMD-packed vectors representing the initial price-time fields for the first leaf, suitable for vectorized order book processing.
+    ///
+    /// For the buy side, the price columns are initialized to the maximum value (`M31(255)`), while for the sell side, all columns are zero-initialized. The length of each vector is determined by `1 << log_size`.
+    ///
+    /// # Parameters
+    /// - `log_size`: The log base 2 of the number of rows to generate for each column.
+    ///
+    /// # Returns
+    /// An array of vectors, each containing `PackedBaseField` elements for the price and time fields, arranged for SIMD processing.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let cols = BuyLeaf::<BaseField>::first_price_time_cols(4);
+    /// assert_eq!(cols[0].len(), 16);
+    /// let cols = SellLeaf::<BaseField>::first_price_time_cols(4);
+    /// assert_eq!(cols[0].iter().all(|x| x.is_zero()), true);
+    /// ```    pub fn first_price_time_cols(log_size: u32) -> [Vec<PackedBaseField>; 2 * N_U64_FELTS] {
         let mut price_time = array::from_fn(|_| BaseColumn::zeros(1 << log_size).data);
         match S::side() {
             Side::Buy => {

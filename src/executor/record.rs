@@ -163,8 +163,22 @@ impl ExecutionTrace<BaseField> {
 
     /// The following methods will take input as an event
     /// and compute the corresponding Trace Row For constraint evaluations
-    /// Adds an Add Event to the Execution Trace
-    pub fn add_add_event(
+    /// Records an 8-limb byte-wise addition event, including carry propagation and range checks, in the execution trace.
+    ///
+    /// Performs addition of two 64-bit values represented as arrays of 8 bytes, checks for overflow, and logs the operation for constraint evaluation. Each input and output byte is range-checked to ensure it is within [0, 255]. Returns an error if the result overflows the byte range.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IMTError::AdditionOverflow` if the final limb exceeds 255, or `IMTError::InvalidU8Pair` if any byte is out of range.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut trace = ExecutionTrace::new();
+    /// let a = [BaseField::from(1); 8];
+    /// let b = [BaseField::from(2); 8];
+    /// trace.add_add_event(a, b).unwrap();
+    /// ```    pub fn add_add_event(
         &mut self,
         a: [BaseField; N_U64_LIMBS],
         b: [BaseField; N_U64_LIMBS],
@@ -297,8 +311,21 @@ impl ExecutionTrace<BaseField> {
     /// Adds a Range Check U8 Event by recording the corresponding Trace Row.
     ///
     /// # Errors
-    /// Returns a `RangeCheckError::InputLimbExceedsRange` if `a` or `b` is greater than 255.
-    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
+    /// Records a range check event for two u8 values, incrementing the corresponding counter.
+    ///
+    /// Returns an error if either input exceeds 255.
+    ///
+    /// # Errors
+    ///
+    /// Returns `IMTError::InvalidU8Pair(a, b)` if `a` or `b` is greater than 255.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut trace = ExecutionTrace::new();
+    /// assert!(trace.add_range_check_u8_event(42, 100).is_ok());
+    /// assert!(trace.add_range_check_u8_event(300, 1).is_err());
+    /// ```    pub fn add_range_check_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
         if a >= 256 || b >= 256 {
             return Err(IMTError::InvalidU8Pair(a, b));
         }
@@ -307,8 +334,17 @@ impl ExecutionTrace<BaseField> {
         Ok(())
     }
 
-    /// Max Log Size for the Execution Trace
-    pub fn max_log_size(&self) -> u32 {
+    /// Returns the maximum log size (bit length) among all instruction and auxiliary operation vectors in the execution trace.
+    ///
+    /// The log size is computed as the smallest number of bits required to index the largest component, including a fixed size for byte operations.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let trace = ExecutionTrace::<BaseField>::new();
+    /// let log_size = trace.max_log_size();
+    /// assert!(log_size >= 16);
+    /// ```    pub fn max_log_size(&self) -> u32 {
         let n = max([
             self.buy_insert_order.len(),
             self.buy_delete_order.len(),

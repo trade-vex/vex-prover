@@ -27,8 +27,28 @@ use crate::{
 #[cfg(feature = "relation-tracker")]
 use crate::relation_tracker::track_vex_relations;
 
-/// Prove the Vex Execution Trace
-pub fn prove_vex(
+/// Generates a STARK proof for a given Vex execution trace.
+///
+/// This function constructs a zero-knowledge proof attesting to the correctness of a Vex execution trace by:
+/// - Building and committing preprocessed, main, and interaction traces for all Vex components (including addition and partial order match).
+/// - Aggregating component claims and interaction claims.
+/// - Validating lookup sum consistency between the main and interaction claims.
+/// - Producing a proof using polynomial commitment schemes and a cryptographic channel.
+///
+/// # Returns
+/// A `VexProof` containing the aggregated claim, interaction claim, and the STARK proof if successful; otherwise, a `VexProvingError`.
+///
+/// # Errors
+/// Returns `VexProvingError::InvalidLogupSum` if the lookup sum check fails, or a `VexProvingError::Stark` if proof generation fails.
+///
+/// # Examples
+///
+/// ```
+/// use vex_prover::{prove_vex, ExecutionTrace};
+///
+/// let trace = ExecutionTrace::example(); // Construct a valid execution trace
+/// let proof = prove_vex(trace).expect("Proof generation should succeed");
+/// ```pub fn prove_vex(
     trace: ExecutionTrace<BaseField>,
 ) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError> {
     let _span = span!(Level::INFO, "Prove Vex").entered();
@@ -425,6 +445,16 @@ mod tests {
     use super::*;
 
     #[test_log::test]
+    /// Tests the end-to-end STARK proof generation and verification for a simulated Vex order book execution trace.
+    ///
+    /// This test creates a randomized sequence of buy and sell orders, applies them to an order book,
+    /// extracts the resulting execution trace, generates a STARK proof for the trace, and verifies the proof.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_prove();
+    /// ```
     fn test_prove() {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();

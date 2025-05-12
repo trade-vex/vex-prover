@@ -118,6 +118,19 @@ mod tests {
     };
 
     #[test_log::test]
+    /// Tests the addition component by generating a large set of random 64-bit addition operations, constructing the corresponding execution trace, and verifying that the component's constraints hold on the interpolated trace polynomials.
+    ///
+    /// This test simulates 11,000 random additions of 64-bit unsigned integers, splits them into field elements, and checks that the cryptographic proof system's addition constraints are satisfied.
+    ///
+    /// # Panics
+    ///
+    /// Panics if any constraint is violated during verification.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// test_addition_table(); // Should complete without panicking
+    /// ```
     fn test_addition_table() {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();

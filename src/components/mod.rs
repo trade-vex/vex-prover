@@ -143,8 +143,15 @@ pub struct VexInteractionElements {
 }
 
 impl VexInteractionElements {
-    /// Draw all the interaction elements for the components.
-    pub fn draw(channel: &mut impl Channel) -> Self {
+    /// Constructs a `VexInteractionElements` instance by drawing all required interaction elements from the provided channel.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut channel = MyChannel::new();
+    /// let elements = VexInteractionElements::draw(&mut channel);
+    /// // elements now contains all interaction elements drawn from the channel
+    /// ```    pub fn draw(channel: &mut impl Channel) -> Self {
         Self {
             instruction_elements: InstructionElements::draw(channel),
             state_elements: StateElements::draw(channel),
@@ -181,8 +188,18 @@ pub struct VexComponents {
 }
 
 impl VexComponents {
-    /// Create a new instance of VexComponents.
-    pub fn new(
+    /// Constructs a new `VexComponents` instance, initializing all proof system components with the provided claims, interaction elements, and interaction claims.
+    ///
+    /// This method sets up the full suite of VEX proof components—including processor, insertion, poseidon hash, less-than, addition, bytes, and various matching and partial matching components—by allocating trace locations and passing the relevant evaluation structures and claimed sums to each component.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let claim = VexClaim::default();
+    /// let interaction_elements = VexInteractionElements::default();
+    /// let interaction_claim = VexInteractionClaim::default();
+    /// let components = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
+    /// ```    pub fn new(
         claim: &VexClaim,
         interaction_elements: &VexInteractionElements,
         interaction_claim: &VexInteractionClaim,
@@ -431,8 +448,15 @@ impl VexComponents {
         }
     }
 
-    /// Returns the ComponentProver of each components whose log sizes are in decreasing order.
-    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
+    /// Returns references to all component provers in the VEX system, ordered by decreasing log size.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let components = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
+    /// let provers = components.provers();
+    /// assert!(!provers.is_empty());
+    /// ```    pub fn provers(&self) -> Vec<&dyn ComponentProver<SimdBackend>> {
         vec![
             &self.bytes,
             &self.poseidon,

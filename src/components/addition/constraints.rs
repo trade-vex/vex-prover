@@ -25,8 +25,15 @@ impl FrameworkEval for AddEval {
     }
 
     /// Computes the maximum constraint degree bound
-    /// This helps in polynomial commitment scheme and constraint verification
-    fn max_constraint_log_degree_bound(&self) -> u32 {
+    /// Returns the maximum logarithmic degree bound for constraints, computed as the trace log size plus one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let eval = AddEval { /* fields omitted */ };
+    /// let bound = eval.max_constraint_log_degree_bound();
+    /// assert_eq!(bound, eval.claim.log_size + 1);
+    /// ```    fn max_constraint_log_degree_bound(&self) -> u32 {
         self.claim.log_size + 1
     }
 
@@ -37,8 +44,17 @@ impl FrameworkEval for AddEval {
     /// 2. Ensure correct byte-wise addition with carry propagation.
     /// 3. Ensure carry bits are boolean.
     /// 4. Perform U8 range checks on inputs and outputs.
-    /// 5. Generate interaction relations for verification.
-    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
+    /// Evaluates and enforces all addition constraints for a single row in the trace.
+    ///
+    /// This method applies a sequence of constraints to ensure the correctness of a multi-byte addition operation with carry propagation. It enforces booleanity of control flags, validates byte-wise addition with proper carry handling, checks that all carry bits are boolean, performs range checks on all input and output bytes, and records the results for further verification.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `add_eval` is an instance of AddEval and `eval` implements EvalAtRow.
+    /// let updated_eval = add_eval.evaluate(eval);
+    /// // The returned `updated_eval` will have all addition constraints applied for the current row.
+    /// ```    fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Extract the addition operation details from the current row
         let op = AddOp::<E::F>::from_eval(&mut eval);
 

@@ -79,8 +79,17 @@ pub struct VexClaim {
 }
 
 impl VexClaim {
-    /// mix all components log sizes and public inputs into the channel
-    pub fn mix_into(&self, channel: &mut impl Channel) {
+    /// Mixes all component claims' log sizes and public inputs into the provided channel in a fixed order.
+    ///
+    /// This method ensures that the cryptographic channel receives the combined data from all component claims, which is essential for constructing a valid proof.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut channel = MyChannel::new();
+    /// vex_claim.mix_into(&mut channel);
+    /// // The channel now contains the mixed data from all component claims.
+    /// ```    pub fn mix_into(&self, channel: &mut impl Channel) {
         self.bytes_claim.mix_into(channel);
         self.poseidon_claim.mix_into(channel);
         self.strict_less_than_claim.mix_into(channel);
@@ -99,8 +108,14 @@ impl VexClaim {
         self.sell_passive_partial_match_claim.mix_into(channel);
     }
 
-    /// Returns the total log size of all components
-    pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
+    /// Aggregates and returns the concatenated log sizes from all component claims.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let log_sizes = vex_claim.log_sizes();
+    /// assert!(!log_sizes.is_empty());
+    /// ```    pub fn log_sizes(&self) -> TreeVec<Vec<u32>> {
         TreeVec::concat_cols(
             [
                 self.bytes_claim.log_sizes(),
@@ -126,6 +141,15 @@ impl VexClaim {
 }
 
 impl std::fmt::Debug for VexClaim {
+    /// Formats the `VexClaim` struct for debugging, displaying the initial and final states along with the log sizes of all component claims.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fmt::Debug;
+    /// let claim = VexClaim::default(); // assuming Default is implemented for demonstration
+    /// println!("{:?}", claim);
+    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VexClaim")
             .field("initial_state", &self.initial_state)
@@ -217,8 +241,17 @@ pub struct VexInteractionClaim {
 }
 
 impl VexInteractionClaim {
-    /// mix all logups into the channel
-    pub fn mix_into(&self, channel: &mut impl Channel) {
+    /// Mixes all component interaction claims into the provided channel.
+    ///
+    /// This method sequentially mixes the interaction claims for all components—including bytes, Poseidon, strict less than, less than, addition, processor, insertions, matches, and partial matches—into the given cryptographic channel. This is used to aggregate all relevant interaction data for proof construction.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let mut channel = MyChannel::new();
+    /// vex_interaction_claim.mix_into(&mut channel);
+    /// // The channel now contains all mixed interaction claims.
+    /// ```    pub fn mix_into(&self, channel: &mut impl Channel) {
         self.bytes_interaction_claim.mix_into(channel);
         self.poseidon_interaction_claim.mix_into(channel);
         self.strict_less_than_interaction_claim.mix_into(channel);
@@ -243,8 +276,32 @@ impl VexInteractionClaim {
             .mix_into(channel);
     }
 
-    /// Returns the total logup sum of all components
-    fn components_logup_sum(&self) -> SecureField {
+    /// Computes the sum of the claimed logup values from all component interaction claims.
+    ///
+    /// # Returns
+    /// The total logup sum as a `SecureField`, representing the aggregate of all component claimed sums.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let total_sum = vex_interaction_claim.components_logup_sum();
+    /// assert_eq!(total_sum, vex_interaction_claim.processor_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.buy_insert_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.sell_insert_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.poseidon_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.strict_less_than_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.less_than_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.add_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.bytes_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.buy_aggressive_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.sell_aggressive_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.buy_passive_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.sell_passive_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.buy_aggressive_partial_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.sell_aggressive_partial_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.buy_passive_partial_match_interaction_claim.claimed_sum
+    ///     + vex_interaction_claim.sell_passive_partial_match_interaction_claim.claimed_sum);
+    /// ```    fn components_logup_sum(&self) -> SecureField {
         let mut sum = SecureField::zero();
         sum += self.processor_interaction_claim.claimed_sum;
         sum += self.buy_insert_interaction_claim.claimed_sum;
@@ -275,6 +332,15 @@ impl VexInteractionClaim {
 }
 
 impl std::fmt::Debug for VexInteractionClaim {
+    /// Formats the `VexInteractionClaim` for debugging, displaying the claimed sums of all component interaction claims.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::fmt::Debug;
+    /// let claim = VexInteractionClaim::default();
+    /// println!("{:?}", claim);
+    /// ```
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("VexInteractionClaim")
             .field("processor", &self.processor_interaction_claim.claimed_sum)

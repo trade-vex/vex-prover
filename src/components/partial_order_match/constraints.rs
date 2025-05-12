@@ -100,12 +100,48 @@ pub struct PartialMatchEval<S, T: OrderMatchType> {
 ///   21. Finalize the evaluation by calling `eval.finalize_logup_in_pairs()`.
 ///
 impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
+    /// Returns the log size parameter from the claim.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let eval = PartialMatchEval { claim: claim_struct, /* other fields */ };
+    /// let log_size = eval.log_size();
+    /// assert_eq!(log_size, claim_struct.log_size);
+    /// ```
     fn log_size(&self) -> u32 {
         self.claim.log_size
     }
+    /// Returns the maximum log degree bound for constraints as the claim's log size plus one.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// let eval = PartialMatchEval { claim: Claim { log_size: 4, /* ... */ }, /* ... */ };
+    /// assert_eq!(eval.max_constraint_log_degree_bound(), 5);
+    /// ```
     fn max_constraint_log_degree_bound(&self) -> u32 {
         self.claim.log_size + 1
     }
+    /// Evaluates all constraints for a partial order match operation in an Incremental Merkle Tree (IMT).
+    ///
+    /// This method enforces the correctness of a partial match (aggressive or passive) on either the buy or sell side,
+    /// ensuring state transitions, Merkle proofs, volume updates, and opcode consistency are valid within the IMT-based order book.
+    /// It checks boolean flags, verifies Merkle proofs for both the matched and constructed leaves, enforces volume conservation,
+    /// and ensures the integrity of root hashes and priority values for both sides of the order book.
+    ///
+    /// # Type Parameters
+    /// - `E`: The evaluation context implementing `EvalAtRow`.
+    ///
+    /// # Returns
+    /// The updated evaluation context after all constraints have been applied.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// // Assume `eval` is an evaluation context and `partial_match_eval` is an instance of PartialMatchEval.
+    /// let updated_eval = partial_match_eval.evaluate(eval);
+    /// ```
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
 
