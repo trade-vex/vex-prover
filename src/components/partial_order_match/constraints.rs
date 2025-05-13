@@ -274,7 +274,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
             mult.clone(),
         );
 
-        // updates matched leaf active flag to 0
+        // updates matched leaf volume
         let mut updated_leaf = op.leaf.clone();
         for i in 0..N_U64_FELTS {
             updated_leaf[LeafColumn::VOLUME + i] = remaining_volume[i].clone();
