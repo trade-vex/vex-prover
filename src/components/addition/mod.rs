@@ -103,6 +103,7 @@ relation!(AddElements, 24);
 
 #[cfg(test)]
 mod tests {
+    use crate::imt::error::IMTError;
     use constraints::AddEval;
     use rand::Rng;
     use stwo_prover::{
@@ -167,5 +168,15 @@ mod tests {
             },
             interaction_claim.claimed_sum,
         )
+    }
+
+    #[test]
+    fn test_addition_overflow_event() {
+        // Test case: u64::MAX + 1 must overflow
+        let mut record = ExecutionTrace::new();
+        let a = Price::from_u64(u64::MAX);
+        let b = Price::from_u64(1);
+        let res = record.add_add_event(a.to_felts(), b.to_felts());
+        assert!(matches!(res, Err(IMTError::AdditionOverflow)));
     }
 }
