@@ -1,13 +1,12 @@
 use std::{marker::PhantomData, vec};
 
 use addition::{AddComponent, AddElements, AddEval};
-use num_traits::{One, Zero};
 use order_match::{
     BuyAggressiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
     SellAggressiveMatchComponent, SellPassiveMatchComponent,
 };
 use partial_order_match::{
-    BuyAgessivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
+    BuyAggressivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
     SellAggressivePartialMatchComponent, SellPassivePartialMatchComponent,
 };
 use stwo_prover::{
@@ -174,7 +173,7 @@ pub struct VexComponents {
     sell_aggressive_match: SellAggressiveMatchComponent,
     buy_passive_match: BuyPassiveMatchComponent,
     sell_passive_match: SellPassiveMatchComponent,
-    buy_aggressive_partial_match: BuyAgessivePartialMatchComponent,
+    buy_aggressive_partial_match: BuyAggressivePartialMatchComponent,
     sell_aggressive_partial_match: SellAggressivePartialMatchComponent,
     buy_passive_partial_match: BuyPassivePartialMatchComponent,
     sell_passive_partial_match: SellPassivePartialMatchComponent,
@@ -343,7 +342,7 @@ impl VexComponents {
                 .claimed_sum,
         );
 
-        let buy_aggressive_partial_match = BuyAgessivePartialMatchComponent::new(
+        let buy_aggressive_partial_match = BuyAggressivePartialMatchComponent::new(
             tree_span_provider,
             PartialMatchEval {
                 claim: claim.buy_aggressive_partial_match_claim.clone(),

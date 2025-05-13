@@ -20,7 +20,7 @@ mod trace;
 pub use constraints::PartialMatchEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
-pub type BuyAgessivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Buy, Aggressive>>;
+pub type BuyAggressivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Buy, Aggressive>>;
 pub type BuyPassivePartialMatchComponent = FrameworkComponent<PartialMatchEval<Buy, Passive>>;
 
 pub type SellAggressivePartialMatchComponent =

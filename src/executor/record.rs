@@ -7,7 +7,6 @@ use stwo_prover::core::{
 };
 
 use super::{
-    error::RangeCheckError,
     instruction::{InstructionColumn, Opcode, N_INSTRUCTION_FELTS},
     state::StateFelts,
 };
