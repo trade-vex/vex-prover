@@ -31,6 +31,13 @@ impl FrameworkEval for AddEval {
     }
 
     /// Evaluates constraints for an addition operation on a row.
+    ///
+    /// Steps performed:
+    /// 1. Validate the `is_real` flag (boolean check).
+    /// 2. Ensure correct byte-wise addition with carry propagation.
+    /// 3. Ensure carry bits are boolean.
+    /// 4. Perform U8 range checks on inputs and outputs.
+    /// 5. Generate interaction relations for verification.
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Extract the addition operation details from the current row
         let op = AddOp::<E::F>::from_eval(&mut eval);

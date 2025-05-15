@@ -1,7 +1,7 @@
 use crate::types::N_U64_LIMBS;
 use std::array;
 use stwo_prover::{
-    constraint_framework::EvalAtRow,
+    constraint_framework::{EvalAtRow, FrameworkComponent},
     core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
     relation,
 };
@@ -11,7 +11,11 @@ use super::TraceSize;
 mod constraints;
 mod trace;
 
+pub use constraints::AddEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
+
+/// Addition Component, containts constraints for adding two u64 numbers, represented as N u8 limbs.
+pub type AddComponent = FrameworkComponent<AddEval>;
 
 /// AddOperations represents a collection of add operations to be processed in the circuit.
 /// Each operation is represented as an array of field elements arranged according to the AddColumn layout.
@@ -81,7 +85,7 @@ impl AddColumn {
 }
 
 impl TraceSize for AddColumn {
-    // is_first preprocessed column
+    // 1 is_first pre-processed column
     const PREPROCESSED_COLS: usize = 1;
     // last field's index + offset
     const MAIN_COLS: usize = Self::IS_REAL + 1;
@@ -99,6 +103,7 @@ relation!(AddElements, 24);
 
 #[cfg(test)]
 mod tests {
+    use crate::imt::error::IMTError;
     use constraints::AddEval;
     use rand::Rng;
     use stwo_prover::{
@@ -121,9 +126,11 @@ mod tests {
         let n = 11000;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
-            let a: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX / 2));
-            let b: Price<BaseField> = Price::from_u64(rng.gen_range(0..=u64::MAX - a.to_u64()));
-            let _ = record.add_add_event(a.to_felts(), b.to_felts());
+            let a_u64 = rng.gen::<u64>();
+            let b_u64 = rng.gen::<u64>();
+            let a: Price<BaseField> = Price::from_u64(a_u64 / 2);
+            let b: Price<BaseField> = Price::from_u64(b_u64 / 2);
+            record.add_add_event(a.to_felts(), b.to_felts()).unwrap();
         }
         let log_size = (record.add_operations.len() - 1).ilog2() + 1;
         span.exit();
@@ -161,5 +168,15 @@ mod tests {
             },
             interaction_claim.claimed_sum,
         )
+    }
+
+    #[test]
+    fn test_addition_overflow_event() {
+        // Test case: u64::MAX + 1 must overflow
+        let mut record = ExecutionTrace::new();
+        let a = Price::from_u64(u64::MAX);
+        let b = Price::from_u64(1);
+        let res = record.add_add_event(a.to_felts(), b.to_felts());
+        assert!(matches!(res, Err(IMTError::AdditionOverflow)));
     }
 }

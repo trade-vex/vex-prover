@@ -2,9 +2,7 @@
 
 use crate::executor::state::StateFelts;
 use components::{
-    bytes::BytesPreProcessedColumn, insertions::InsertionsColumn, less_than::LessThanColumn,
-    order_match::MatchColumn, poseidon::PoseidonColumn, processor::ProcessorColumn, Claim,
-    InteractionClaim,
+    addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn, less_than::LessThanColumn, order_match::MatchColumn, partial_order_match::PartialMatchColumn, poseidon::PoseidonColumn, processor::ProcessorColumn, Claim, InteractionClaim
 };
 use executor::state::StateElements;
 use imt::side::{Aggressive, Passive};
@@ -58,6 +56,8 @@ pub struct VexClaim {
     pub strict_less_than_claim: Claim<LessThanColumn>,
     /// less than claim
     pub less_than_claim: Claim<LessThanColumn>,
+    /// add claim
+    pub add_claim: Claim<AddColumn>,
     /// bytes component claim
     pub bytes_claim: Claim<BytesPreProcessedColumn>,
     /// Buy Aggressive Match Claim
@@ -68,6 +68,14 @@ pub struct VexClaim {
     pub buy_passive_match_claim: Claim<MatchColumn<Passive>>,
     /// Sell Passive Match Claim
     pub sell_passive_match_claim: Claim<MatchColumn<Passive>>,
+    /// Buy Aggressive Partial Match Claim
+    pub buy_aggressive_partial_match_claim: Claim<PartialMatchColumn<Aggressive>>,
+    /// Sell Aggressive Partial Match Claim
+    pub sell_aggressive_partial_match_claim: Claim<PartialMatchColumn<Aggressive>>,
+    /// Buy Passive Partial Match Claim
+    pub buy_passive_partial_match_claim: Claim<PartialMatchColumn<Passive>>,
+    /// Sell Passive Partial Match Claim
+    pub sell_passive_partial_match_claim: Claim<PartialMatchColumn<Passive>>,
 }
 
 impl VexClaim {
@@ -77,6 +85,7 @@ impl VexClaim {
         self.poseidon_claim.mix_into(channel);
         self.strict_less_than_claim.mix_into(channel);
         self.less_than_claim.mix_into(channel);
+        self.add_claim.mix_into(channel);
         self.processor_claim.mix_into(channel);
         self.buy_insert_claim.mix_into(channel);
         self.sell_insert_claim.mix_into(channel);
@@ -84,6 +93,10 @@ impl VexClaim {
         self.sell_aggressive_match_claim.mix_into(channel);
         self.buy_passive_match_claim.mix_into(channel);
         self.sell_passive_match_claim.mix_into(channel);
+        self.buy_aggressive_partial_match_claim.mix_into(channel);
+        self.sell_aggressive_partial_match_claim.mix_into(channel);
+        self.buy_passive_partial_match_claim.mix_into(channel);
+        self.sell_passive_partial_match_claim.mix_into(channel);
     }
 
     /// Returns the total log size of all components
@@ -94,6 +107,7 @@ impl VexClaim {
                 self.poseidon_claim.log_sizes(),
                 self.strict_less_than_claim.log_sizes(),
                 self.less_than_claim.log_sizes(),
+                self.add_claim.log_sizes(),
                 self.processor_claim.log_sizes(),
                 self.buy_insert_claim.log_sizes(),
                 self.sell_insert_claim.log_sizes(),
@@ -101,6 +115,10 @@ impl VexClaim {
                 self.sell_aggressive_match_claim.log_sizes(),
                 self.buy_passive_match_claim.log_sizes(),
                 self.sell_passive_match_claim.log_sizes(),
+                self.buy_aggressive_partial_match_claim.log_sizes(),
+                self.sell_aggressive_partial_match_claim.log_sizes(),
+                self.buy_passive_partial_match_claim.log_sizes(),
+                self.sell_passive_partial_match_claim.log_sizes(),
             ]
             .into_iter(),
         )
@@ -121,6 +139,7 @@ impl std::fmt::Debug for VexClaim {
                 &self.strict_less_than_claim.log_size,
             )
             .field("less_than_log_size", &self.less_than_claim.log_size)
+            .field("add_log_size", &self.add_claim.log_size)
             .field("bytes_log_size", &self.bytes_claim.log_size)
             .field(
                 "buy_aggressive_match_log_size",
@@ -137,6 +156,22 @@ impl std::fmt::Debug for VexClaim {
             .field(
                 "sell_passive_match_log_size",
                 &self.sell_passive_match_claim.log_size,
+            )
+            .field(
+                "buy_aggressive_partial_match_log_size",
+                &self.buy_aggressive_partial_match_claim.log_size,
+            )
+            .field(
+                "sell_aggressive_partial_match_log_size",
+                &self.sell_aggressive_partial_match_claim.log_size,
+            )
+            .field(
+                "buy_passive_partial_match_log_size",
+                &self.buy_passive_partial_match_claim.log_size,
+            )
+            .field(
+                "sell_passive_partial_match_log_size",
+                &self.sell_passive_partial_match_claim.log_size,
             )
             .finish()
     }
@@ -157,6 +192,8 @@ pub struct VexInteractionClaim {
     pub strict_less_than_interaction_claim: InteractionClaim<LessThanColumn>,
     /// Less than component interaction claim
     pub less_than_interaction_claim: InteractionClaim<LessThanColumn>,
+    /// Add component interaction claim
+    pub add_interaction_claim: InteractionClaim<AddColumn>,
     /// Bytes component interaction claim
     pub bytes_interaction_claim: InteractionClaim<BytesPreProcessedColumn>,
     /// Buy Aggressive Match Interaction Claim
@@ -167,6 +204,16 @@ pub struct VexInteractionClaim {
     pub buy_passive_match_interaction_claim: InteractionClaim<MatchColumn<Passive>>,
     /// Sell Passive Match Interaction Claim
     pub sell_passive_match_interaction_claim: InteractionClaim<MatchColumn<Passive>>,
+    /// Buy Aggressive Partial Match Interaction Claim
+    pub buy_aggressive_partial_match_interaction_claim:
+        InteractionClaim<PartialMatchColumn<Aggressive>>,
+    /// Sell Aggressive Partial Match Interaction Claim
+    pub sell_aggressive_partial_match_interaction_claim:
+        InteractionClaim<PartialMatchColumn<Aggressive>>,
+    /// Buy Passive Partial Match Interaction Claim
+    pub buy_passive_partial_match_interaction_claim: InteractionClaim<PartialMatchColumn<Passive>>,
+    /// Sell Passive Partial Match Interaction Claim
+    pub sell_passive_partial_match_interaction_claim: InteractionClaim<PartialMatchColumn<Passive>>,
 }
 
 impl VexInteractionClaim {
@@ -176,6 +223,7 @@ impl VexInteractionClaim {
         self.poseidon_interaction_claim.mix_into(channel);
         self.strict_less_than_interaction_claim.mix_into(channel);
         self.less_than_interaction_claim.mix_into(channel);
+        self.add_interaction_claim.mix_into(channel);
         self.processor_interaction_claim.mix_into(channel);
         self.buy_insert_interaction_claim.mix_into(channel);
         self.sell_insert_interaction_claim.mix_into(channel);
@@ -185,6 +233,14 @@ impl VexInteractionClaim {
             .mix_into(channel);
         self.buy_passive_match_interaction_claim.mix_into(channel);
         self.sell_passive_match_interaction_claim.mix_into(channel);
+        self.buy_aggressive_partial_match_interaction_claim
+            .mix_into(channel);
+        self.sell_aggressive_partial_match_interaction_claim
+            .mix_into(channel);
+        self.buy_passive_partial_match_interaction_claim    
+            .mix_into(channel);
+        self.sell_passive_partial_match_interaction_claim
+            .mix_into(channel);
     }
 
     /// Returns the total logup sum of all components
@@ -196,11 +252,16 @@ impl VexInteractionClaim {
         sum += self.poseidon_interaction_claim.claimed_sum;
         sum += self.strict_less_than_interaction_claim.claimed_sum;
         sum += self.less_than_interaction_claim.claimed_sum;
+        sum += self.add_interaction_claim.claimed_sum;
         sum += self.bytes_interaction_claim.claimed_sum;
         sum += self.buy_aggressive_match_interaction_claim.claimed_sum;
         sum += self.sell_aggressive_match_interaction_claim.claimed_sum;
         sum += self.buy_passive_match_interaction_claim.claimed_sum;
         sum += self.sell_passive_match_interaction_claim.claimed_sum;
+        sum += self.buy_aggressive_partial_match_interaction_claim.claimed_sum;
+        sum += self.sell_aggressive_partial_match_interaction_claim.claimed_sum;
+        sum += self.buy_passive_partial_match_interaction_claim.claimed_sum;
+        sum += self.sell_passive_partial_match_interaction_claim.claimed_sum;
         sum
     }
 
@@ -228,6 +289,7 @@ impl std::fmt::Debug for VexInteractionClaim {
                 &self.strict_less_than_interaction_claim.claimed_sum,
             )
             .field("less_than", &self.less_than_interaction_claim.claimed_sum)
+            .field("add", &self.add_interaction_claim.claimed_sum)
             .field("bytes", &self.bytes_interaction_claim.claimed_sum)
             .field(
                 "buy_aggressive_match",
@@ -244,6 +306,22 @@ impl std::fmt::Debug for VexInteractionClaim {
             .field(
                 "sell_passive_match",
                 &self.sell_passive_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "buy_aggressive_partial_match",
+                &self.buy_aggressive_partial_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "sell_aggressive_partial_match",
+                &self.sell_aggressive_partial_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "buy_passive_partial_match",
+                &self.buy_passive_partial_match_interaction_claim.claimed_sum,
+            )
+            .field(
+                "sell_passive_partial_match",
+                &self.sell_passive_partial_match_interaction_claim.claimed_sum,
             )
             .finish()
     }

@@ -387,6 +387,7 @@ impl OrderBook {
         proof: PartialMatchProof<S>,
         is_aggressive: bool,
     ) -> Result<(), IMTError> {
+        let mut trace = self.trace.borrow_mut();
         let initial_state = self.state;
         let mut final_state = initial_state;
         let opcode = match S::SIDE {
@@ -413,6 +414,10 @@ impl OrderBook {
         };
         final_state.n += BaseField::one();
         self.state = final_state;
+        trace.add_add_event(
+            proof.filled_volume.to_felts(),
+            proof.remaining_volume.to_felts(),
+        )?;
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
             initial_state.buy_root,
@@ -439,7 +444,7 @@ impl OrderBook {
             final_state.best_sell_price,
             BaseField::one()
         );
-        self.trace.borrow_mut().add_instruction(instruction_felts);
+        trace.add_instruction(instruction_felts);
         Ok(())
     }
 }
@@ -600,16 +605,13 @@ mod test {
         );
     }
 
-    // currently the orders are places such that they are not matched
-    // this test is to check if the orders are inserted correctly
-    // this will be updated once the matching state updates are implemented
     fn generate_random_order<S: OrderSide>(time: u64, base_price: u64) -> Order<BaseField, S> {
         let mut rng = rand::thread_rng();
         let price = match S::side() {
             Side::Buy => rng.gen_range(100..110),
             Side::Sell => rng.gen_range(100..=110),
         };
-        let volume = 100;
+        let volume = rng.gen_range(1..=1000);
         Order::new(volume, base_price + price, time)
     }
 

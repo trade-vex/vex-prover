@@ -15,6 +15,9 @@ use crate::{
 };
 use num_traits::{One, Zero};
 use stwo_prover::constraint_framework::EvalAtRow;
+use stwo_prover::core::backend::simd::column::BaseColumn;
+use stwo_prover::core::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
+use stwo_prover::core::backend::Column;
 use stwo_prover::core::fields::m31::{BaseField, M31};
 
 #[derive(Clone)]
@@ -183,6 +186,20 @@ impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
             Side::Buy => {
                 for i in 0..N_U64_FELTS {
                     price_time[i] = F::from(M31(255))
+                }
+            }
+            Side::Sell => {} // sell sides first price time is default/zeros
+        }
+        price_time
+    }
+
+    /// first price time cols of the first leaf
+    pub fn first_price_time_cols(log_size: u32) -> [Vec<PackedBaseField>; 2 * N_U64_FELTS] {
+        let mut price_time = array::from_fn(|_| BaseColumn::zeros(1 << log_size).data);
+        match S::side() {
+            Side::Buy => {
+                for i in 0..N_U64_FELTS {
+                    price_time[i] = vec![PackedBaseField::broadcast(M31(255)); 1 << (log_size - LOG_N_LANES)]
                 }
             }
             Side::Sell => {} // sell sides first price time is default/zeros

@@ -422,6 +422,9 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
         }
         // update volume to the new volume & finalize the update
         let remaining_volume = match_leaf.volume - filled_volume;
+        if remaining_volume == Volume::zero() {
+            return Err(IMTError::NotAPartialMatch);
+        }
         self.leaves[index].volume = remaining_volume;
         let match_updated_path = self.finalize_update(index);
         Ok(PartialMatchProof {
