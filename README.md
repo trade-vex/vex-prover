@@ -1,3 +1,5 @@
+![VEX](resources/img/banner.png)
+
 # Vex Prover
 
 **VEX** (Verifiable Exchange) is a performant off-chain trading system with on-chain verifiability. It combines the power of STARKs and a IMT's(Indexed Merkle Tree's) to deliver fast, fair, and verifiable trade execution—without relying on centralized trusted system.
