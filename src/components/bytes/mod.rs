@@ -25,7 +25,7 @@ pub const ELEMENT_BITS: u32 = 8;
 pub const LOG_SIZE: u32 = 2 * ELEMENT_BITS;
 
 /// Number of PreProcessed Columns for Bytes Component.
-pub const N_PREPROCESSED_COLUMNS: usize = 4;
+pub const N_PREPROCESSED_COLUMNS: usize = 3;
 
 /// Bytes Component is the PreProcessed Table for Binary Operations b/w pair of ELEMENT_BITS elements.
 #[derive(Debug, Clone)]
@@ -33,7 +33,6 @@ pub enum BytesPreProcessedColumn {
     A = 0,
     B = 1,
     CLessThanU8 = 2,
-    IsFirst = 3,
 }
 
 impl TraceSize for BytesPreProcessedColumn {
@@ -57,7 +56,6 @@ impl BytesPreProcessedColumn {
             Self::A => 0,
             Self::B => 1,
             Self::CLessThanU8 => 2,
-            Self::IsFirst => 3,
         }
     }
 }
@@ -74,7 +72,7 @@ mod tests {
     use constraints::BytesEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
+        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -127,7 +125,7 @@ mod tests {
 
         // panics if the constraints are not satisfied
         let _span = span!(Level::INFO, "Bytes: Constraint Assertion").entered();
-        assert_constraints_on_polys(
+        assert_constraints(
             &trace_polys,
             CanonicCoset::new(LOG_SIZE),
             |eval| {

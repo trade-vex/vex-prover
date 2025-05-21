@@ -98,16 +98,14 @@ impl TraceSize for AddColumn {
 
 // Defines a relation for storing and verifying addition operation elements
 // The number 24 specifies the log size of the relation
-// As we yield a, b, c that is 8*3 elements
 relation!(AddElements, 24);
 
 #[cfg(test)]
 mod tests {
-    use crate::imt::error::IMTError;
     use constraints::AddEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
+        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -123,13 +121,11 @@ mod tests {
         // Execution Record
         let span = span!(Level::INFO, "Generating Execution Record").entered();
         let mut record = ExecutionTrace::new();
-        let n = 11000;
+        let n = 124213;
         let mut rng = rand::thread_rng();
         for _ in 0..n {
-            let a_u64 = rng.gen::<u64>();
-            let b_u64 = rng.gen::<u64>();
-            let a: Price<BaseField> = Price::from_u64(a_u64 / 2);
-            let b: Price<BaseField> = Price::from_u64(b_u64 / 2);
+            let a: Price<BaseField> = Price::from_u64(rng.gen());
+            let b: Price<BaseField> = Price::from_u64(rng.gen());
             record.add_add_event(a.to_felts(), b.to_felts()).unwrap();
         }
         let log_size = (record.add_operations.len() - 1).ilog2() + 1;
@@ -160,7 +156,7 @@ mod tests {
 
         // Panics if the constraints are not satisfied
         let _span = span!(Level::INFO, "Constraint Assertion").entered();
-        assert_constraints_on_polys(
+        assert_constraints(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {
@@ -168,15 +164,5 @@ mod tests {
             },
             interaction_claim.claimed_sum,
         )
-    }
-
-    #[test]
-    fn test_addition_overflow_event() {
-        // Test case: u64::MAX + 1 must overflow
-        let mut record = ExecutionTrace::new();
-        let a = Price::from_u64(u64::MAX);
-        let b = Price::from_u64(1);
-        let res = record.add_add_event(a.to_felts(), b.to_felts());
-        assert!(matches!(res, Err(IMTError::AdditionOverflow)));
     }
 }

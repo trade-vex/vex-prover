@@ -42,7 +42,7 @@ impl TraceSize for InsertionsColumn {
     ///     - 1 for updated leaf
     /// 4*MERKLE_HEIGHT for merkle paths verification
     /// Total Poseidon Interactions: 4 + 4*MERKLE_HEIGHT
-    /// low_time, low.next_time < inserted time => 2 strict less than checks
+    /// inserted time < low_time, low.next_time => 2 strict less than checks
     /// inserted price checks for low and next => 1 strict and 1 non-strict less than checks
     /// Total Strict Less Than Interactions: 3
     /// Total Non Strict Less Than Interactions: 1
@@ -58,7 +58,7 @@ mod tests {
     use constraints::InsertionsEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
+        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -114,7 +114,7 @@ mod tests {
         };
 
         // panics if the constraints are not satisfied
-        assert_constraints_on_polys(
+        assert_constraints(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {

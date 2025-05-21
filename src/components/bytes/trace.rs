@@ -34,16 +34,14 @@ pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField
 {
     let _span = span!(Level::INFO, "Bytes: Preprocessed Trace").entered();
     // The Trace is populated
-    // The Trace is filled for a, b, c_and, c_less_than and later is_first is added
-    let mut trace =
-        unsafe { ComponentTrace::<{ N_PREPROCESSED_COLUMNS - 1 }>::uninitialized(LOG_SIZE) };
+    let mut trace = unsafe { ComponentTrace::<N_PREPROCESSED_COLUMNS>::uninitialized(LOG_SIZE) };
 
     // values from 0 to 2^LOG_SIZE
     let values: Vec<_> = (0..(1 << LOG_SIZE)).collect();
     trace
         .iter_mut()
         .zip(values.chunks_exact(N_LANES))
-        .for_each(|(mut row, input)| {
+        .for_each(|(row, input)| {
             // a: higher bits
             *row[BytesPreProcessedColumn::A as usize] =
                 PackedBaseField::from_array(array::from_fn(|i| {

@@ -76,7 +76,7 @@ pub struct InsertionsEval<S> {
 ///   10. Ensure that the resultant root hash from updating the low leaf is equal to the root contained in inactive leaf's merkle path.
 ///   11. Verify the Merkle Proof of the Inactive Leaf.
 ///   12. Update the Inactive Leaf's value to the inserted leaf using the updated_merkle_path.
-///   13. Ensure that the final state's count is equal to the initial state's count plus 1.
+///   13. Ensure that the final state's count is equal to the initial state's count minus 1.
 ///   14. Verify that the final root hash of the final state is equal to the root hash in the merkle path of the updated leaf.
 ///   15. The Priority must be updated only if the low leaf is the first leaf in the tree.
 ///       - The priority of the leaf will change only if the low leaf is the first leaf in the tree.
@@ -120,7 +120,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             array::from_fn(|i| op.low_leaf[LeafColumn::NEXT_PRICE + i].clone());
         let next_time: [E::F; N_U64_FELTS] =
             array::from_fn(|i| op.low_leaf[LeafColumn::NEXT_TIME + i].clone());
-        // time of inserted leaf must be greater than time of low leaf and low leaf's next
+        // // time of inserted leaf must be greater than time of low leaf and low leaf's next
         eval.add_to_relation(RelationEntry::new(
             &self.strict_less_than_elements,
             mult.clone(),
@@ -311,7 +311,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                 }
             }
             Side::Sell => {
-                // final state's sell root hash must be equal to the root in the inserted leaf's merkle path
+                // initial state's sell root hash must be equal to the root in the inserted leaf's merkle path
                 for i in 0..N_HASH {
                     eval.add_constraint(
                         op.final_state.sell_root[i].clone()

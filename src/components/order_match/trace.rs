@@ -76,7 +76,7 @@ pub fn trace<S: OrderSide, T: OrderMatchType>(
     )
     .entered();
     // calculate shape of the trace table
-    let log_size = ((matches.len() - 1).ilog2() + 1).max(4);
+    let log_size = (matches.len() - 1).ilog2() + 1;
     debug!("Len: {}", matches.len());
     debug!("Log Size: {}", log_size);
     // pad matches to a power of 2

@@ -100,7 +100,7 @@ mod tests {
     use rand::Rng;
     use std::{cell::RefCell, rc::Rc};
     use stwo_prover::{
-        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
+        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -140,7 +140,7 @@ mod tests {
             claim,
         };
 
-        assert_constraints_on_polys(
+        assert_constraints(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {

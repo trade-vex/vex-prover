@@ -15,7 +15,7 @@ pub use trace::{interaction_trace, preprocessed_trace, trace};
 pub type ProcessorComponent = FrameworkComponent<ProcessorEval>;
 
 /// Processor Column
-/// Each row of the trace is an array of instruction field elements arranged as per the `InstructionColumn`
+/// Each row of the trace is a Instruction field elements arranged as per the `InstructionColumn`
 /// The last field is a flag to indicate if the row is real or padded
 #[derive(Debug, Clone)]
 pub struct ProcessorColumn;
@@ -35,7 +35,7 @@ mod tests {
     use constraints::ProcessorEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints_on_polys, FrameworkEval},
+        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -98,7 +98,7 @@ mod tests {
         };
 
         // panics if the constraints are not satisfied
-        assert_constraints_on_polys(
+        assert_constraints(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {

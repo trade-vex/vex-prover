@@ -1,4 +1,5 @@
 #![feature(btree_cursors, portable_simd, iter_array_chunks)]
+#![feature(trait_upcasting)]
 
 use crate::executor::state::StateFelts;
 use components::{

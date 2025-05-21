@@ -68,7 +68,8 @@ pub fn trace(
 }
 
 /// Generates the interaction trace.
-/// - Uses `RangeCheckU8Elements` for byte-wise addition checks.
+/// - Uses `AddU8Elements` for byte-wise addition checks.
+/// - Uses `AddElements` to store final addition results.
 pub fn interaction_trace(
     trace: &ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     range_check_u8_elements: &RangeCheckU8Elements,

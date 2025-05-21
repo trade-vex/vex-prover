@@ -1,9 +1,7 @@
+use crate::{executor::instruction::IMTOperation, types::Price};
 use num_traits::One;
 use std::fmt::Debug;
-
 use stwo_prover::core::fields::m31::BaseField;
-
-use crate::{executor::instruction::{IMTOperation, Opcode}, types::Price};
 
 /// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
@@ -11,7 +9,7 @@ pub struct Buy;
 #[derive(Debug, Clone, Copy)]
 pub struct Sell;
 
-/// Type markers for Match Types
+/// Type markers for Buy and Sell sides
 #[derive(Debug, Clone, Copy)]
 pub struct Aggressive;
 #[derive(Debug, Clone, Copy)]
@@ -24,7 +22,7 @@ pub enum MatchType {
 }
 
 /// Order match type marker trait with compile-time constants
-pub trait OrderMatchType: 'static + Copy + Send + Sync + Clone + Debug {
+pub trait OrderMatchType: 'static + Copy + Send + Sync + Clone + Copy + Debug {
     /// Associated constant for match type name
     const NAME: &'static str;
     /// Associated constant for match type variant
@@ -64,7 +62,7 @@ pub enum Side {
 }
 
 /// Order side marker trait with compile-time constants
-pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Debug {
+pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Copy + Debug {
     /// Associated constant for side name
     const NAME: &'static str;
     /// Associated constant for side variant
@@ -86,7 +84,10 @@ pub trait OrderSide: 'static + Copy + Send + Sync + Clone + Debug {
     }
     /// get the name of the side
     fn name() -> &'static str {
-        Self::NAME
+        match Self::side() {
+            Side::Buy => "Buy",
+            Side::Sell => "Sell",
+        }
     }
 }
 
@@ -100,13 +101,13 @@ impl OrderSide for Buy {
     }
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
-            IMTOperation::Insertion => Opcode::InsertBuyOrder.to_field(),
-            IMTOperation::Update => Opcode::UpdateBuyOrder.to_field(),
-            IMTOperation::Deletion => Opcode::CancelBuyOrder.to_field(),
-            IMTOperation::MatchAggressive => Opcode::MatchAggressiveBuy.to_field(),
-            IMTOperation::MatchPassive => Opcode::MatchPassiveBuy.to_field(),
-            IMTOperation::PartialMatchAggressive => Opcode::PartialMatchAggressiveBuy.to_field(),
-            IMTOperation::PartialMatchPassive => Opcode::PartialMatchPassiveBuy.to_field(),
+            IMTOperation::Insertion => BaseField::from_u32_unchecked(0),
+            IMTOperation::Deletion => BaseField::from_u32_unchecked(2),
+            IMTOperation::Update => BaseField::from_u32_unchecked(4),
+            IMTOperation::MatchAggressive => BaseField::from_u32_unchecked(6),
+            IMTOperation::MatchPassive => BaseField::from_u32_unchecked(8),
+            IMTOperation::PartialMatchAggressive => BaseField::from_u32_unchecked(10),
+            IMTOperation::PartialMatchPassive => BaseField::from_u32_unchecked(12),
         }
     }
 }
@@ -120,13 +121,13 @@ impl OrderSide for Sell {
     }
     fn op_code(op: IMTOperation) -> BaseField {
         match op {
-            IMTOperation::Insertion => Opcode::InsertSellOrder.to_field(),
-            IMTOperation::Update => Opcode::UpdateSellOrder.to_field(),
-            IMTOperation::Deletion => Opcode::CancelSellOrder.to_field(),
-            IMTOperation::MatchAggressive => Opcode::MatchAggressiveSell.to_field(),
-            IMTOperation::MatchPassive => Opcode::MatchPassiveSell.to_field(),
-            IMTOperation::PartialMatchAggressive => Opcode::PartialMatchAggressiveSell.to_field(),
-            IMTOperation::PartialMatchPassive => Opcode::PartialMatchPassiveSell.to_field(),
+            IMTOperation::Insertion => BaseField::from_u32_unchecked(1),
+            IMTOperation::Deletion => BaseField::from_u32_unchecked(3),
+            IMTOperation::Update => BaseField::from_u32_unchecked(5),
+            IMTOperation::MatchAggressive => BaseField::from_u32_unchecked(7),
+            IMTOperation::MatchPassive => BaseField::from_u32_unchecked(9),
+            IMTOperation::PartialMatchAggressive => BaseField::from_u32_unchecked(11),
+            IMTOperation::PartialMatchPassive => BaseField::from_u32_unchecked(13),
         }
     }
 }

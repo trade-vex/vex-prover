@@ -2,12 +2,12 @@ use std::array;
 
 use stwo_prover::{constraint_framework::EvalAtRow, core::fields::m31::BaseField, relation};
 
-use super::state::{State, N_STATE_FELTS};
 use crate::{
     hash::N_HASH,
     imt::{IndexBits, LeafFelts, MerklePath, MerkleProof, MERKLE_HEIGHT, N_LEAF_FELTS},
 };
-use num_traits::FromPrimitive;
+
+use super::state::{State, N_STATE_FELTS};
 
 pub const N_INSTRUCTION_FELTS: usize = InstructionColumn::N_INSTRUCTION_FELTS;
 
@@ -120,7 +120,6 @@ relation!(InstructionElements, {
 });
 
 /// The Higher Level Operation to be performed in both the IMTs
-#[repr(u32)]
 #[derive(Clone, Copy, Debug)]
 pub enum Opcode {
     InsertBuyOrder,
@@ -130,49 +129,58 @@ pub enum Opcode {
     CancelBuyOrder,
     CancelSellOrder,
     MatchAggressiveBuy,
-    MatchAggressiveSell,
     MatchPassiveBuy,
+    MatchAggressiveSell,
     MatchPassiveSell,
     PartialMatchAggressiveBuy,
-    PartialMatchAggressiveSell,
     PartialMatchPassiveBuy,
+    PartialMatchAggressiveSell,
     PartialMatchPassiveSell,
 }
 
 impl Opcode {
-    pub fn from_field(f: BaseField) -> Opcode {
-        FromPrimitive::from_u32(f.0).expect("invalid opcode")
-    }
-    pub fn to_field(self) -> BaseField {
-        BaseField::from_u32_unchecked(self as u32)
-    }
-}
-
-impl FromPrimitive for Opcode {
-    fn from_u64(num: u64) -> Option<Opcode> {
-        match num {
-            0 => Some(Opcode::InsertBuyOrder),
-            1 => Some(Opcode::InsertSellOrder),
-            2 => Some(Opcode::UpdateBuyOrder),
-            3 => Some(Opcode::UpdateSellOrder),
-            4 => Some(Opcode::CancelBuyOrder),
-            5 => Some(Opcode::CancelSellOrder),
-            6 => Some(Opcode::MatchAggressiveBuy),
-            7 => Some(Opcode::MatchAggressiveSell),
-            8 => Some(Opcode::MatchPassiveBuy),
-            9 => Some(Opcode::MatchPassiveSell),
-            10 => Some(Opcode::PartialMatchAggressiveBuy),
-            11 => Some(Opcode::PartialMatchAggressiveSell),
-            12 => Some(Opcode::PartialMatchPassiveBuy),
-            13 => Some(Opcode::PartialMatchPassiveSell),
-            _ => None,
+    /// from field returns an Opcode instance from a given field
+    pub fn from_field(felt: BaseField) -> Opcode {
+        match felt.0 {
+            0 => Opcode::InsertBuyOrder,
+            1 => Opcode::InsertSellOrder,
+            2 => Opcode::UpdateBuyOrder,
+            3 => Opcode::UpdateSellOrder,
+            4 => Opcode::CancelBuyOrder,
+            5 => Opcode::CancelSellOrder,
+            6 => Opcode::MatchAggressiveBuy,
+            7 => Opcode::MatchAggressiveSell,
+            8 => Opcode::MatchPassiveBuy,
+            9 => Opcode::MatchPassiveSell,
+            10 => Opcode::PartialMatchAggressiveBuy,
+            11 => Opcode::PartialMatchAggressiveSell,
+            12 => Opcode::PartialMatchPassiveBuy,
+            13 => Opcode::PartialMatchPassiveSell,
+            _ => panic!("Invalid Opcode"),
         }
     }
 
-    fn from_i64(num: i64) -> Option<Opcode> {
-        Self::from_u64(num as u64)
+    /// to_field returns a field instance from a given Opcode
+    pub fn to_field(&self) -> BaseField {
+        match self {
+            Opcode::InsertBuyOrder => BaseField::from_u32_unchecked(0),
+            Opcode::InsertSellOrder => BaseField::from_u32_unchecked(1),
+            Opcode::UpdateBuyOrder => BaseField::from_u32_unchecked(2),
+            Opcode::UpdateSellOrder => BaseField::from_u32_unchecked(3),
+            Opcode::CancelBuyOrder => BaseField::from_u32_unchecked(4),
+            Opcode::CancelSellOrder => BaseField::from_u32_unchecked(5),
+            Opcode::MatchAggressiveBuy => BaseField::from_u32_unchecked(6),
+            Opcode::MatchAggressiveSell => BaseField::from_u32_unchecked(7),
+            Opcode::MatchPassiveBuy => BaseField::from_u32_unchecked(8),
+            Opcode::MatchPassiveSell => BaseField::from_u32_unchecked(9),
+            Opcode::PartialMatchAggressiveBuy => BaseField::from_u32_unchecked(10),
+            Opcode::PartialMatchAggressiveSell => BaseField::from_u32_unchecked(11),
+            Opcode::PartialMatchPassiveBuy => BaseField::from_u32_unchecked(12),
+            Opcode::PartialMatchPassiveSell => BaseField::from_u32_unchecked(13),
+        }
     }
 }
+
 /// 5 Types of IMT Operations
 pub enum IMTOperation {
     Insertion,

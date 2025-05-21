@@ -19,9 +19,7 @@ pub const N_STATE_FELTS: usize = 1 // n
     + 1; // op_code
 
 /// State conists of root hashes and priority orders for Buy and Sell IMTs
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-
+#[derive(Clone, Copy, Debug, Default)]
 pub struct State<F> {
     /// ith state
     pub n: F,

@@ -164,7 +164,7 @@ pub fn interaction_trace<S: OrderSide>(
     );
 
     // Constraint 3 in constraints.rs
-    // next_time < inserted_time
+    // low_time < next_time
     add_less_than_interaction_col(
         &mut logup_gen,
         &next_time,

@@ -228,36 +228,36 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
             low_leaf.label.time().to_felts(),
             order.price_time.time().to_felts(),
         )?;
-        debug_assert!(low_leaf.label.time() < order.price_time.time());
+        assert!(low_leaf.label.time() < order.price_time.time());
         trace.add_strictly_less_than_event(
             low_leaf.next.time().to_felts(),
             order.price_time.time().to_felts(),
         )?;
-        debug_assert!(low_leaf.next.time() < order.price_time.time());
+        assert!(low_leaf.next.time() < order.price_time.time());
         match S::SIDE {
             Side::Buy => {
                 trace.add_less_than_event(
                     order.price_time.price().to_felts(),
                     low_leaf.label.price().to_felts(),
                 )?;
-                debug_assert!(order.price_time.price() <= low_leaf.label.price());
+                assert!(order.price_time.price() <= low_leaf.label.price());
                 trace.add_strictly_less_than_event(
                     low_leaf.next.price().to_felts(),
                     order.price_time.price().to_felts(),
                 )?;
-                debug_assert!(low_leaf.next.price() < order.price_time.price());
+                assert!(low_leaf.next.price() < order.price_time.price());
             }
             Side::Sell => {
                 trace.add_less_than_event(
                     low_leaf.label.price().to_felts(),
                     order.price_time.price().to_felts(),
                 )?;
-                debug_assert!(low_leaf.label.price() <= order.price_time.price());
+                assert!(low_leaf.label.price() <= order.price_time.price());
                 trace.add_strictly_less_than_event(
                     order.price_time.price().to_felts(),
                     low_leaf.next.price().to_felts(),
                 )?;
-                debug_assert!(order.price_time.price() < low_leaf.next.price());
+                assert!(order.price_time.price() < low_leaf.next.price());
             }
         }
         // manually drop the trace to avoid borrow_mut() conflicts in get_merkle_proof and finalize operations.
@@ -454,7 +454,7 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
 
     /// Finds the index of the leaf in the tree which has the given Price, Time.
     #[inline]
-    pub fn find(&self, key: &PriceTime<BaseField, S>) -> Result<usize, IMTError> {
+    fn find(&self, key: &PriceTime<BaseField, S>) -> Result<usize, IMTError> {
         self.index_map
             .get(key)
             .copied()
@@ -503,12 +503,10 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
             let sibling_index = if index % 2 == 0 { index + 1 } else { index - 1 };
             *sibling = if sibling_index < self.raw[i].len() {
                 self.raw[i][sibling_index]
-            } else {
-                debug_assert!(
-                    index % 2 != 0,
-                    "Unreachable: index is even and sibling index is out of bounds"
-                );
+            } else if index % 2 == 0 {
                 Self::get_empty_hash(i)
+            } else {
+                panic!("Unexpected condition: index is odd and sibling index is out of bounds");
             };
             if index % 2 == 0 {
                 trace.add_merkle_hash_event(path[i], *sibling);
@@ -596,7 +594,7 @@ impl<S: OrderSide> IndexedMerkleTree<S> {
         self.leaves[0].next.price()
     }
 
-    /// Returns the felts representing best price in the tree.
+    /// Returns the best price in the tree.
     pub fn best_price_felts(&self) -> PriceFelts<BaseField> {
         self.leaves[0].next.price().to_felts()
     }
