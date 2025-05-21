@@ -26,7 +26,7 @@ use crate::{
     VexClaim, VexInteractionClaim,
 };
 
-use bytes::{AndElements, BytesComponent, LessThanU8Elements, RangeCheckU8Elements};
+use bytes::{BytesComponent, LessThanU8Elements, RangeCheckU8Elements};
 use insertions::{BuyInsertionComponent, InsertionsEval, SellInsertionComponent};
 use less_than::{
     LessThanComponent, LessThanElements, StrictLessThanComponent, StrictLessThanElements,
@@ -135,7 +135,6 @@ pub struct VexInteractionElements {
     pub less_than_elements: LessThanElements,
     pub strict_less_than_elements: StrictLessThanElements,
     pub less_than_u8_elements: LessThanU8Elements,
-    pub and_elements: AndElements,
     pub range_check_u8_elements: RangeCheckU8Elements,
     pub match_elements: MatchElements,
     pub add_elements: AddElements,
@@ -151,7 +150,6 @@ impl VexInteractionElements {
             less_than_elements: LessThanElements::draw(channel),
             strict_less_than_elements: StrictLessThanElements::draw(channel),
             less_than_u8_elements: LessThanU8Elements::draw(channel),
-            and_elements: AndElements::draw(channel),
             range_check_u8_elements: RangeCheckU8Elements::draw(channel),
             match_elements: MatchElements::draw(channel),
             add_elements: AddElements::draw(channel),
@@ -192,7 +190,6 @@ impl VexComponents {
             tree_span_provider,
             bytes::BytesEval {
                 claim: claim.bytes_claim.clone(),
-                and_elements: interaction_elements.and_elements.clone(),
                 less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
                 range_check_u8_elements: interaction_elements.range_check_u8_elements.clone(),
             },

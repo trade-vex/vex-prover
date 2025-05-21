@@ -267,6 +267,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             op.initial_state.best_buy_price,
             op.initial_state.sell_root,
             op.initial_state.best_sell_price,
+            op.initial_state.op_code,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -283,6 +284,7 @@ impl<S: OrderSide> FrameworkEval for DeletionsEval<S> {
             op.final_state.best_buy_price,
             op.final_state.sell_root,
             op.final_state.best_sell_price,
+            op.final_state.op_code,
             op.is_real
         );
         // yield the results

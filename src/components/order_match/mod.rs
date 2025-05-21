@@ -144,16 +144,24 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 200;
+        let n = 1 << 7;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
-            let buy_order = Order::new(100, rng.gen_range(100..=110), time);
-            let sell_order = Order::new(100, rng.gen_range(100..=110), time);
+            // using volume as 100, because partial matching is not implemented
+            let buy_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
+            let sell_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
             order_book.place_buy_order(buy_order).unwrap();
             order_book.place_sell_order(sell_order).unwrap();
         }
-
         let execution_trace = std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
         span.exit();
 

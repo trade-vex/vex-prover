@@ -47,6 +47,7 @@ impl OrderBook {
             PriceTime::<BaseField, Buy>::last().price().to_felts(),
             sell_imt.root(),
             PriceTime::<BaseField, Sell>::last().price().to_felts(),
+            Opcode::InsertBuyOrder.to_field(),
         );
         trace.borrow_mut().initial_state = state.to_felts();
         OrderBook {
@@ -71,6 +72,7 @@ impl OrderBook {
         final_state.n += BaseField::one();
         final_state.buy_root = self.buy_imt.root();
         final_state.best_buy_price = self.buy_imt.best_price_felts();
+        final_state.op_code = Opcode::InsertBuyOrder.to_field();
         self.state = final_state;
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
@@ -78,7 +80,8 @@ impl OrderBook {
             initial_state.best_buy_price,
             initial_state.sell_root,
             initial_state.best_sell_price,
-            Opcode::InsertBuyOrder.to_field(),
+            initial_state.op_code,
+            final_state.op_code,
             proof.low_merkle_proof,
             proof.low_merkle_path,
             proof.low_merkle_updated_path,
@@ -94,6 +97,7 @@ impl OrderBook {
             final_state.best_buy_price,
             final_state.sell_root,
             final_state.best_sell_price,
+            final_state.op_code,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -119,6 +123,7 @@ impl OrderBook {
         final_state.n += BaseField::one();
         final_state.sell_root = self.sell_imt.root();
         final_state.best_sell_price = self.sell_imt.best_price_felts();
+        final_state.op_code = Opcode::InsertSellOrder.to_field();
         self.state = final_state;
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
             initial_state.n,
@@ -126,7 +131,8 @@ impl OrderBook {
             initial_state.best_buy_price,
             initial_state.sell_root,
             initial_state.best_sell_price,
-            Opcode::InsertSellOrder.to_field(),
+            initial_state.op_code,
+            final_state.op_code,
             proof.low_merkle_proof,
             proof.low_merkle_path,
             proof.low_merkle_updated_path,
@@ -142,6 +148,7 @@ impl OrderBook {
             final_state.best_buy_price,
             final_state.sell_root,
             final_state.best_sell_price,
+            final_state.op_code,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -166,6 +173,7 @@ impl OrderBook {
         final_state.n += BaseField::one();
         final_state.buy_root = self.buy_imt.root();
         final_state.best_buy_price = self.buy_imt.best_price().to_felts();
+        final_state.op_code = Opcode::CancelBuyOrder.to_field();
         self.state = final_state;
 
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
@@ -174,7 +182,8 @@ impl OrderBook {
             initial_state.best_buy_price,
             initial_state.sell_root,
             initial_state.best_sell_price,
-            Opcode::CancelBuyOrder.to_field(),
+            initial_state.op_code,
+            final_state.op_code,
             proof.low_merkle_proof,
             proof.low_merkle_path,
             proof.low_merkle_updated_path,
@@ -190,6 +199,7 @@ impl OrderBook {
             final_state.best_buy_price,
             final_state.sell_root,
             final_state.best_sell_price,
+            final_state.op_code,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -214,6 +224,7 @@ impl OrderBook {
         final_state.n += BaseField::one();
         final_state.sell_root = self.sell_imt.root();
         final_state.best_sell_price = self.sell_imt.best_price().to_felts();
+        final_state.op_code = Opcode::CancelSellOrder.to_field();
         self.state = final_state;
 
         let instruction_felts: [BaseField; N_INSTRUCTION_FELTS] = flatten!(
@@ -222,7 +233,8 @@ impl OrderBook {
             initial_state.best_buy_price,
             initial_state.sell_root,
             initial_state.best_sell_price,
-            Opcode::CancelSellOrder.to_field(),
+            initial_state.op_code,
+            final_state.op_code,
             proof.low_merkle_proof,
             proof.low_merkle_path,
             proof.low_merkle_updated_path,
@@ -238,6 +250,7 @@ impl OrderBook {
             final_state.best_buy_price,
             final_state.sell_root,
             final_state.best_sell_price,
+            final_state.op_code,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -255,6 +268,7 @@ impl OrderBook {
             } else {
                 match_leaf.volume
             };
+            debug!("Trade: {:?}, {:?}", match_leaf.price(), volume);
             order.volume -= volume;
             match_leaf.volume -= volume;
             let initial_state = self.state;
@@ -298,6 +312,7 @@ impl OrderBook {
             } else {
                 match_leaf.volume
             };
+            debug!("Trade: {:?}, {:?}", match_leaf.price(), volume);
             order.volume -= volume;
             match_leaf.volume -= volume;
 
@@ -330,26 +345,26 @@ impl OrderBook {
     ) -> Result<(), IMTError> {
         let initial_state = self.state;
         let mut final_state = initial_state;
-        let opcode = match S::SIDE {
+        match S::SIDE {
             Side::Buy => {
                 debug_assert_eq!(proof.initial_root, initial_state.buy_root);
                 final_state.buy_root = self.buy_imt.root();
                 final_state.best_buy_price = self.buy_imt.best_price_felts();
-                if is_aggressive {
-                    Opcode::MatchAggressiveBuy
+                final_state.op_code = if is_aggressive {
+                    Opcode::MatchAggressiveBuy.to_field()
                 } else {
-                    Opcode::MatchPassiveBuy
-                }
+                    Opcode::MatchPassiveBuy.to_field()
+                };
             }
             Side::Sell => {
                 debug_assert_eq!(proof.initial_root, initial_state.sell_root);
                 final_state.sell_root = self.sell_imt.root();
                 final_state.best_sell_price = self.sell_imt.best_price_felts();
-                if is_aggressive {
-                    Opcode::MatchAggressiveSell
+                final_state.op_code = if is_aggressive {
+                    Opcode::MatchAggressiveSell.to_field()
                 } else {
-                    Opcode::MatchPassiveSell
-                }
+                    Opcode::MatchPassiveSell.to_field()
+                };
             }
         };
         final_state.n += BaseField::one();
@@ -360,7 +375,8 @@ impl OrderBook {
             initial_state.best_buy_price,
             initial_state.sell_root,
             initial_state.best_sell_price,
-            opcode.to_field(),
+            initial_state.op_code,
+            final_state.op_code,
             proof.low_merkle_proof,
             proof.low_merkle_path,
             proof.low_merkle_updated_path,
@@ -376,6 +392,7 @@ impl OrderBook {
             final_state.best_buy_price,
             final_state.sell_root,
             final_state.best_sell_price,
+            final_state.op_code,
             BaseField::one()
         );
         self.trace.borrow_mut().add_instruction(instruction_felts);
@@ -390,26 +407,26 @@ impl OrderBook {
         let mut trace = self.trace.borrow_mut();
         let initial_state = self.state;
         let mut final_state = initial_state;
-        let opcode = match S::SIDE {
+        match S::SIDE {
             Side::Buy => {
                 debug_assert_eq!(proof.initial_root, initial_state.buy_root);
                 final_state.buy_root = self.buy_imt.root();
                 final_state.best_buy_price = self.buy_imt.best_price_felts();
-                if is_aggressive {
-                    Opcode::PartialMatchAggressiveBuy
+                final_state.op_code = if is_aggressive {
+                    Opcode::PartialMatchAggressiveBuy.to_field()
                 } else {
-                    Opcode::PartialMatchPassiveBuy
+                    Opcode::PartialMatchPassiveBuy.to_field()
                 }
             }
             Side::Sell => {
                 debug_assert_eq!(proof.initial_root, initial_state.sell_root);
                 final_state.sell_root = self.sell_imt.root();
                 final_state.best_sell_price = self.sell_imt.best_price_felts();
-                if is_aggressive {
-                    Opcode::PartialMatchAggressiveSell
+                final_state.op_code = if is_aggressive {
+                    Opcode::PartialMatchAggressiveSell.to_field()
                 } else {
-                    Opcode::PartialMatchPassiveSell
-                }
+                    Opcode::PartialMatchPassiveSell.to_field()
+                };
             }
         };
         final_state.n += BaseField::one();
@@ -424,7 +441,8 @@ impl OrderBook {
             initial_state.best_buy_price,
             initial_state.sell_root,
             initial_state.best_sell_price,
-            opcode.to_field(),
+            initial_state.op_code,
+            final_state.op_code,
             proof.low_merkle_proof,
             proof.low_merkle_path,
             MerklePath::<BaseField>::default(),
@@ -442,6 +460,7 @@ impl OrderBook {
             final_state.best_buy_price,
             final_state.sell_root,
             final_state.best_sell_price,
+            final_state.op_code,
             BaseField::one()
         );
         trace.add_instruction(instruction_felts);

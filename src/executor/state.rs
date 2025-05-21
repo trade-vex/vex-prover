@@ -15,7 +15,8 @@ pub const N_STATE_FELTS: usize = 1 // n
     + N_HASH // buy_root
     + N_U64_FELTS // best_buy_price
     + N_HASH // sell_root
-    + N_U64_FELTS; // best_sell_price
+    + N_U64_FELTS // best_sell_price
+    + 1; // op_code
 
 /// State conists of root hashes and priority orders for Buy and Sell IMTs
 
@@ -32,6 +33,8 @@ pub struct State<F> {
     pub sell_root: Hash<F>,
     /// the order which should be matched first in the Sell IMT
     pub best_sell_price: PriceFelts<F>,
+    /// the op code that resulted in this state
+    pub op_code: F,
 }
 
 // StateElements are used and yielded in the processor component
@@ -47,6 +50,7 @@ impl<F> State<F> {
         best_buy_price: PriceFelts<F>,
         sell_root: Hash<F>,
         best_sell_price: PriceFelts<F>,
+        op_code: F,
     ) -> Self {
         State {
             n,
@@ -54,6 +58,7 @@ impl<F> State<F> {
             best_buy_price,
             sell_root,
             best_sell_price,
+            op_code,
         }
     }
 
@@ -64,12 +69,14 @@ impl<F> State<F> {
         let best_buy_price = array::from_fn(|_| eval.next_trace_mask());
         let sell_root = array::from_fn(|_| eval.next_trace_mask());
         let best_sell_price = array::from_fn(|_| eval.next_trace_mask());
+        let op_code = eval.next_trace_mask();
         State {
             n,
             buy_root,
             best_buy_price,
             sell_root,
             best_sell_price,
+            op_code,
         }
     }
 }
@@ -81,7 +88,8 @@ impl<F: Clone + Debug + Copy> State<F> {
             self.buy_root,
             self.best_buy_price,
             self.sell_root,
-            self.best_sell_price
+            self.best_sell_price,
+            self.op_code
         )
     }
 }

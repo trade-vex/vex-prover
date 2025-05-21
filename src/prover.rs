@@ -109,7 +109,7 @@ pub fn prove_vex(
         partial_order_match::trace::<Sell, Passive>(trace.sell_passive_partial_match);
 
     // Extend the main trace with the components
-    tree_builder.extend_evals(bytes_trace);
+    tree_builder.extend_evals(bytes_trace.clone());
     tree_builder.extend_evals(poseidon_trace.clone());
     tree_builder.extend_evals(strict_less_than_trace.clone());
     tree_builder.extend_evals(less_than_trace.clone());
@@ -164,8 +164,7 @@ pub fn prove_vex(
 
     let mut tree_builder = commitment_scheme.tree_builder();
     let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
-        trace.byte_operations,
-        &interaction_elements.and_elements,
+        &bytes_trace,
         &interaction_elements.less_than_u8_elements,
         &interaction_elements.range_check_u8_elements,
     );
@@ -415,7 +414,7 @@ mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     use rand::Rng;
-    use tracing::{debug, span, Level};
+    use tracing::{span, Level};
 
     use crate::{
         executor::{order_book::OrderBook, record::ExecutionTrace},
@@ -436,19 +435,31 @@ mod tests {
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
-            // using volume as 100, because partial matching is not implemented
-            let buy_order = Order::new(rng.gen_range(1..1000), rng.gen_range(100..=105), time);
-            let sell_order = Order::new(rng.gen_range(1..1000), rng.gen_range(100..=105), time);
+            let buy_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
+            let sell_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
             order_book.place_buy_order(buy_order).unwrap();
             order_book.place_sell_order(sell_order).unwrap();
         }
 
         let mut execution_trace =
             std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
-        debug!("shape: {:#?}", execution_trace.sizes());
         execution_trace.final_state = order_book.state().to_felts();
         span.exit();
+        let shape = execution_trace.sizes();
+        let start = std::time::Instant::now();
         let proof = prove_vex(execution_trace).unwrap();
+        let end = start.elapsed();
+        // println!("Time taken for prove_vex: {:?}", end.duration_since(start));
+        println!("Proof Generated, Summary: {shape:#?}");
+        println!("Instructions proved per second: {}", shape.instructions as f64 / end.as_secs_f64());
         verify_vex(proof).unwrap();
     }
 }

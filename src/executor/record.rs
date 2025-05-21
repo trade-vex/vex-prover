@@ -46,7 +46,7 @@ pub type InstructionFelts<F> = [F; N_INSTRUCTION_FELTS];
 /// 2. Less Than Operations: Compare two Price pairs, comprising 8 Field Elements each
 /// 3. Comparison Operations: Compare two Price, Time pairs
 /// 4. Hash Operations: Poseidon Hash Operations
-/// 5. Byte Operations: U8 Operations such as and, less than, range check
+/// 5. Byte Operations: U8 Operations such as less than, range check
 pub struct ExecutionTrace<F> {
     /// Buy Side Instructions
     /// 1. Place Buy Order
@@ -271,17 +271,6 @@ impl ExecutionTrace<BaseField> {
         self.poseidon_operations.push(input);
     }
 
-    /// Adds an And U8 Event by recording the corresponding Trace Row
-    /// Returns an error if a or b is greater than 255
-    pub fn add_and_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        if (a >= 256) || (b >= 256) {
-            return Err(IMTError::InvalidU8Pair(a, b));
-        }
-        let offset = (a << 8) + b;
-        self.byte_operations[0].as_mut_slice()[offset as usize].0 += 1;
-        Ok(())
-    }
-
     /// Adds a Less Than U8 Event by recording the corresponding Trace Row
     /// Returns an error if a or b is greater than 255
     pub fn add_less_than_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
@@ -289,7 +278,7 @@ impl ExecutionTrace<BaseField> {
             return Err(IMTError::InvalidU8Pair(a, b));
         }
         let offset = (a << 8) + b;
-        self.byte_operations[1].as_mut_slice()[offset as usize].0 += 1;
+        self.byte_operations[0].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
     }
 
@@ -302,7 +291,7 @@ impl ExecutionTrace<BaseField> {
             return Err(IMTError::InvalidU8Pair(a, b));
         }
         let offset = (a << 8) + b;
-        self.byte_operations[2].as_mut_slice()[offset as usize].0 += 1;
+        self.byte_operations[1].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
     }
 
@@ -332,7 +321,7 @@ impl ExecutionTrace<BaseField> {
             1 << (2 * N_U64_FELTS), // 2^8 * 2^8 combinations
         ])
         .unwrap();
-
+        // log size is ceil(log2(n))
         (n - 1).ilog2() + 1
     }
 

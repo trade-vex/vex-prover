@@ -58,15 +58,15 @@ pub struct PartialMatchEval<S, T: OrderMatchType> {
 ///  Order Match Operation within a Single IMT:
 ///  1) Check if the low leaf points to the matched leaf.
 ///  2) Update the Volume of the Matched Leaf.
-///  The constraints must ensure that the low leaf in the instruction is the first leaf in the tree.
-///  The constraints must ensure that the updates are done correctly.
+///     The constraints must ensure that the low leaf in the instruction is the first leaf in the tree.
+///     The constraints must ensure that the updates are done correctly.
 ///
 ///   The method follows these steps:
 ///   1. Retrieve Instruction for the row
 ///   2. IsReal must be a boolean. it is true if the operation is from non-padded row.
 ///   3. The Matched Leaf must be active.
 ///   4. Assert that the opcode is equal to the operation's opcode. // different for side + type combination
-///   5. Todo constraint:- The Op code that precedes the current operation must be correct.
+///   5. The Op code that precedes the current operation must be correct.
 ///        - Aggressive Match: The previous operation must be an insert operation on the same side.
 ///        - Passive Match: The previous operation must be an aggressive match operation on the opposite side.
 ///          Note - The previous operation can be either full or partial match.
@@ -129,7 +129,13 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                     op.opcode.clone()
                         - E::F::from(S::op_code(IMTOperation::PartialMatchAggressive)),
                 );
-                //@todo prev op must be insert S::Side
+                eval.add_constraint(
+                    (op.initial_state.op_code.clone()
+                        - E::F::from(S::op_code(IMTOperation::Insertion)))
+                        * (op.initial_state.op_code.clone()
+                            - E::F::from(S::complement_op_code(IMTOperation::MatchPassive))),
+                );
+
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
 
@@ -180,7 +186,14 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                     op.opcode.clone() - E::F::from(S::op_code(IMTOperation::PartialMatchPassive)),
                 );
 
-                //@todo prev op must be aggressive match S::side
+                eval.add_constraint(
+                    (op.initial_state.op_code.clone()
+                        - E::F::from(S::complement_op_code(IMTOperation::MatchAggressive)))
+                        * (op.initial_state.op_code.clone()
+                            - E::F::from(S::complement_op_code(
+                                IMTOperation::PartialMatchAggressive,
+                            ))),
+                );
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
                 let values =
@@ -211,13 +224,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         let mut low_leaf: [E::F; N_LEAF_FELTS] = array::from_fn(|_| E::F::zero());
         low_leaf[LeafColumn::ACTIVE] = E::F::one();
         let first_price_time_felts = Leaf::<E::F, S>::first_price_time_felts();
-        for i in 0..2 * N_U64_FELTS {
-            low_leaf[LeafColumn::LABEL + i] = first_price_time_felts[i].clone();
-        }
-        for i in 0..2 * N_U64_FELTS {
-            low_leaf[LeafColumn::NEXT + i] = op.leaf[LeafColumn::LABEL + i].clone();
-        }
-
+        low_leaf[LeafColumn::LABEL..(2 * N_U64_FELTS + LeafColumn::LABEL)]
+            .clone_from_slice(&first_price_time_felts[..(2 * N_U64_FELTS)]);
+        low_leaf[LeafColumn::NEXT..(2 * N_U64_FELTS + LeafColumn::NEXT)]
+            .clone_from_slice(&op.leaf[LeafColumn::LABEL..(2 * N_U64_FELTS + LeafColumn::LABEL)]);
         // low index must be 0
         for i in 0..MERKLE_HEIGHT {
             eval.add_constraint(op.low_index[i].clone());
@@ -276,10 +286,8 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
 
         // updates matched leaf volume
         let mut updated_leaf = op.leaf.clone();
-        for i in 0..N_U64_FELTS {
-            updated_leaf[LeafColumn::VOLUME + i] = remaining_volume[i].clone();
-        }
-
+        updated_leaf[LeafColumn::VOLUME..(N_U64_FELTS + LeafColumn::VOLUME)]
+            .clone_from_slice(&remaining_volume[..N_U64_FELTS]);
         // eval updated leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
@@ -365,6 +373,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
             op.initial_state.best_buy_price,
             op.initial_state.sell_root,
             op.initial_state.best_sell_price,
+            op.initial_state.op_code,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -381,6 +390,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
             op.final_state.best_buy_price,
             op.final_state.sell_root,
             op.final_state.best_sell_price,
+            op.final_state.op_code,
             op.is_real
         );
         // yield the results

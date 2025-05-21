@@ -57,7 +57,8 @@ impl FrameworkEval for ProcessorEval {
             op.initial_state.buy_root.clone(),
             op.initial_state.best_buy_price.clone(),
             op.initial_state.sell_root.clone(),
-            op.initial_state.best_sell_price.clone()
+            op.initial_state.best_sell_price.clone(),
+            op.initial_state.op_code.clone()
         );
 
         // use the initial state
@@ -73,7 +74,8 @@ impl FrameworkEval for ProcessorEval {
             op.initial_state.best_buy_price,
             op.initial_state.sell_root,
             op.initial_state.best_sell_price,
-            op.opcode,
+            op.initial_state.op_code,
+            op.opcode.clone(),
             op.low_merkle_proof,
             op.low_merkle_path,
             op.updated_low_merkle_path,
@@ -89,6 +91,7 @@ impl FrameworkEval for ProcessorEval {
             op.final_state.best_buy_price.clone(),
             op.final_state.sell_root.clone(),
             op.final_state.best_sell_price.clone(),
+            op.final_state.op_code.clone(),
             op.is_real
         );
         // use the instruction elements to update the state to the final state
@@ -101,12 +104,16 @@ impl FrameworkEval for ProcessorEval {
         // ensure that the state count is updated correctly
         eval.add_constraint(op.final_state.n.clone() - op.initial_state.n.clone() - E::F::one());
 
+        // the instructions opcode must be the same as the final state opcode
+        eval.add_constraint(op.opcode.clone() - op.final_state.op_code.clone());
+
         let final_state: Vec<E::F> = flatten!(
             op.final_state.n,
             op.final_state.buy_root,
             op.final_state.best_buy_price,
             op.final_state.sell_root,
-            op.final_state.best_sell_price
+            op.final_state.best_sell_price,
+            op.final_state.op_code
         );
 
         // yield the final state

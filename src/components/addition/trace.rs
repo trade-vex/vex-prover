@@ -6,7 +6,8 @@ use crate::{
 };
 
 use num_traits::{One, Zero};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::iter::{IndexedParallelIterator, ParallelIterator};
+use rayon::slice::ParallelSlice;
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
 use stwo_prover::{
@@ -55,12 +56,7 @@ pub fn trace(
     // Populate the trace using SIMD for parallel processing.`
     trace
         .par_iter_mut()
-        .zip(
-            add_operations
-                .into_par_iter()
-                .chunks(N_LANES) // Process in chunks of N_LANES (SIMD width)
-                .into_par_iter(),
-        )
+        .zip(add_operations.par_chunks_exact(N_LANES))
         .for_each(|(row, data)| {
             for (i, cell) in row.into_iter().enumerate() {
                 let column_chunk = core::array::from_fn(|j| data[j][i]);

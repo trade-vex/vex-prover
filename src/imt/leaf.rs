@@ -199,7 +199,8 @@ impl<F: One + Zero + From<BaseField>, S: OrderSide> Leaf<F, S> {
         match S::side() {
             Side::Buy => {
                 for i in 0..N_U64_FELTS {
-                    price_time[i] = vec![PackedBaseField::broadcast(M31(255)); 1 << (log_size - LOG_N_LANES)]
+                    price_time[i] =
+                        vec![PackedBaseField::broadcast(M31(255)); 1 << (log_size - LOG_N_LANES)]
                 }
             }
             Side::Sell => {} // sell sides first price time is default/zeros

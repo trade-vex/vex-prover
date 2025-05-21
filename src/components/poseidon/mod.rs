@@ -159,7 +159,7 @@ pub fn trace(
 
     trace
         .par_iter_mut()
-        .zip(poseidon_operations.par_chunks_exact(N_LANES * N_INSTANCES_PER_ROW))
+        .zip(poseidon_operations.par_chunks_exact(N_INSTANCES_PER_ROW * N_LANES))
         .for_each(|(mut row, data)| {
             let mut col_index = 0;
             for rep_i in 0..N_INSTANCES_PER_ROW {

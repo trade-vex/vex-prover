@@ -55,15 +55,15 @@ pub struct MatchEval<S, T: OrderMatchType> {
 ///  Order Match Operation within a Single IMT:
 ///  1) Updating the 0th Leaf's next value to point to the next leaf of the matched leaf.
 ///  2) Switch the active flag of the matched leaf to 0.
-///  The constraints must ensure that the low leaf in the instruction is the first leaf in the tree.
-///  The constraints must ensure that the updates are done correctly.
+///     The constraints must ensure that the low leaf in the instruction is the first leaf in the tree.
+///     The constraints must ensure that the updates are done correctly.
 ///
 ///   The method follows these steps:
 ///   1. Retrieve Instruction for the row
 ///   2. IsReal must be a boolean. it is true if the operation is from non-padded row.
 ///   3. The Matched Leaf must be active.
 ///   3. Assert that the opcode is equal to the operation's opcode. // different for side + type combination
-///   4. Todo constraint:- The Op code that precedes the current operation must be correct.
+///   4. The Op code that precedes the current operation must be correct.
 ///        - Aggressive Match: The previous operation must be an insert operation on the same side.
 ///        - Passive Match: The previous operation must be an aggressive match operation on the opposite side.
 ///          Note - The previous operation can be either full or partial match.
@@ -81,7 +81,7 @@ pub struct MatchEval<S, T: OrderMatchType> {
 ///      - The Low Leaf's volume must be equal to zero.
 ///      - The Low Leaf's price_time must be equal to the first price_time in the tree.
 ///      - The Low Leaf's next value must be equal to the Matched Leaf.
-///     Note: Instead of adding constraints, the low leaf can be constructed with the eval function.
+///         Note: Instead of adding constraints, the low leaf can be constructed with the eval function.
 ///           Because there is not arithmetic involved in the construction, the constraints can be avoided.
 ///   6. Assert that the initial root hash of the initial state is equal to the root hash in the merkle path of the low/0th leaf.
 ///   8. The Low leaf is part of the Merkle Tree by verifying the Merkle Proof.
@@ -126,7 +126,12 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 eval.add_constraint(
                     op.opcode.clone() - E::F::from(S::op_code(IMTOperation::MatchAggressive)),
                 );
-                //@todo prev op must be insert S::Side
+                eval.add_constraint(
+                    (op.initial_state.op_code.clone()
+                        - E::F::from(S::op_code(IMTOperation::Insertion)))
+                        * (op.initial_state.op_code.clone()
+                            - E::F::from(S::complement_op_code(IMTOperation::MatchPassive))),
+                );
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
 
@@ -177,8 +182,15 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                 eval.add_constraint(
                     op.opcode.clone() - E::F::from(S::op_code(IMTOperation::MatchPassive)),
                 );
+                eval.add_constraint(
+                    (op.initial_state.op_code.clone()
+                        - E::F::from(S::complement_op_code(IMTOperation::MatchAggressive)))
+                        * (op.initial_state.op_code.clone()
+                            - E::F::from(S::complement_op_code(
+                                IMTOperation::PartialMatchAggressive,
+                            ))),
+                );
 
-                //@todo prev op must be aggressive match S::side
                 let price: [E::F; N_U64_FELTS] =
                     array::from_fn(|i| op.leaf[LeafColumn::PRICE + i].clone());
                 let volume: [E::F; N_U64_FELTS] =
@@ -374,6 +386,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
             op.initial_state.best_buy_price,
             op.initial_state.sell_root,
             op.initial_state.best_sell_price,
+            op.initial_state.op_code,
             op.opcode,
             op.low_merkle_proof,
             op.low_merkle_path,
@@ -390,6 +403,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
             op.final_state.best_buy_price,
             op.final_state.sell_root,
             op.final_state.best_sell_price,
+            op.final_state.op_code,
             op.is_real
         );
         // yield the results

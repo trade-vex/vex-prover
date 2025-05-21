@@ -1,5 +1,5 @@
 use super::{
-    AndElements, ByteOperations, BytesPreProcessedColumn, LessThanU8Elements, RangeCheckU8Elements,
+    ByteOperations, BytesPreProcessedColumn, LessThanU8Elements, RangeCheckU8Elements,
     ELEMENT_BITS, LOG_SIZE, N_PREPROCESSED_COLUMNS,
 };
 use crate::components::{Claim, InteractionClaim};
@@ -28,7 +28,6 @@ use tracing::{span, Level};
 /// Columns in the Preprocessed Trace correspond to:
 /// - a: higher bits
 /// - b: lower bits
-/// - c_and: a & b
 /// - c_less_than: a < b
 /// - is_first: is the first column
 pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>
@@ -55,15 +54,6 @@ pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField
             *row[BytesPreProcessedColumn::B as usize] =
                 PackedBaseField::from_array(array::from_fn(|i| {
                     M31((input[i] & ((1 << ELEMENT_BITS) - 1)) as u32)
-                }));
-
-            // c_and: a & b
-            *row[BytesPreProcessedColumn::CAnd as usize] =
-                PackedBaseField::from_array(array::from_fn(|i| {
-                    M31(
-                        ((input[i] >> ELEMENT_BITS) & (input[i] & ((1 << ELEMENT_BITS) - 1)))
-                            as u32,
-                    )
                 }));
 
             // c_less_than: a < b
@@ -100,8 +90,7 @@ pub fn trace(
 
 /// Interaction Trace for the Byte Events For Logup Constraints
 pub fn interaction_trace(
-    byte_operations: ByteOperations,
-    and_elements: &AndElements,
+    trace: &ColumnVec<CircleEvaluation<SimdBackend, BaseField, BitReversedOrder>>,
     less_than_u8_elements: &LessThanU8Elements,
     range_check_u8_elements: &RangeCheckU8Elements,
 ) -> (
@@ -122,47 +111,34 @@ pub fn interaction_trace(
         })
         .unzip(); // <-- Parallel iterators could speed this up if safe
 
-    // Interaction Trace For And Elements, Less Than U8 Elements
-    // The Relation Elements consists of [a, b, c_and], [a, b, c_less_than]
-    let mut col_gen = logup_gen.new_col();
-    for (vec_row, (&a_elem, &b_elem_base)) in a_elems.iter().zip(&b_elem_bases).enumerate() {
-        let a = u32x16::splat(a_elem);
-        let b = u32x16::splat(b_elem_base) | offsets;
-        let c_and = a & b;
-        let c_less_than = u32x16::from_array(std::array::from_fn(|i| {
-            (a_elem < (b_elem_base | i as u32)) as u32
-        }));
-
-        // Batch 2 Logup Columns
-        // sum = (-and_mult/and_elements) + (-less_than_mult/less_than_u8_elements)
-        // sum = -(and_mult * less_than_u8_elements + less_than_mult * and_elements) / (and_elements * less_than_u8_elements)
-        // Mult is in Negative as this component is "yielding" values which are "used" by other components
-        // a, b, c are in range of 0..256 so we can safely convert them to PackedSecureField from u32x16
-        let and_elements: PackedSecureField = and_elements
-            .combine(&[a, b, c_and].map(|x| unsafe { PackedBaseField::from_simd_unchecked(x) }));
-        let less_than_elements: PackedSecureField = less_than_u8_elements.combine(
-            &[a, b, c_less_than].map(|x| unsafe { PackedBaseField::from_simd_unchecked(x) }),
-        );
-
-        let and_mult = PackedSecureField::from(byte_operations[0].data[vec_row]);
-        let less_than_mult = PackedSecureField::from(byte_operations[1].data[vec_row]);
-        let denom = and_elements * less_than_elements;
-        let num = -(and_mult * less_than_elements + less_than_mult * and_elements);
-        col_gen.write_frac(vec_row, num, denom);
-    }
-    col_gen.finalize_col();
-
+    // Interaction Trace For Less Than U8 Elements
+    // The Relation Elements consists of [a, b, c_less_than]
     // Interaction Trace for Range Check U8 Elements
     // The Relation Elements consists a pair of U8 elements [a, b]
     let mut col_gen = logup_gen.new_col();
     for (vec_row, (&a_elem, &b_elem_base)) in a_elems.iter().zip(&b_elem_bases).enumerate() {
         let a = u32x16::splat(a_elem);
         let b = u32x16::splat(b_elem_base) | offsets;
-        let p: PackedSecureField = range_check_u8_elements
+        let c_less_than = u32x16::from_array(std::array::from_fn(|i| {
+            (a_elem < (b_elem_base | i as u32)) as u32
+        }));
+
+        // Batch 2 Logup Columns, (Less Than U8 and Range Check U8)
+        // sum = (-less_than_mult/less_than_u8_elements) + (-range_check_mult/range_check_u8_elements)
+        // sum = -(less_than_mult * range_check_u8_elements + range_check_mult * less_than_u8_elements) / (less_than_u8_elements * range_check_u8_elements)
+        // Mult is in Negative as this component is "yielding" values which are "used" by other components
+        // a, b, c are in range of 0..256 so we can safely convert them to PackedSecureField from u32x16
+        let less_than_elements: PackedSecureField = less_than_u8_elements.combine(
+            &[a, b, c_less_than].map(|x| unsafe { PackedBaseField::from_simd_unchecked(x) }),
+        );
+        let range_check_elements: PackedSecureField = range_check_u8_elements
             .combine(&[a, b].map(|x| unsafe { PackedBaseField::from_simd_unchecked(x) }));
-        let num = byte_operations[2].data[vec_row];
-        let denom = p;
-        col_gen.write_frac(vec_row, PackedSecureField::from(-num), denom);
+
+        let less_than_mult = PackedSecureField::from(trace[0].data[vec_row]);
+        let range_check_mult = PackedSecureField::from(trace[1].data[vec_row]);
+        let denom = less_than_elements * range_check_elements;
+        let num = -(less_than_mult * range_check_elements + range_check_mult * less_than_elements);
+        col_gen.write_frac(vec_row, num, denom);
     }
     col_gen.finalize_col();
 
