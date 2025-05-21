@@ -1,29 +1,21 @@
 use std::{marker::PhantomData, vec};
 
 use addition::{AddComponent, AddElements, AddEval};
-use num_traits::{One, Zero};
 use order_match::{
-    BuyAgessiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
+    BuyAggressiveMatchComponent, BuyPassiveMatchComponent, MatchElements, MatchEval,
     SellAggressiveMatchComponent, SellPassiveMatchComponent,
 };
 use partial_order_match::{
-    BuyAgessivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
+    BuyAggressivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
     SellAggressivePartialMatchComponent, SellPassivePartialMatchComponent,
 };
 use stwo_prover::{
     constraint_framework::TraceLocationAllocator,
     core::{
         air::{Component, ComponentProver},
-        backend::{
-            simd::{
-                column::BaseColumn,
-                m31::{PackedBaseField, LOG_N_LANES, N_LANES},
-                SimdBackend,
-            },
-            Column,
-        },
+        backend::simd::SimdBackend,
         channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
+        fields::qm31::SecureField,
         pcs::TreeVec,
     },
 };
@@ -44,11 +36,13 @@ use processor::{ProcessorComponent, ProcessorEval};
 pub mod addition;
 pub mod bytes;
 pub(crate) mod constraints_utils;
+pub mod deletion;
 pub mod insertions;
 pub mod less_than;
 pub mod order_match;
 pub mod partial_order_match;
 pub mod poseidon;
+
 pub mod processor;
 pub(crate) mod trace_utils;
 pub use trace_utils::is_first;
@@ -75,7 +69,7 @@ pub struct Claim<T: TraceSize> {
 
 impl<T: TraceSize> Claim<T> {
     pub const fn new(log_size: u32) -> Self {
-        _ = T::ASSERT;
+        T::ASSERT;
 
         Self {
             log_size,
@@ -118,7 +112,7 @@ pub struct InteractionClaim<T: TraceSize> {
 
 impl<T: TraceSize> InteractionClaim<T> {
     pub const fn new(claimed_sum: SecureField) -> Self {
-        let _ = T::ASSERT;
+        T::ASSERT;
 
         Self {
             claimed_sum,
@@ -163,32 +157,6 @@ impl VexInteractionElements {
     }
 }
 
-/// Generate IsReal column.
-/// For any given number of inputs, the size of the column is next power of two.
-/// The First `padding_offset` elements are set to 1; the rest are set to 0.
-pub fn is_real_col(padding_offset: usize) -> BaseColumn {
-    let log_size = (padding_offset - 1).ilog2() + 1;
-    let mut is_real = BaseColumn::zeros(1 << log_size);
-    for vec_row in 0..1 << (log_size - LOG_N_LANES) {
-        let row_offset = vec_row * N_LANES;
-        if padding_offset <= row_offset {
-            is_real.data[vec_row] = PackedBaseField::zero();
-            continue;
-        }
-        if padding_offset >= row_offset + N_LANES {
-            is_real.data[vec_row] = PackedBaseField::one();
-            continue;
-        }
-
-        let mut res = [BaseField::zero(); N_LANES];
-        for v in res.iter_mut().take(padding_offset - row_offset) {
-            *v = BaseField::one();
-        }
-        is_real.data[vec_row] = PackedBaseField::from_array(res);
-    }
-    is_real
-}
-
 /// VexComponents is the main struct that holds all the components of the system.
 pub struct VexComponents {
     processor: ProcessorComponent,
@@ -199,11 +167,11 @@ pub struct VexComponents {
     less_than: LessThanComponent,
     add_component: AddComponent,
     bytes: BytesComponent,
-    buy_aggressive_match: BuyAgessiveMatchComponent,
+    buy_aggressive_match: BuyAggressiveMatchComponent,
     sell_aggressive_match: SellAggressiveMatchComponent,
     buy_passive_match: BuyPassiveMatchComponent,
     sell_passive_match: SellPassiveMatchComponent,
-    buy_aggressive_partial_match: BuyAgessivePartialMatchComponent,
+    buy_aggressive_partial_match: BuyAggressivePartialMatchComponent,
     sell_aggressive_partial_match: SellAggressivePartialMatchComponent,
     buy_passive_partial_match: BuyPassivePartialMatchComponent,
     sell_passive_partial_match: SellPassivePartialMatchComponent,
@@ -307,7 +275,7 @@ impl VexComponents {
             interaction_claim.sell_insert_interaction_claim.claimed_sum,
         );
 
-        let buy_aggressive_match = BuyAgessiveMatchComponent::new(
+        let buy_aggressive_match = BuyAggressiveMatchComponent::new(
             tree_span_provider,
             MatchEval {
                 claim: claim.buy_aggressive_match_claim.clone(),
@@ -371,7 +339,7 @@ impl VexComponents {
                 .claimed_sum,
         );
 
-        let buy_aggressive_partial_match = BuyAgessivePartialMatchComponent::new(
+        let buy_aggressive_partial_match = BuyAggressivePartialMatchComponent::new(
             tree_span_provider,
             PartialMatchEval {
                 claim: claim.buy_aggressive_partial_match_claim.clone(),
@@ -518,23 +486,4 @@ pub enum VexComponent {
 
     /// Main Processor Component
     Processor,
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-    use stwo_prover::core::fields::m31::M31;
-
-    #[test]
-    fn test_is_real() {
-        let n_rows = 1179;
-        let is_real = is_real_col(n_rows);
-        assert_eq!(is_real.data.len(), 2048 / 16);
-        for i in 0..n_rows {
-            assert_eq!(is_real.as_slice()[i], M31::one());
-        }
-        for i in n_rows..2048 {
-            assert_eq!(is_real.as_slice()[i], M31::zero());
-        }
-    }
 }

@@ -1,5 +1,4 @@
-use crate::components::TraceSize;
-use itertools::izip;
+use itertools::{chain, izip, max};
 use num_traits::{One, Zero};
 use std::array;
 use stwo_prover::core::{
@@ -11,18 +10,18 @@ use super::{
     instruction::{InstructionColumn, Opcode, N_INSTRUCTION_FELTS},
     state::StateFelts,
 };
+
 use crate::{
     components::{
         addition::AddColumn,
         bytes::ByteOperations,
         less_than::{LessThanColumn, LessThanOperations},
         poseidon::{PoseidonOperations, N_INSTANCES_PER_ROW},
-        VexComponent,
+        TraceSize, VexComponent,
     },
     imt::{error::IMTError, LeafFelts, N_U64_FELTS},
     types::N_U64_LIMBS,
 };
-use itertools::{chain, max, Itertools};
 
 pub type Instructions<F> = Vec<[F; N_INSTRUCTION_FELTS]>;
 pub type InstructionFelts<F> = [F; N_INSTRUCTION_FELTS];
@@ -161,6 +160,8 @@ impl ExecutionTrace<BaseField> {
         self.instructions.push(instruction);
     }
 
+    /// The following methods will take input as an event
+    /// and compute the corresponding Trace Row For constraint evaluations
     /// Adds an Add Event to the Execution Trace
     pub fn add_add_event(
         &mut self,
@@ -168,10 +169,6 @@ impl ExecutionTrace<BaseField> {
         b: [BaseField; N_U64_LIMBS],
     ) -> Result<(), IMTError> {
         let mut row = [BaseField::zero(); AddColumn::MAIN_COLS];
-
-        // Copy input operands a and b into the trace row
-        row[AddColumn::A..AddColumn::B].copy_from_slice(&a);
-        row[AddColumn::B..AddColumn::C].copy_from_slice(&b);
 
         let mut carry = [BaseField::zero(); N_U64_LIMBS - 1];
         let mut c = [BaseField::zero(); N_U64_LIMBS];
@@ -184,7 +181,6 @@ impl ExecutionTrace<BaseField> {
                 } else {
                     BaseField::zero()
                 });
-            c[i] = sum; // Store result of addition
 
             if sum > BaseField::from(255) {
                 c[i] = sum - BaseField::from(256);
@@ -194,11 +190,12 @@ impl ExecutionTrace<BaseField> {
                 carry[i] = BaseField::zero();
             }
         }
-        c[7] = if a[7] + b[7] + carry[6] > BaseField::from(255) {
-            a[7] + b[7] + carry[6] - BaseField::from(256)
-        } else {
-            a[7] + b[7] + carry[6]
-        };
+        // Compute the final limb
+        let last_sum = a[7] + b[7] + carry[6];
+        c[7] = last_sum;
+        if c[7] > BaseField::from(255) {
+            return Err(IMTError::AdditionOverflow);
+        }
 
         // Dispatch range check events in the same order as in constraints.rs
         let values: Vec<BaseField> = chain!(a.into_iter(), b.into_iter(), c.into_iter()).collect();
@@ -208,8 +205,9 @@ impl ExecutionTrace<BaseField> {
             self.add_range_check_u8_event(values[i].0, values[i + 1].0)?;
             self.add_range_check_u8_event(values[i + 2].0, values[i + 3].0)?;
         }
-
-        // Copy computed c and carry values into the row
+        // Copy input operands a and b ,computed c and carry values into the row
+        row[AddColumn::A..AddColumn::B].copy_from_slice(&a);
+        row[AddColumn::B..AddColumn::C].copy_from_slice(&b);
         row[AddColumn::C..AddColumn::CARRY].copy_from_slice(&c);
         row[AddColumn::CARRY..AddColumn::IS_REAL].copy_from_slice(&carry);
 
@@ -217,7 +215,6 @@ impl ExecutionTrace<BaseField> {
         row[AddColumn::IS_REAL] = BaseField::one();
 
         self.add_operations.push(row);
-
         Ok(())
     }
 
@@ -246,32 +243,40 @@ impl ExecutionTrace<BaseField> {
         self.comparison_operations.push(event);
     }
 
-    /// Adds a Poseidon Event by recording the corresponding Trace Row
+    /// Adds a Poseidon hash operation for a Merkle tree node
+    ///
+    /// This hashes two child nodes together, each represented by 8 BaseField elements
     pub fn add_merkle_hash_event(&mut self, a: [BaseField; 8], b: [BaseField; 8]) {
-        self.poseidon_operations.push(
-            chain!(a, b, [BaseField::one()])
-                .collect_vec()
-                .try_into()
-                .unwrap(),
-        );
+        let mut input = [BaseField::zero(); 17];
+        input[0..8].copy_from_slice(&a);
+        input[8..16].copy_from_slice(&b);
+        input[16] = BaseField::one(); // Selector for Merkle hash operation
+
+        self.poseidon_operations.push(input);
     }
 
-    /// Add a Leaf Hash Event
+    /// Adds a Poseidon hash operation for a leaf node
+    ///
+    /// # Arguments
+    /// * `leaf_felts` - The field elements representing the leaf data
     pub fn add_leaf_hash_event(&mut self, leaf_felts: &LeafFelts<BaseField>) {
-        // @todo: The Hash Function is not implemented.
-        // Only the first 16 elements are taken into account
-        self.poseidon_operations.push(
-            chain!(leaf_felts[0..16].iter().cloned(), [BaseField::one()])
-                .collect_vec()
-                .try_into()
-                .unwrap(),
-        );
+        let mut input = [BaseField::zero(); 17];
+
+        // Only the first 16 elements are used in the hash
+        for (i, value) in leaf_felts[0..16].iter().enumerate() {
+            input[i] = *value;
+        }
+
+        input[16] = BaseField::one(); // Selector for leaf hash operation
+        self.poseidon_operations.push(input);
     }
 
     /// Adds a Less Than U8 Event by recording the corresponding Trace Row
     /// Returns an error if a or b is greater than 255
     pub fn add_less_than_u8_event(&mut self, a: u32, b: u32) -> Result<(), IMTError> {
-        assert!(a < 256 && b < 256, "Invalid U8 Pair");
+        if a >= 256 || b >= 256 {
+            return Err(IMTError::InvalidU8Pair(a, b));
+        }
         let offset = (a << 8) + b;
         self.byte_operations[0].as_mut_slice()[offset as usize].0 += 1;
         Ok(())
@@ -419,7 +424,6 @@ impl ExecutionTrace<BaseField> {
 ///
 /// let trace = ExecutionTrace::new();
 /// let shape = trace.sizes();
-/// let log_shape = trace.log_sizes();
 /// ```
 #[derive(Debug)]
 pub struct ExecutionTraceShape<T: Copy> {
@@ -468,32 +472,6 @@ impl<F> ExecutionTrace<F> {
             strict_less_than_operations: self.strict_less_than_operations.len(),
             comparison_operations: self.comparison_operations.len(),
             poseidon_operations: self.poseidon_operations.len(),
-        }
-    }
-
-    pub fn log_sizes(&self) -> ExecutionTraceShape<u32> {
-        ExecutionTraceShape {
-            buy_insert_order: (self.buy_insert_order.len() - 1).ilog2() + 1,
-            buy_delete_order: (self.buy_delete_order.len() - 1).ilog2() + 1,
-            buy_modify_order: (self.buy_modify_order.len() - 1).ilog2() + 1,
-            buy_aggressive_match: (self.buy_aggressive_match.len() - 1).ilog2() + 1,
-            buy_passive_match: (self.buy_passive_match.len() - 1).ilog2() + 1,
-            buy_aggressive_partial_match: (self.buy_aggressive_partial_match.len() - 1).ilog2() + 1,
-            buy_passive_partial_match: (self.buy_passive_partial_match.len() - 1).ilog2() + 1,
-            sell_insert_order: (self.sell_insert_order.len() - 1).ilog2() + 1,
-            sell_delete_order: (self.sell_delete_order.len() - 1).ilog2() + 1,
-            sell_modify_order: (self.sell_modify_order.len() - 1).ilog2() + 1,
-            sell_aggressive_match: (self.sell_aggressive_match.len() - 1).ilog2() + 1,
-            sell_passive_match: (self.sell_passive_match.len() - 1).ilog2() + 1,
-            sell_aggressive_partial_match: (self.sell_aggressive_partial_match.len() - 1).ilog2()
-                + 1,
-            sell_passive_partial_match: (self.sell_passive_partial_match.len() - 1).ilog2() + 1,
-            instructions: (self.instructions.len() - 1).ilog2() + 1,
-            add_operations: (self.add_operations.len() - 1).ilog2() + 1,
-            less_than_operations: (self.less_than_operations.len() - 1).ilog2() + 1,
-            strict_less_than_operations: (self.strict_less_than_operations.len() - 1).ilog2() + 1,
-            comparison_operations: (self.comparison_operations.len() - 1).ilog2() + 1,
-            poseidon_operations: (self.poseidon_operations.len() - 1).ilog2() + 1,
         }
     }
 }

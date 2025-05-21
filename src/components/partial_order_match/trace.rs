@@ -130,9 +130,11 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
     let leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] =
         array::from_fn(|i| &trace[InstructionColumn::LEAF + i].data);
 
-    let low_leaf_data = BaseColumn::zeros(1 << log_size).data;
+    let padded_len: usize = 1 << log_size;
+    let low_leaf_data = BaseColumn::zeros(padded_len).data;
     let mut low_leaf: [&Vec<PackedBaseField>; N_LEAF_FELTS] = array::from_fn(|_| &low_leaf_data);
-    let active = vec![PackedBaseField::one(); 1 << (log_size - LOG_N_LANES)];
+    let active_len: usize = 1 << (log_size - LOG_N_LANES);
+    let active = vec![PackedBaseField::one(); active_len];
     low_leaf[LeafColumn::ACTIVE] = &active;
     let low_price_time_cols = Leaf::<BaseField, S>::first_price_time_cols(log_size);
     for (i, col) in low_price_time_cols.iter().enumerate() {

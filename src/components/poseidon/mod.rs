@@ -1,13 +1,12 @@
 use itertools::Itertools;
 use num_traits::{One, Zero};
-use rayon::iter::IndexedParallelIterator;
-use rayon::iter::ParallelIterator;
-use rayon::slice::ParallelSlice;
-// use rayon::iter::{
-//     IndexedParallelIterator, IntoParallelIterator, IntoParallelRefIterator, ParallelIterator,
-// };
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    slice::ParallelSlice,
+};
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use stwo_prover::core::backend::simd::m31::N_LANES;
 use stwo_prover::{
     constraint_framework::{
         logup::LogupTraceGenerator, EvalAtRow, FrameworkComponent, FrameworkEval, Relation,
@@ -15,7 +14,7 @@ use stwo_prover::{
     },
     core::{
         backend::simd::{
-            m31::{PackedBaseField, LOG_N_LANES, N_LANES},
+            m31::{PackedBaseField, LOG_N_LANES},
             qm31::{PackedQM31, PackedSecureField},
             SimdBackend,
         },
@@ -238,7 +237,7 @@ pub fn interaction_trace(
 
     for rep_i in 0..N_INSTANCES_PER_ROW {
         let mut col_gen = logup_gen.new_col();
-        for vec_row in 0..1 << (log_size - LOG_N_LANES) {
+        for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
             // fetch the initial state and the final hash from the trace.
             let values: [PackedBaseField; N_ELEMENTS] = array::from_fn(|i| {
                 if i < 16 {
@@ -250,7 +249,7 @@ pub fn interaction_trace(
             let is_real = trace[N_COLUMNS_PER_REP * rep_i].data[vec_row];
             let denom0: PackedSecureField = poseidon_elements.combine(&values);
             // the multiplicity is negative as the output is "yielded".
-            col_gen.write_frac(vec_row, -PackedQM31::one() * (is_real), denom0);
+            col_gen.write_frac(vec_row, -PackedQM31::one() * is_real, denom0);
         }
         col_gen.finalize_col();
     }
@@ -282,7 +281,7 @@ mod tests {
     };
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, preprocessed_columns::IsFirst},
+        constraint_framework::{assert_constraints_on_polys, preprocessed_columns::IsFirst},
         core::{pcs::TreeVec, poly::circle::CanonicCoset},
     };
 
@@ -295,7 +294,7 @@ mod tests {
         let mut sell_imt = SellIMT::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 48;
+        let n = 1_000;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
@@ -329,7 +328,7 @@ mod tests {
             poseidon_elements,
             claim,
         };
-        assert_constraints(
+        assert_constraints_on_polys(
             &trace_polys,
             CanonicCoset::new(log_size),
             |eval| {
