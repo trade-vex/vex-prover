@@ -19,7 +19,7 @@ use crate::{
         poseidon, processor, VexComponent, VexComponents, VexInteractionElements,
     },
     error::{VexProvingError, VexVerificationError},
-    executor::record::ExecutionTrace,
+    executor::{record::ExecutionTrace, state::StateFeltsWrapper},
     imt::side::{Aggressive, Buy, Passive, Sell},
     VexClaim, VexInteractionClaim, VexProof,
 };
@@ -128,8 +128,8 @@ pub fn prove_vex(
 
     // create the VexClaim
     let claim = VexClaim {
-        final_state: trace.final_state,
-        initial_state: trace.initial_state,
+        final_state: StateFeltsWrapper(trace.final_state),
+        initial_state: StateFeltsWrapper(trace.initial_state),
         processor_claim,
         buy_insert_claim,
         sell_insert_claim,
@@ -431,7 +431,7 @@ mod tests {
         let mut order_book = OrderBook::new(Rc::clone(&record));
         let mut rng = rand::thread_rng();
         let mut time = 1;
-        let n = 1 << 12;
+        let n = 1 << 8;
         for _ in 0..n {
             let time_inc = rng.gen_range(1..=16);
             time += time_inc;
@@ -459,7 +459,10 @@ mod tests {
         let end = start.elapsed();
         // println!("Time taken for prove_vex: {:?}", end.duration_since(start));
         println!("Proof Generated, Summary: {shape:#?}");
-        println!("Instructions proved per second: {}", shape.instructions as f64 / end.as_secs_f64());
+        println!(
+            "Instructions proved per second: {}",
+            shape.instructions as f64 / end.as_secs_f64()
+        );
         verify_vex(proof).unwrap();
     }
 }

@@ -1,7 +1,7 @@
 #![feature(btree_cursors, portable_simd, iter_array_chunks)]
 #![feature(trait_upcasting)]
 
-use crate::executor::state::StateFelts;
+use crate::executor::state::StateFeltsWrapper;
 use components::{
     addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn,
     less_than::LessThanColumn, order_match::MatchColumn, partial_order_match::PartialMatchColumn,
@@ -10,11 +10,12 @@ use components::{
 use executor::state::StateElements;
 use imt::side::{Aggressive, Passive};
 use num_traits::Zero;
+use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::Relation,
     core::{
         channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
+        fields::{qm31::SecureField, FieldExpOps},
         pcs::TreeVec,
         prover::StarkProof,
         vcs::ops::MerkleHasher,
@@ -32,7 +33,7 @@ pub mod prover;
 pub mod relation_tracker;
 pub mod types;
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct VexProof<H: MerkleHasher> {
     pub stark_proof: StarkProof<H>,
     pub claim: VexClaim,
@@ -42,11 +43,12 @@ pub struct VexProof<H: MerkleHasher> {
 /// Claim for the Vex Prover
 /// Claim containts public inputs, initial state, final state and all the components
 /// and LogSizes for each component
+#[derive(Serialize, Deserialize)]
 pub struct VexClaim {
     /// The Initial State of the Matching Engine
-    pub initial_state: StateFelts<BaseField>,
+    pub initial_state: StateFeltsWrapper,
     /// The Final State of the Matching Engine
-    pub final_state: StateFelts<BaseField>,
+    pub final_state: StateFeltsWrapper,
     /// processor claim
     pub processor_claim: Claim<ProcessorColumn>,
     /// buy insert claim
@@ -182,6 +184,7 @@ impl std::fmt::Debug for VexClaim {
 
 /// Interaction Claim for the Vex Prover
 /// Contains LogUp Sum for each component
+#[derive(Serialize, Deserialize)]
 pub struct VexInteractionClaim {
     /// Processor component interaction claim
     pub processor_interaction_claim: InteractionClaim<ProcessorColumn>,
@@ -277,8 +280,8 @@ impl VexInteractionClaim {
     /// Returns the logup sum of all components and yields the initial state and final state
     /// This Must be Zero if all the lookups were correct
     pub fn logup_sum(&self, claim: &VexClaim, state_elements: &StateElements) -> SecureField {
-        let initial_state_comb: SecureField = state_elements.combine(&claim.initial_state);
-        let final_state_comb: SecureField = state_elements.combine(&claim.final_state);
+        let initial_state_comb: SecureField = state_elements.combine(&claim.initial_state.0);
+        let final_state_comb: SecureField = state_elements.combine(&claim.final_state.0);
         self.components_logup_sum() + final_state_comb.inverse() - initial_state_comb.inverse()
     }
 }

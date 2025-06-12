@@ -190,6 +190,36 @@ implement_field_array_type!(Price);
 implement_field_array_type!(Time);
 implement_field_array_type!(Volume);
 
+pub mod m31_array_serde {
+    use super::M31;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S>(arr: &[M31; 34], serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        arr.iter()
+            .map(|m| m.0)
+            .collect::<Vec<u32>>()
+            .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<[M31; 34], D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let vec = <Vec<u32>>::deserialize(deserializer)?;
+        if vec.len() != 34 {
+            return Err(serde::de::Error::custom("Expected 34 elements"));
+        }
+        let mut arr = [M31(0); 34];
+        for (i, v) in vec.into_iter().enumerate() {
+            arr[i] = M31(v);
+        }
+        Ok(arr)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::u64::MAX;

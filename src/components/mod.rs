@@ -10,6 +10,7 @@ use partial_order_match::{
     BuyAgessivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
     SellAggressivePartialMatchComponent, SellPassivePartialMatchComponent,
 };
+use serde::{Deserialize, Serialize};
 use stwo_prover::{
     constraint_framework::TraceLocationAllocator,
     core::{
@@ -67,7 +68,7 @@ pub trait TraceSize {
 }
 
 /// Generic Claim to implement for claims each component
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct Claim<T: TraceSize> {
     pub log_size: u32,
     _marker: PhantomData<T>,
@@ -110,7 +111,7 @@ impl<T: TraceSize> Claim<T> {
 
 /// Generic InteractionClaim to implement for interaction claims each component
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
 pub struct InteractionClaim<T: TraceSize> {
     pub claimed_sum: SecureField,
     _marker: PhantomData<T>,

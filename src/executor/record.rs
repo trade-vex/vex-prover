@@ -1,6 +1,7 @@
 use crate::components::TraceSize;
 use itertools::izip;
 use num_traits::{One, Zero};
+use serde::{Deserialize, Serialize};
 use std::array;
 use stwo_prover::core::{
     backend::{simd::column::BaseColumn, Column},
@@ -494,6 +495,108 @@ impl<F> ExecutionTrace<F> {
             strict_less_than_operations: (self.strict_less_than_operations.len() - 1).ilog2() + 1,
             comparison_operations: (self.comparison_operations.len() - 1).ilog2() + 1,
             poseidon_operations: (self.poseidon_operations.len() - 1).ilog2() + 1,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct SerializableExecutionTrace {
+    pub buy_insert_order: Vec<Vec<u32>>,
+    pub buy_delete_order: Vec<Vec<u32>>,
+    pub buy_modify_order: Vec<Vec<u32>>,
+    pub buy_aggressive_match: Vec<Vec<u32>>,
+    pub buy_passive_match: Vec<Vec<u32>>,
+    pub buy_aggressive_partial_match: Vec<Vec<u32>>,
+    pub buy_passive_partial_match: Vec<Vec<u32>>,
+
+    pub sell_insert_order: Vec<Vec<u32>>,
+    pub sell_delete_order: Vec<Vec<u32>>,
+    pub sell_modify_order: Vec<Vec<u32>>,
+    pub sell_aggressive_match: Vec<Vec<u32>>,
+    pub sell_passive_match: Vec<Vec<u32>>,
+    pub sell_aggressive_partial_match: Vec<Vec<u32>>,
+    pub sell_passive_partial_match: Vec<Vec<u32>>,
+
+    pub instructions: Vec<Vec<u32>>,
+    pub add_operations: Vec<[u32; 32]>,
+    pub less_than_operations: Vec<Vec<u32>>, // flatten [BaseField; N] to Vec<u32>
+    pub strict_less_than_operations: Vec<Vec<u32>>,
+    pub comparison_operations: Vec<Vec<u32>>,
+    pub poseidon_operations: Vec<Vec<u32>>,
+    pub byte_operations: Vec<Vec<u32>>, // convert BaseColumn -> Vec<u32>
+    pub initial_state: Vec<u32>,
+    pub final_state: Vec<u32>,
+}
+
+impl From<&ExecutionTrace<BaseField>> for SerializableExecutionTrace {
+    fn from(trace: &ExecutionTrace<BaseField>) -> Self {
+        fn to_vec_of_u32<const N: usize>(input: &Vec<[BaseField; N]>) -> Vec<Vec<u32>> {
+            input
+                .iter()
+                .map(|arr| arr.iter().map(|f| f.0).collect())
+                .collect()
+        }
+
+        fn to_vec_u32_from_column(col: &BaseColumn) -> Vec<u32> {
+            col.data
+                .iter()
+                .flat_map(|packed| packed.to_array())
+                .map(|f| f.0)
+                .collect()
+        }
+
+        Self {
+            buy_insert_order: to_vec_of_u32(&trace.buy_insert_order),
+            buy_delete_order: to_vec_of_u32(&trace.buy_delete_order),
+            buy_modify_order: to_vec_of_u32(&trace.buy_modify_order),
+            buy_aggressive_match: to_vec_of_u32(&trace.buy_aggressive_match),
+            buy_passive_match: to_vec_of_u32(&trace.buy_passive_match),
+            buy_aggressive_partial_match: to_vec_of_u32(&trace.buy_aggressive_partial_match),
+            buy_passive_partial_match: to_vec_of_u32(&trace.buy_passive_partial_match),
+
+            sell_insert_order: to_vec_of_u32(&trace.sell_insert_order),
+            sell_delete_order: to_vec_of_u32(&trace.sell_delete_order),
+            sell_modify_order: to_vec_of_u32(&trace.sell_modify_order),
+            sell_aggressive_match: to_vec_of_u32(&trace.sell_aggressive_match),
+            sell_passive_match: to_vec_of_u32(&trace.sell_passive_match),
+            sell_aggressive_partial_match: to_vec_of_u32(&trace.sell_aggressive_partial_match),
+            sell_passive_partial_match: to_vec_of_u32(&trace.sell_passive_partial_match),
+
+            instructions: to_vec_of_u32(&trace.instructions),
+            add_operations: trace
+                .add_operations
+                .iter()
+                .map(|a| a.map(|f| f.0))
+                .collect(),
+
+            less_than_operations: trace
+                .less_than_operations
+                .iter()
+                .map(|arr| arr.iter().map(|f| f.0).collect())
+                .collect(),
+            strict_less_than_operations: trace
+                .strict_less_than_operations
+                .iter()
+                .map(|arr| arr.iter().map(|f| f.0).collect())
+                .collect(),
+            comparison_operations: trace
+                .comparison_operations
+                .iter()
+                .map(|a| a.iter().map(|f| f.0).collect::<Vec<u32>>())
+                .collect(),
+            poseidon_operations: trace
+                .poseidon_operations
+                .iter()
+                .map(|a| a.iter().map(|f| f.0).collect::<Vec<u32>>())
+                .collect(),
+            byte_operations: trace
+                .byte_operations
+                .iter()
+                .map(to_vec_u32_from_column)
+                .collect(),
+
+            initial_state: trace.initial_state.map(|f| f.0).to_vec(),
+            final_state: trace.final_state.map(|f| f.0).to_vec(),
         }
     }
 }

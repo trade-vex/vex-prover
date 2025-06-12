@@ -1,15 +1,20 @@
 use std::{array, fmt::Debug};
 
-use stwo_prover::{constraint_framework::EvalAtRow, relation};
+use serde::{Deserialize, Serialize};
+use stwo_prover::{constraint_framework::EvalAtRow, core::fields::m31::BaseField, relation};
 
 use crate::{
     executor::flatten_single,
     flatten,
     hash::N_HASH,
     imt::{Hash, PriceFelts, N_U64_FELTS},
+    types::m31_array_serde,
 };
 
 pub type StateFelts<F> = [F; N_STATE_FELTS];
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct StateFeltsWrapper(#[serde(with = "m31_array_serde")] pub [BaseField; 34]);
 
 pub const N_STATE_FELTS: usize = 1 // n
     + N_HASH // buy_root
@@ -19,7 +24,7 @@ pub const N_STATE_FELTS: usize = 1 // n
     + 1; // op_code
 
 /// State conists of root hashes and priority orders for Buy and Sell IMTs
-#[derive(Clone, Copy, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize)]
 pub struct State<F> {
     /// ith state
     pub n: F,

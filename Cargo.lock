@@ -1250,6 +1250,8 @@ dependencies = [
  "num-traits",
  "rand",
  "rayon",
+ "serde",
+ "serde_json",
  "stwo-air-utils",
  "stwo-prover",
  "test-log",
