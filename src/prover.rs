@@ -31,12 +31,9 @@ use crate::{
 use crate::relation_tracker::track_vex_relations;
 
 /// Generic prove function that works with any backend
-fn prove_vex_with_backend<B: Backend + PolyOps>(
+fn prove_vex_with_backend<B: Backend>(
     trace: ExecutionTrace<BaseField>,
-) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError>
-where
-    B: Backend,
-{
+) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError> {
     let _span = span!(Level::INFO, "Prove Vex (Generic)").entered();
 
     // default config
