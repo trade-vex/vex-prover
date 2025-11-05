@@ -2,7 +2,7 @@ use num_traits::Zero;
 use stwo_prover::{
     constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
     core::{
-        backend::simd::SimdBackend,
+        backend::{Backend, simd::SimdBackend},
         channel::Blake2sChannel,
         fields::m31::BaseField,
         pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
@@ -12,6 +12,9 @@ use stwo_prover::{
     },
 };
 use tracing::{span, Level};
+
+#[cfg(not(target_arch = "wasm32"))]
+use stwo_prover::core::backend::cuda::CudaBackend;
 
 use crate::{
     components::{
@@ -27,17 +30,20 @@ use crate::{
 #[cfg(feature = "relation-tracker")]
 use crate::relation_tracker::track_vex_relations;
 
-/// Prove the Vex Execution Trace
-pub fn prove_vex(
+/// Generic prove function that works with any backend
+fn prove_vex_with_backend<B: Backend + PolyOps>(
     trace: ExecutionTrace<BaseField>,
-) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError> {
-    let _span = span!(Level::INFO, "Prove Vex").entered();
+) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError>
+where
+    B: Backend,
+{
+    let _span = span!(Level::INFO, "Prove Vex (Generic)").entered();
 
     // default config
     let config = PcsConfig::default();
 
     // precompute twiddles for low degree polynomial extension
-    let twiddles = SimdBackend::precompute_twiddles(
+    let twiddles = B::precompute_twiddles(
         CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 2)
             .circle_domain()
             .half_coset,
@@ -46,7 +52,7 @@ pub fn prove_vex(
     // blake2s channel and commitment scheme used in merkle tree
     let channel = &mut Blake2sChannel::default();
     let mut commitment_scheme =
-        CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
+        CommitmentSchemeProver::<B, Blake2sMerkleChannel>::new(config, &twiddles);
 
     let span = span!(Level::INFO, "Preprocessed Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
@@ -337,7 +343,7 @@ pub fn prove_vex(
     let span = span!(Level::INFO, "Proof Generation").entered();
     let component_builder = VexComponents::new(&claim, &interaction_elements, &interaction_claim);
     let components = component_builder.provers();
-    let proof = prover::prove::<SimdBackend, _>(&components, channel, commitment_scheme)
+    let proof = prover::prove::<B, _>(&components, channel, commitment_scheme)
         .map_err(VexProvingError::Stark)?;
     span.exit();
 
@@ -346,6 +352,29 @@ pub fn prove_vex(
         interaction_claim,
         stark_proof: proof,
     })
+}
+
+/// Prove the Vex Execution Trace using SIMD backend
+pub fn prove_vex(
+    trace: ExecutionTrace<BaseField>,
+) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError> {
+    prove_vex_with_backend::<SimdBackend>(trace)
+}
+
+/// Prove the Vex Execution Trace using CUDA backend
+///
+/// # Requirements
+/// - CUDA Toolkit must be installed
+/// - NVIDIA GPU with compute capability 7.0 or higher recommended
+///
+/// # Performance
+/// CUDA backend provides significant performance improvements, typically 10-150x faster
+/// than SIMD backend depending on trace size. See NitrooZK-stwo benchmarks for details.
+#[cfg(not(target_arch = "wasm32"))]
+pub fn prove_vex_cuda(
+    trace: ExecutionTrace<BaseField>,
+) -> Result<VexProof<Blake2sMerkleHasher>, VexProvingError> {
+    prove_vex_with_backend::<CudaBackend>(trace)
 }
 
 /// Verify VexProof
@@ -460,6 +489,46 @@ mod tests {
         // println!("Time taken for prove_vex: {:?}", end.duration_since(start));
         println!("Proof Generated, Summary: {shape:#?}");
         println!("Instructions proved per second: {}", shape.instructions as f64 / end.as_secs_f64());
+        verify_vex(proof).unwrap();
+    }
+
+    #[test_log::test]
+    #[cfg(not(target_arch = "wasm32"))]
+    fn test_prove_cuda() {
+        // Execution Record
+        let span = span!(Level::INFO, "Generating Execution Record (CUDA)").entered();
+        let record = Rc::new(RefCell::new(ExecutionTrace::new()));
+        let mut order_book = OrderBook::new(Rc::clone(&record));
+        let mut rng = rand::thread_rng();
+        let mut time = 1;
+        let n = 1 << 12;
+        for _ in 0..n {
+            let time_inc = rng.gen_range(1..=16);
+            time += time_inc;
+            let buy_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
+            let sell_order = Order::new(
+                rng.gen_range(100000..10000000),
+                rng.gen_range(1000000..=1000990),
+                time,
+            );
+            order_book.place_buy_order(buy_order).unwrap();
+            order_book.place_sell_order(sell_order).unwrap();
+        }
+
+        let mut execution_trace =
+            std::mem::replace(&mut *record.borrow_mut(), ExecutionTrace::new());
+        execution_trace.final_state = order_book.state().to_felts();
+        span.exit();
+        let shape = execution_trace.sizes();
+        let start = std::time::Instant::now();
+        let proof = prove_vex_cuda(execution_trace).unwrap();
+        let end = start.elapsed();
+        println!("CUDA Proof Generated, Summary: {shape:#?}");
+        println!("CUDA Instructions proved per second: {}", shape.instructions as f64 / end.as_secs_f64());
         verify_vex(proof).unwrap();
     }
 }

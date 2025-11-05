@@ -7,8 +7,8 @@ edition = "2021"
 debug = 1
 
 [dependencies]
-stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad", features = ["parallel"] }
-stwo-air-utils = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad" }
+stwo-prover = { git = "https://github.com/AntChainOpenLabs/NitrooZK-stwo", rev = "6590e8b", features = ["parallel"] }
+stwo-air-utils = { git = "https://github.com/AntChainOpenLabs/NitrooZK-stwo", rev = "6590e8b" }
 tracing = "0.1"
 itertools = "0.12.0"
 num-traits = "0.2.19"
