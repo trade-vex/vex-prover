@@ -1,6 +1,13 @@
 #![feature(btree_cursors, portable_simd, iter_array_chunks)]
 #![feature(trait_upcasting)]
 
+#[cfg(feature = "jemalloc")]
+use tikv_jemallocator::Jemalloc;
+
+#[cfg(feature = "jemalloc")]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 use crate::executor::state::StateFelts;
 use components::{
     addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn,
