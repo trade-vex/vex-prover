@@ -1,5 +1,4 @@
 use num_traits::Zero;
-use rayon::join;
 use stwo_prover::{
     constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
     core::{
@@ -83,99 +82,31 @@ pub fn prove_vex(
 
     let span = span!(Level::INFO, "Main Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
-
-    // Parallelize trace generation using rayon::join
-    let (
-        (bytes_trace, bytes_claim),
-        (
-            (poseidon_trace, poseidon_claim),
-            (
-                (strict_less_than_trace, strict_less_than_claim),
-                (
-                    (less_than_trace, less_than_claim),
-                    (
-                        (add_trace, add_claim),
-                        (
-                            (processor_trace, processor_claim),
-                            (
-                                (buy_insert_trace, buy_insert_claim),
-                                (
-                                    (sell_insert_trace, sell_insert_claim),
-                                    (
-                                        (match_aggressive_buy_trace, buy_aggressive_match_claim),
-                                        (
-                                            (match_aggressive_sell_trace, sell_aggressive_match_claim),
-                                            (
-                                                (match_passive_buy_trace, buy_passive_match_claim),
-                                                (
-                                                    (match_passive_sell_trace, sell_passive_match_claim),
-                                                    (
-                                                        (partial_match_aggressive_buy_trace, buy_aggressive_partial_match_claim),
-                                                        (
-                                                            (partial_match_aggressive_sell_trace, sell_aggressive_partial_match_claim),
-                                                            (
-                                                                (partial_match_passive_buy_trace, buy_passive_partial_match_claim),
-                                                                (partial_match_passive_sell_trace, sell_passive_partial_match_claim),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    ) = join(
-        || bytes::trace(trace.byte_operations.clone()),
-        || join(
-            || poseidon::trace(trace.poseidon_operations),
-            || join(
-                || less_than::trace::<true>(trace.strict_less_than_operations),
-                || join(
-                    || less_than::trace::<false>(trace.less_than_operations),
-                    || join(
-                        || addition::trace(trace.add_operations),
-                        || join(
-                            || processor::trace(trace.instructions),
-                            || join(
-                                || insertions::trace::<Buy>(trace.buy_insert_order),
-                                || join(
-                                    || insertions::trace::<Sell>(trace.sell_insert_order),
-                                    || join(
-                                        || order_match::trace::<Buy, Aggressive>(trace.buy_aggressive_match),
-                                        || join(
-                                            || order_match::trace::<Sell, Aggressive>(trace.sell_aggressive_match),
-                                            || join(
-                                                || order_match::trace::<Buy, Passive>(trace.buy_passive_match),
-                                                || join(
-                                                    || order_match::trace::<Sell, Passive>(trace.sell_passive_match),
-                                                    || join(
-                                                        || partial_order_match::trace::<Buy, Aggressive>(trace.buy_aggressive_partial_match),
-                                                        || join(
-                                                            || partial_order_match::trace::<Sell, Aggressive>(trace.sell_aggressive_partial_match),
-                                                            || join(
-                                                                || partial_order_match::trace::<Buy, Passive>(trace.buy_passive_partial_match),
-                                                                || partial_order_match::trace::<Sell, Passive>(trace.sell_passive_partial_match),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    );
+    let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
+    let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations);
+    let (strict_less_than_trace, strict_less_than_claim) =
+        less_than::trace::<true>(trace.strict_less_than_operations);
+    let (less_than_trace, less_than_claim) = less_than::trace::<false>(trace.less_than_operations);
+    let (add_trace, add_claim) = addition::trace(trace.add_operations);
+    let (processor_trace, processor_claim) = processor::trace(trace.instructions);
+    let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
+    let (sell_insert_trace, sell_insert_claim) = insertions::trace::<Sell>(trace.sell_insert_order);
+    let (match_aggressive_buy_trace, buy_aggressive_match_claim) =
+        order_match::trace::<Buy, Aggressive>(trace.buy_aggressive_match);
+    let (match_aggressive_sell_trace, sell_aggressive_match_claim) =
+        order_match::trace::<Sell, Aggressive>(trace.sell_aggressive_match);
+    let (match_passive_buy_trace, buy_passive_match_claim) =
+        order_match::trace::<Buy, Passive>(trace.buy_passive_match);
+    let (match_passive_sell_trace, sell_passive_match_claim) =
+        order_match::trace::<Sell, Passive>(trace.sell_passive_match);
+    let (partial_match_aggressive_buy_trace, buy_aggressive_partial_match_claim) =
+        partial_order_match::trace::<Buy, Aggressive>(trace.buy_aggressive_partial_match);
+    let (partial_match_aggressive_sell_trace, sell_aggressive_partial_match_claim) =
+        partial_order_match::trace::<Sell, Aggressive>(trace.sell_aggressive_partial_match);
+    let (partial_match_passive_buy_trace, buy_passive_partial_match_claim) =
+        partial_order_match::trace::<Buy, Passive>(trace.buy_passive_partial_match);
+    let (partial_match_passive_sell_trace, sell_passive_partial_match_claim) =
+        partial_order_match::trace::<Sell, Passive>(trace.sell_passive_partial_match);
 
     // Extend the main trace with the components
     tree_builder.extend_evals(bytes_trace.clone());
@@ -232,182 +163,124 @@ pub fn prove_vex(
     let interaction_elements = VexInteractionElements::draw(channel);
 
     let mut tree_builder = commitment_scheme.tree_builder();
-
-    // Parallelize interaction trace generation using rayon::join
-    let (
-        (bytes_interaction_trace, bytes_interaction_claim),
-        (
-            (poseidon_interaction_trace, poseidon_interaction_claim),
-            (
-                (processor_interaction_trace, processor_interaction_claim),
-                (
-                    (strict_less_than_interaction_trace, strict_less_than_interaction_claim),
-                    (
-                        (less_than_interaction_trace, less_than_interaction_claim),
-                        (
-                            (add_interaction_trace, add_interaction_claim),
-                            (
-                                (buy_insert_interaction_trace, buy_insert_interaction_claim),
-                                (
-                                    (sell_insert_interaction_trace, sell_insert_interaction_claim),
-                                    (
-                                        (buy_aggressive_match_interaction_trace, buy_aggressive_match_interaction_claim),
-                                        (
-                                            (sell_aggressive_match_interaction_trace, sell_aggressive_match_interaction_claim),
-                                            (
-                                                (buy_passive_match_interaction_trace, buy_passive_match_interaction_claim),
-                                                (
-                                                    (sell_passive_match_interaction_trace, sell_passive_match_interaction_claim),
-                                                    (
-                                                        (buy_aggressive_partial_match_interaction_trace, buy_aggressive_partial_match_interaction_claim),
-                                                        (
-                                                            (sell_aggressive_partial_match_interaction_trace, sell_aggressive_partial_match_interaction_claim),
-                                                            (
-                                                                (buy_passive_partial_match_interaction_trace, buy_passive_partial_match_interaction_claim),
-                                                                (sell_passive_partial_match_interaction_trace, sell_passive_partial_match_interaction_claim),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
-    ) = join(
-        || bytes::interaction_trace(
-            &bytes_trace,
+    let (bytes_interaction_trace, bytes_interaction_claim) = bytes::interaction_trace(
+        &bytes_trace,
+        &interaction_elements.less_than_u8_elements,
+        &interaction_elements.range_check_u8_elements,
+    );
+    let (poseidon_interaction_trace, poseidon_interaction_claim) =
+        poseidon::interaction_trace(&poseidon_trace, &interaction_elements.poseidon_elements);
+    let (processor_interaction_trace, processor_interaction_claim) = processor::interaction_trace(
+        &processor_trace,
+        &interaction_elements.state_elements,
+        &interaction_elements.instruction_elements,
+    );
+    let (strict_less_than_interaction_trace, strict_less_than_interaction_claim) =
+        less_than::interaction_trace::<true, _>(
+            &strict_less_than_trace,
             &interaction_elements.less_than_u8_elements,
-            &interaction_elements.range_check_u8_elements,
-        ),
-        || join(
-            || poseidon::interaction_trace(&poseidon_trace, &interaction_elements.poseidon_elements),
-            || join(
-                || processor::interaction_trace(
-                    &processor_trace,
-                    &interaction_elements.state_elements,
-                    &interaction_elements.instruction_elements,
-                ),
-                || join(
-                    || less_than::interaction_trace::<true, _>(
-                        &strict_less_than_trace,
-                        &interaction_elements.less_than_u8_elements,
-                        &interaction_elements.strict_less_than_elements,
-                    ),
-                    || join(
-                        || less_than::interaction_trace::<false, _>(
-                            &less_than_trace,
-                            &interaction_elements.less_than_u8_elements,
-                            &interaction_elements.less_than_elements,
-                        ),
-                        || join(
-                            || addition::interaction_trace(
-                                &add_trace,
-                                &interaction_elements.range_check_u8_elements,
-                                &interaction_elements.add_elements,
-                            ),
-                            || join(
-                                || insertions::interaction_trace::<Buy>(
-                                    &buy_insert_trace,
-                                    &interaction_elements.poseidon_elements,
-                                    &interaction_elements.less_than_elements,
-                                    &interaction_elements.strict_less_than_elements,
-                                    &interaction_elements.instruction_elements,
-                                ),
-                                || join(
-                                    || insertions::interaction_trace::<Sell>(
-                                        &sell_insert_trace,
-                                        &interaction_elements.poseidon_elements,
-                                        &interaction_elements.less_than_elements,
-                                        &interaction_elements.strict_less_than_elements,
-                                        &interaction_elements.instruction_elements,
-                                    ),
-                                    || join(
-                                        || order_match::interaction_trace::<Buy, Aggressive>(
-                                            &match_aggressive_buy_trace,
-                                            &interaction_elements.poseidon_elements,
-                                            &interaction_elements.less_than_elements,
-                                            &interaction_elements.instruction_elements,
-                                            &interaction_elements.match_elements,
-                                        ),
-                                        || join(
-                                            || order_match::interaction_trace::<Sell, Aggressive>(
-                                                &match_aggressive_sell_trace,
-                                                &interaction_elements.poseidon_elements,
-                                                &interaction_elements.less_than_elements,
-                                                &interaction_elements.instruction_elements,
-                                                &interaction_elements.match_elements,
-                                            ),
-                                            || join(
-                                                || order_match::interaction_trace::<Buy, Passive>(
-                                                    &match_passive_buy_trace,
-                                                    &interaction_elements.poseidon_elements,
-                                                    &interaction_elements.less_than_elements,
-                                                    &interaction_elements.instruction_elements,
-                                                    &interaction_elements.match_elements,
-                                                ),
-                                                || join(
-                                                    || order_match::interaction_trace::<Sell, Passive>(
-                                                        &match_passive_sell_trace,
-                                                        &interaction_elements.poseidon_elements,
-                                                        &interaction_elements.less_than_elements,
-                                                        &interaction_elements.instruction_elements,
-                                                        &interaction_elements.match_elements,
-                                                    ),
-                                                    || join(
-                                                        || partial_order_match::interaction_trace::<Buy, Aggressive>(
-                                                            &partial_match_aggressive_buy_trace,
-                                                            &interaction_elements.poseidon_elements,
-                                                            &interaction_elements.less_than_elements,
-                                                            &interaction_elements.instruction_elements,
-                                                            &interaction_elements.match_elements,
-                                                            &interaction_elements.add_elements,
-                                                        ),
-                                                        || join(
-                                                            || partial_order_match::interaction_trace::<Sell, Aggressive>(
-                                                                &partial_match_aggressive_sell_trace,
-                                                                &interaction_elements.poseidon_elements,
-                                                                &interaction_elements.less_than_elements,
-                                                                &interaction_elements.instruction_elements,
-                                                                &interaction_elements.match_elements,
-                                                                &interaction_elements.add_elements,
-                                                            ),
-                                                            || join(
-                                                                || partial_order_match::interaction_trace::<Buy, Passive>(
-                                                                    &partial_match_passive_buy_trace,
-                                                                    &interaction_elements.poseidon_elements,
-                                                                    &interaction_elements.less_than_elements,
-                                                                    &interaction_elements.instruction_elements,
-                                                                    &interaction_elements.match_elements,
-                                                                    &interaction_elements.add_elements,
-                                                                ),
-                                                                || partial_order_match::interaction_trace::<Sell, Passive>(
-                                                                    &partial_match_passive_sell_trace,
-                                                                    &interaction_elements.poseidon_elements,
-                                                                    &interaction_elements.less_than_elements,
-                                                                    &interaction_elements.instruction_elements,
-                                                                    &interaction_elements.match_elements,
-                                                                    &interaction_elements.add_elements,
-                                                                ),
-                                                            ),
-                                                        ),
-                                                    ),
-                                                ),
-                                            ),
-                                        ),
-                                    ),
-                                ),
-                            ),
-                        ),
-                    ),
-                ),
-            ),
-        ),
+            &interaction_elements.strict_less_than_elements,
+        );
+    let (less_than_interaction_trace, less_than_interaction_claim) =
+        less_than::interaction_trace::<false, _>(
+            &less_than_trace,
+            &interaction_elements.less_than_u8_elements,
+            &interaction_elements.less_than_elements,
+        );
+    let (add_interaction_trace, add_interaction_claim) = addition::interaction_trace(
+        &add_trace,
+        &interaction_elements.range_check_u8_elements,
+        &interaction_elements.add_elements,
+    );
+    let (buy_insert_interaction_trace, buy_insert_interaction_claim) =
+        insertions::interaction_trace::<Buy>(
+            &buy_insert_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.strict_less_than_elements,
+            &interaction_elements.instruction_elements,
+        );
+    let (sell_insert_interaction_trace, sell_insert_interaction_claim) =
+        insertions::interaction_trace::<Sell>(
+            &sell_insert_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.strict_less_than_elements,
+            &interaction_elements.instruction_elements,
+        );
+    let (buy_aggressive_match_interaction_trace, buy_aggressive_match_interaction_claim) =
+        order_match::interaction_trace::<Buy, Aggressive>(
+            &match_aggressive_buy_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (sell_aggressive_match_interaction_trace, sell_aggressive_match_interaction_claim) =
+        order_match::interaction_trace::<Sell, Aggressive>(
+            &match_aggressive_sell_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (buy_passive_match_interaction_trace, buy_passive_match_interaction_claim) =
+        order_match::interaction_trace::<Buy, Passive>(
+            &match_passive_buy_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (sell_passive_match_interaction_trace, sell_passive_match_interaction_claim) =
+        order_match::interaction_trace::<Sell, Passive>(
+            &match_passive_sell_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+        );
+    let (
+        buy_aggressive_partial_match_interaction_trace,
+        buy_aggressive_partial_match_interaction_claim,
+    ) = partial_order_match::interaction_trace::<Buy, Aggressive>(
+        &partial_match_aggressive_buy_trace,
+        &interaction_elements.poseidon_elements,
+        &interaction_elements.less_than_elements,
+        &interaction_elements.instruction_elements,
+        &interaction_elements.match_elements,
+        &interaction_elements.add_elements,
+    );
+    let (
+        sell_aggressive_partial_match_interaction_trace,
+        sell_aggressive_partial_match_interaction_claim,
+    ) = partial_order_match::interaction_trace::<Sell, Aggressive>(
+        &partial_match_aggressive_sell_trace,
+        &interaction_elements.poseidon_elements,
+        &interaction_elements.less_than_elements,
+        &interaction_elements.instruction_elements,
+        &interaction_elements.match_elements,
+        &interaction_elements.add_elements,
+    );
+    let (buy_passive_partial_match_interaction_trace, buy_passive_partial_match_interaction_claim) =
+        partial_order_match::interaction_trace::<Buy, Passive>(
+            &partial_match_passive_buy_trace,
+            &interaction_elements.poseidon_elements,
+            &interaction_elements.less_than_elements,
+            &interaction_elements.instruction_elements,
+            &interaction_elements.match_elements,
+            &interaction_elements.add_elements,
+        );
+    let (
+        sell_passive_partial_match_interaction_trace,
+        sell_passive_partial_match_interaction_claim,
+    ) = partial_order_match::interaction_trace::<Sell, Passive>(
+        &partial_match_passive_sell_trace,
+        &interaction_elements.poseidon_elements,
+        &interaction_elements.less_than_elements,
+        &interaction_elements.instruction_elements,
+        &interaction_elements.match_elements,
+        &interaction_elements.add_elements,
     );
 
     tree_builder.extend_evals(bytes_interaction_trace);
