@@ -104,7 +104,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
+        self.claim.log_size + 3  // Raised to +3 for full batching of merkle operations
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
@@ -375,7 +375,48 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
             -mult,
             &values,
         ));
-        eval.finalize_logup();
+
+        // Finalize with full batching mapping relations to columns
+        // Relations added in order:
+        //   - Aggressive: less_than, add, match, 3×(leaf+20 merkle), instruction = 67 relations
+        //   - Passive: add, match, 3×(leaf+20 merkle), instruction = 66 relations
+        //
+        // Batching maps to:
+        //   - Aggressive: 25 columns (less_than, add, match, leaf_batch, 20 merkle_batch, instruction)
+        //   - Passive: 24 columns (add, match, leaf_batch, 20 merkle_batch, instruction)
+
+        let mut batch_sizes = vec![];
+        let mut col = 0;
+
+        // Add less_than for Aggressive
+        if T::MATCHTYPE == MatchType::Aggressive {
+            batch_sizes.push(col);
+            col += 1;
+        }
+
+        // Add add_elements
+        batch_sizes.push(col);
+        col += 1;
+
+        // Add match_elements
+        batch_sizes.push(col);
+        col += 1;
+
+        let leaf_col = col;
+        let merkle_start_col = col + 1;
+        let merkle_end_col = col + MERKLE_HEIGHT;
+
+        // For 3 merkle proofs, each adds 1 leaf + 20 merkle steps
+        for _ in 0..3 {
+            batch_sizes.push(leaf_col); // leaf hash -> batched leaf column
+            for mcol in merkle_start_col..=merkle_end_col {
+                batch_sizes.push(mcol); // merkle steps -> batched by level
+            }
+        }
+
+        batch_sizes.push(merkle_end_col + 1); // instruction
+
+        eval.finalize_logup_batched(&batch_sizes);
         eval
     }
 }
