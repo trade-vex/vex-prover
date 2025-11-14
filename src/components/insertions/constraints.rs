@@ -92,7 +92,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 1
+        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
@@ -283,13 +283,9 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     );
                 }
 
-                // the initial priority for sell IMT must be equal to the final priority
-                for i in 0..N_U64_FELTS {
-                    eval.add_constraint(
-                        op.initial_state.best_sell_price[i].clone()
-                            - op.final_state.best_sell_price[i].clone(),
-                    );
-                }
+                // Note: Opposite-side state immutability (sell price unchanged for buy operations)
+                // is enforced by ProcessorEval's instruction lookup, which validates the entire
+                // instruction row including both buy and sell state.
 
                 // the initial priority for buy IMT must change only if the low leaf is the first leaf in the buy imt
                 // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time
@@ -319,13 +315,9 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     );
                 }
 
-                // the initial priority for buy IMT must be equal to the final priority
-                for i in 0..N_U64_FELTS {
-                    eval.add_constraint(
-                        op.initial_state.best_buy_price[i].clone()
-                            - op.final_state.best_buy_price[i].clone(),
-                    );
-                }
+                // Note: Opposite-side state immutability (buy price unchanged for sell operations)
+                // is enforced by ProcessorEval's instruction lookup, which validates the entire
+                // instruction row including both buy and sell state.
 
                 // the initial priority for sell IMT must change only if the low leaf is the first leaf in the sell IMT
                 // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time

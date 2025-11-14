@@ -47,7 +47,7 @@ impl<const STRICT: bool> FrameworkEval for LessThanEval<STRICT> {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 1
+        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = LessThanOp::<E::F>::from_eval(&mut eval);

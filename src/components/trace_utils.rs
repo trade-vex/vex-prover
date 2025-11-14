@@ -140,3 +140,113 @@ pub fn add_interaction_col_batched<X: Relation<PackedBaseField, PackedSecureFiel
     }
     col_gen.finalize_col();
 }
+
+/// Descriptor for a single Merkle verification step
+/// Used for batching multiple Merkle steps into a single interaction column
+#[derive(Clone)]
+pub struct MerkleStep<'a> {
+    pub curr: Vec<&'a Vec<PackedBaseField>>,
+    pub sibling: Vec<&'a Vec<PackedBaseField>>,
+    pub hash: Vec<&'a Vec<PackedBaseField>>,
+    pub index_bit: &'a Vec<PackedBaseField>,
+    pub mult: PackedSecureField,
+}
+
+/// Batch multiple Merkle verification steps into a single interaction column
+/// This reduces the number of columns from N steps to N/4 columns (batches of 4)
+/// Uses common denominator technique: (a/b + c/d) = (ad + bc)/(bd)
+pub fn add_merkle_interaction_col_batched<X: Relation<PackedBaseField, PackedSecureField>>(
+    logup_gen: &mut LogupTraceGenerator,
+    batches: &[Vec<MerkleStep>],
+    is_real: &Vec<PackedBaseField>,
+    log_size: u32,
+    poseidon_elements: &X,
+) {
+    for batch in batches {
+        let mut col_gen = logup_gen.new_col();
+        for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
+            let mut numerator = PackedSecureField::zero();
+            let mut denominator = PackedSecureField::one();
+
+            for step in batch {
+                // Extract values for this Merkle step
+                let curr: Vec<PackedBaseField> = step.curr.iter().map(|col| col[vec_row]).collect();
+                let sibling: Vec<PackedBaseField> = step.sibling.iter().map(|col| col[vec_row]).collect();
+                let hash: Vec<PackedBaseField> = step.hash.iter().map(|col| col[vec_row]).collect();
+                let index_bit = step.index_bit[vec_row];
+
+                // Compute left/right based on index bit
+                let (mut left, right): (Vec<PackedBaseField>, Vec<PackedBaseField>) = curr
+                    .into_iter()
+                    .zip(sibling.into_iter())
+                    .map(|(a, b)| {
+                        let a_arr = a.to_array();
+                        let b_arr = b.to_array();
+                        let index_arr = index_bit.to_array();
+                        let mut left = [BaseField::zero(); N_LANES];
+                        let mut right = [BaseField::zero(); N_LANES];
+                        for i in 0..N_LANES {
+                            if index_arr[i] == BaseField::zero() {
+                                left[i] = a_arr[i];
+                                right[i] = b_arr[i];
+                            } else {
+                                left[i] = b_arr[i];
+                                right[i] = a_arr[i];
+                            }
+                        }
+                        (
+                            PackedBaseField::from_array(left),
+                            PackedBaseField::from_array(right),
+                        )
+                    })
+                    .unzip();
+
+                left.extend(right);
+                left.extend(hash);
+
+                // Combine into Poseidon lookup
+                let frac_denom = poseidon_elements.combine(&left);
+
+                // Accumulate using common denominator: (a/b + c/d) = (a*d + c*b)/(b*d)
+                // old_sum = numerator / denominator
+                // new_fraction = mult / frac_denom
+                // new_sum = (numerator * frac_denom + mult * denominator) / (denominator * frac_denom)
+                numerator = numerator * frac_denom.clone() + step.mult * denominator.clone();
+                denominator *= frac_denom;
+            }
+
+            col_gen.write_frac(vec_row, numerator * is_real[vec_row], denominator);
+        }
+        col_gen.finalize_col();
+    }
+}
+
+/// Batch multiple leaf hash interactions into a single column
+/// Similar to add_merkle_interaction_col_batched but for leaf hashes
+pub fn add_leaf_interaction_col_batched<X: Relation<PackedBaseField, PackedSecureField>>(
+    logup_gen: &mut LogupTraceGenerator,
+    batches: &[Vec<(Vec<&Vec<PackedBaseField>>, PackedSecureField)>],
+    is_real: &Vec<PackedBaseField>,
+    log_size: u32,
+    poseidon_elements: &X,
+) {
+    for batch in batches {
+        let mut col_gen = logup_gen.new_col();
+        for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
+            let mut numerator = PackedSecureField::zero();
+            let mut denominator = PackedSecureField::one();
+
+            for (cols, mult) in batch {
+                let values: Vec<PackedBaseField> = cols.iter().map(|col| col[vec_row]).collect();
+                let frac_denom = poseidon_elements.combine(&values);
+
+                // Accumulate using common denominator: (a/b + c/d) = (a*d + c*b)/(b*d)
+                numerator = numerator * frac_denom.clone() + *mult * denominator.clone();
+                denominator *= frac_denom;
+            }
+
+            col_gen.write_frac(vec_row, numerator * is_real[vec_row], denominator);
+        }
+        col_gen.finalize_col();
+    }
+}

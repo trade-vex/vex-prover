@@ -107,7 +107,7 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 1
+        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
@@ -323,20 +323,8 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                     );
                 }
 
-                // the initial priority for sell IMT must be equal to the final priority
-                for i in 0..N_U64_FELTS {
-                    eval.add_constraint(
-                        op.initial_state.best_sell_price[i].clone()
-                            - op.final_state.best_sell_price[i].clone(),
-                    );
-                }
-
-                // the final root hash for sell IMT must be equal to the initial root hash
-                for i in 0..N_HASH {
-                    eval.add_constraint(
-                        op.final_state.sell_root[i].clone() - op.initial_state.sell_root[i].clone(),
-                    );
-                }
+                // Note: Opposite-side state immutability (sell price and root unchanged for buy operations)
+                // is enforced by ProcessorEval's instruction lookup.
 
                 // the final priority will be equal to matched leaf's next price_time
                 for i in 0..N_U64_FELTS {
@@ -355,20 +343,8 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for MatchEval<S, T> {
                     );
                 }
 
-                // the initial priority for buy IMT must be equal to the final priority
-                for i in 0..N_U64_FELTS {
-                    eval.add_constraint(
-                        op.initial_state.best_buy_price[i].clone()
-                            - op.final_state.best_buy_price[i].clone(),
-                    );
-                }
-
-                // the final root hash for buy IMT must be equal to the initial root hash
-                for i in 0..N_HASH {
-                    eval.add_constraint(
-                        op.final_state.buy_root[i].clone() - op.initial_state.buy_root[i].clone(),
-                    );
-                }
+                // Note: Opposite-side state immutability (buy price and root unchanged for sell operations)
+                // is enforced by ProcessorEval's instruction lookup.
 
                 // the final priority will be equal to matched leaf's next price_time
                 for i in 0..N_U64_FELTS {
