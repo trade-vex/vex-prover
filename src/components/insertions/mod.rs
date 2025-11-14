@@ -5,10 +5,7 @@ use stwo_prover::{
 
 use crate::{
     executor::instruction::N_INSTRUCTION_FELTS,
-    imt::{
-        side::{Buy, Sell},
-        MERKLE_HEIGHT,
-    },
+    imt::side::{Buy, Sell},
 };
 
 use super::TraceSize;
@@ -35,20 +32,14 @@ impl TraceSize for InsertionsColumn {
     /// is_first column
     const PREPROCESSED_COLS: usize = 1;
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
-    /// number of poseidon hashes: 4 times for leaf hashes
-    ///     - 1 for low_merkle_proof
-    ///     - 1 for updated low_leaf
-    ///     - 1 for merkle_proof for inserted leaf
-    ///     - 1 for updated leaf
-    /// 4*MERKLE_HEIGHT for merkle paths verification
-    /// Total Poseidon Interactions: 4 + 4*MERKLE_HEIGHT
-    /// inserted time < low_time, low.next_time => 2 strict less than checks
-    /// inserted price checks for low and next => 1 strict and 1 non-strict less than checks
-    /// Total Strict Less Than Interactions: 3
-    /// Total Non Strict Less Than Interactions: 1
-    /// 1 column for yielding the final result
-    /// Total Columns: 4 + 4*MERKLE_HEIGHT + 3 + 1 + 1 = 4*MERKLE_HEIGHT + 9
-    const INTERACTION_COLS: usize = (4 * MERKLE_HEIGHT + 9) * SECURE_EXTENSION_DEGREE;
+    /// Interaction columns (fully batched for efficiency):
+    ///     - 4 less_than columns (2 strict time comparisons + 2 price comparisons)
+    ///     - 1 leaf_batch column (batches 4 leaf hash operations via common denominator)
+    ///     - MERKLE_HEIGHT merkle_batch columns (each batches 4 tree operations per level)
+    ///     - 1 instruction column (final state)
+    ///
+    /// Total Columns: 4 + 1 + MERKLE_HEIGHT + 1 = 4 + 1 + 20 + 1 = 26
+    const INTERACTION_COLS: usize = 26 * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]

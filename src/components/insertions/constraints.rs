@@ -92,7 +92,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
+        self.claim.log_size + 3  // Raised to +3 for full batching of merkle operations
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
@@ -372,7 +372,21 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             -mult,
             &values,
         ));
-        eval.finalize_logup();
+
+        // Finalize with full batching mapping 89 relations to 26 columns
+        let mut batch_sizes = vec![0, 1, 2, 3]; // relations 0-3 -> columns 0-3
+
+        // 4 merkle proofs, each with 1 leaf + 20 merkle steps
+        for _ in 0..4 {
+            batch_sizes.push(4); // leaf hash -> column 4 (batched)
+            for col in 5..=24 {
+                batch_sizes.push(col); // merkle steps -> columns 5-24 (batched)
+            }
+        }
+
+        batch_sizes.push(25); // instruction -> column 25
+
+        eval.finalize_logup_batched(&batch_sizes);
         eval
     }
 }
