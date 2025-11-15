@@ -1,4 +1,6 @@
 use num_traits::Zero;
+use std::collections::HashMap;
+use std::sync::Mutex;
 use stwo_prover::{
     constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
     core::{
@@ -51,29 +53,39 @@ pub fn prove_vex(
     let span = span!(Level::INFO, "Preprocessed Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
 
+    // Memoize is_first() calls to avoid recomputing for same log_size
+    let is_first_cache = Mutex::new(HashMap::new());
+    let get_is_first = |log_size: u32| {
+        let mut cache = is_first_cache.lock().unwrap();
+        cache
+            .entry(log_size)
+            .or_insert_with(|| is_first(log_size))
+            .clone()
+    };
+
     // Extend the preprocessed trace with the components
     tree_builder.extend_evals(bytes::preprocessed_trace());
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Poseidon)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::StrictLessThan)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::LessThan)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Addition)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Processor)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertBuyOrder)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertSellOrder)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveBuy)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveSell)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveBuy)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveSell)));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::Poseidon)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::StrictLessThan)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::LessThan)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::Addition)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::Processor)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::InsertBuyOrder)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::InsertSellOrder)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchAggressiveBuy)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchAggressiveSell)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchPassiveBuy)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchPassiveSell)));
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchAggressiveBuy),
     ));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchAggressiveSell),
     ));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchPassiveBuy),
     ));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchPassiveSell),
     ));
 
