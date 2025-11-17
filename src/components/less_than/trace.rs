@@ -7,17 +7,17 @@ use num_traits::Zero;
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use crate::components::IsFirst;
+use stwo_constraint_framework::{LogupTraceGenerator, Relation};
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
-    core::{
+    core::{fields::m31::BaseField, poly::circle::CanonicCoset, ColumnVec},
+    prover::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
             qm31::PackedSecureField,
             SimdBackend,
         },
-        fields::m31::BaseField,
         poly::{circle::CircleEvaluation, BitReversedOrder},
-        ColumnVec,
     },
 };
 use tracing::{debug, span, Level};

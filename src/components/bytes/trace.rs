@@ -5,20 +5,21 @@ use super::{
 use crate::components::{Claim, InteractionClaim};
 use std::{array, simd::u32x16};
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use crate::components::IsFirst;
+use stwo_constraint_framework::{LogupTraceGenerator, Relation};
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
     core::{
+        fields::m31::{BaseField, M31},
+        poly::circle::CanonicCoset,
+        ColumnVec,
+    },
+    prover::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
             qm31::PackedSecureField,
             SimdBackend,
         },
-        fields::m31::{BaseField, M31},
-        poly::{
-            circle::{CanonicCoset, CircleEvaluation},
-            BitReversedOrder,
-        },
-        ColumnVec,
+        poly::{circle::CircleEvaluation, BitReversedOrder},
     },
 };
 use tracing::{span, Level};
@@ -41,7 +42,7 @@ pub fn preprocessed_trace() -> ColumnVec<CircleEvaluation<SimdBackend, BaseField
     trace
         .iter_mut()
         .zip(values.chunks_exact(N_LANES))
-        .for_each(|(row, input)| {
+        .for_each(|(mut row, input)| {
             // a: higher bits
             *row[BytesPreProcessedColumn::A as usize] =
                 PackedBaseField::from_array(array::from_fn(|i| {

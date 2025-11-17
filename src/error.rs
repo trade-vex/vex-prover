@@ -1,4 +1,5 @@
-use stwo_prover::core::prover::{ProvingError, VerificationError};
+use stwo_prover::prover::ProvingError;
+use stwo_prover::core::verifier::VerificationError;
 
 use crate::imt::error::IMTError;
 use std::{

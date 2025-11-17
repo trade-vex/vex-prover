@@ -1,10 +1,8 @@
 use crate::types::N_U64_LIMBS;
 use std::array;
-use stwo_prover::{
-    constraint_framework::{EvalAtRow, FrameworkComponent},
-    core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
-    relation,
-};
+use stwo_constraint_framework::{EvalAtRow, FrameworkComponent};
+use stwo_constraint_framework::relation;
+use stwo_prover::core::fields::{m31::BaseField, qm31::SECURE_EXTENSION_DEGREE};
 
 use super::TraceSize;
 
@@ -104,10 +102,8 @@ relation!(AddElements, 24);
 mod tests {
     use constraints::AddEval;
     use rand::Rng;
-    use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
-        core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
-    };
+    use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
+    use stwo_prover::core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset};
     use trace::{interaction_trace, preprocessed_trace, trace};
     use tracing::{span, Level};
 

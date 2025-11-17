@@ -1,13 +1,13 @@
 use itertools::Itertools;
 use std::marker::PhantomData;
-use stwo_prover::constraint_framework::relation_tracker::{
+use stwo_constraint_framework::relation_tracker::{
     RelationSummary, RelationTrackerComponent,
 };
-use stwo_prover::constraint_framework::TraceLocationAllocator;
-use stwo_prover::core::backend::simd::SimdBackend;
-use stwo_prover::core::backend::BackendForChannel;
+use stwo_constraint_framework::TraceLocationAllocator;
 use stwo_prover::core::channel::MerkleChannel;
 use stwo_prover::core::pcs::CommitmentSchemeProver;
+use stwo_prover::prover::backend::simd::SimdBackend;
+use stwo_prover::prover::backend::BackendForChannel;
 use stwo_prover::core::poly::circle::CanonicCoset;
 use tracing::info;
 

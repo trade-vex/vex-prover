@@ -1,18 +1,36 @@
 use itertools::{chain, Itertools};
 use num_traits::{One, Zero};
+use stwo_constraint_framework::{LogupTraceGenerator, Relation};
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst, Relation},
-    core::{
+    core::{fields::m31::BaseField, poly::circle::CanonicCoset, ColumnVec},
+    prover::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
             qm31::PackedSecureField,
             SimdBackend,
         },
-        fields::m31::BaseField,
+        backend::{Col, Column},
         poly::{circle::CircleEvaluation, BitReversedOrder},
-        ColumnVec,
     },
 };
+
+// IsFirst: A column with `1` at the first position, and `0` elsewhere.
+// Copied from stwo examples since it's not exported from the main crate
+pub struct IsFirst {
+    log_size: u32,
+}
+
+impl IsFirst {
+    pub const fn new(log_size: u32) -> Self {
+        Self { log_size }
+    }
+
+    pub fn gen_column_simd(&self) -> CircleEvaluation<SimdBackend, BaseField, BitReversedOrder> {
+        let mut col = Col::<SimdBackend, BaseField>::zeros(1 << self.log_size);
+        col.set(0, BaseField::one());
+        CircleEvaluation::new(CanonicCoset::new(self.log_size).circle_domain(), col)
+    }
+}
 
 /// generate preprocessed column for is_first
 /// is_first is a column that is 1 for the first row and 0 for the rest

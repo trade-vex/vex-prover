@@ -1,7 +1,5 @@
-use stwo_prover::{
-    constraint_framework::FrameworkComponent,
-    core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
-};
+use stwo_constraint_framework::FrameworkComponent;
+use stwo_prover::core::fields::{m31::BaseField, qm31::SECURE_EXTENSION_DEGREE};
 
 use crate::{
     executor::instruction::N_INSTRUCTION_FELTS,
@@ -43,13 +41,13 @@ impl TraceSize for InsertionsColumn {
 }
 
 #[cfg(test)]
+use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
 mod tests {
     use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
     use constraints::InsertionsEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};

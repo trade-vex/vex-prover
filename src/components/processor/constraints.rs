@@ -1,6 +1,6 @@
 use crate::executor::{flatten_single, state::StateElements};
 use num_traits::One;
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
+use stwo_constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use crate::{
     components::Claim,

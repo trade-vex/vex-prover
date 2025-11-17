@@ -2,7 +2,7 @@ use num_traits::One;
 use std::array;
 
 use itertools::chain;
-use stwo_prover::constraint_framework::{EvalAtRow, RelationEntry};
+use stwo_constraint_framework::{EvalAtRow, RelationEntry};
 
 use crate::{
     hash::{N_HASH, N_STATE},

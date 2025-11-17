@@ -1,9 +1,8 @@
 use std::marker::PhantomData;
 
-use stwo_prover::{
-    constraint_framework::FrameworkComponent, core::fields::secure_column::SECURE_EXTENSION_DEGREE,
-    relation,
-};
+use stwo_constraint_framework::FrameworkComponent;
+use stwo_constraint_framework::relation;
+use stwo_prover::core::fields::qm31::SECURE_EXTENSION_DEGREE;
 
 use crate::{
     executor::instruction::N_INSTRUCTION_FELTS,
@@ -63,13 +62,13 @@ impl<T: OrderMatchType> TraceSize for MatchColumn<T> {
 relation!(MatchElements, 16);
 
 #[cfg(test)]
+use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
 mod tests {
     use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
     use constraints::MatchEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
         core::{
             channel::Blake2sChannel, fields::m31::BaseField, pcs::TreeVec,
             poly::circle::CanonicCoset,

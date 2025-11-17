@@ -10,10 +10,15 @@ use partial_order_match::{
     BuyAgessivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
     SellAggressivePartialMatchComponent, SellPassivePartialMatchComponent,
 };
+use stwo_constraint_framework::TraceLocationAllocator;
 use stwo_prover::{
-    constraint_framework::TraceLocationAllocator,
     core::{
-        air::{Component, ComponentProver},
+        air::Component,
+        channel::Channel,
+        fields::{m31::BaseField, qm31::SecureField},
+        pcs::TreeVec,
+    },
+    prover::{
         backend::{
             simd::{
                 column::BaseColumn,
@@ -22,9 +27,7 @@ use stwo_prover::{
             },
             Column,
         },
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
-        pcs::TreeVec,
+        ComponentProver,
     },
 };
 
@@ -49,7 +52,7 @@ pub mod partial_order_match;
 pub mod poseidon;
 pub mod processor;
 pub(crate) mod trace_utils;
-pub use trace_utils::is_first;
+pub use trace_utils::{is_first, IsFirst};
 
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {

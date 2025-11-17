@@ -2,9 +2,9 @@ use crate::components::TraceSize;
 use itertools::izip;
 use num_traits::{One, Zero};
 use std::array;
-use stwo_prover::core::{
-    backend::{simd::column::BaseColumn, Column},
-    fields::m31::BaseField,
+use stwo_prover::{
+    core::fields::m31::BaseField,
+    prover::backend::{simd::column::BaseColumn, Column},
 };
 
 use super::{

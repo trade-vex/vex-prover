@@ -1,6 +1,5 @@
-use stwo_prover::{
-    constraint_framework::FrameworkComponent, core::fields::secure_column::SECURE_EXTENSION_DEGREE,
-};
+use stwo_constraint_framework::FrameworkComponent;
+use stwo_prover::core::fields::qm31::SECURE_EXTENSION_DEGREE;
 
 use crate::executor::instruction::N_INSTRUCTION_FELTS;
 
@@ -29,13 +28,13 @@ impl TraceSize for ProcessorColumn {
 }
 
 #[cfg(test)]
+use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
 mod tests {
     use std::{cell::RefCell, rc::Rc};
 
     use constraints::ProcessorEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};

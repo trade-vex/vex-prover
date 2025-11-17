@@ -1,6 +1,8 @@
 use std::array;
 
-use stwo_prover::{constraint_framework::EvalAtRow, core::fields::m31::BaseField, relation};
+use stwo_constraint_framework::EvalAtRow;
+use stwo_constraint_framework::relation;
+use stwo_prover::core::fields::m31::BaseField;
 
 use crate::{
     hash::N_HASH,

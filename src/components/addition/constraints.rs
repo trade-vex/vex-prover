@@ -1,6 +1,6 @@
 use itertools::chain;
 use num_traits::One;
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
+use stwo_constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use super::{AddColumn, AddElements, AddOp};
 use crate::components::{bytes::RangeCheckU8Elements, Claim};

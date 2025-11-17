@@ -1,16 +1,21 @@
 use num_traits::Zero;
 use std::collections::HashMap;
 use std::sync::Mutex;
+use stwo_constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX};
 use stwo_prover::{
-    constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
     core::{
-        backend::simd::SimdBackend,
         channel::Blake2sChannel,
         fields::{m31::BaseField, qm31::SecureField},
-        pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
-        poly::circle::{CanonicCoset, PolyOps},
-        prover::{self, verify},
+        pcs::{CommitmentSchemeVerifier, PcsConfig},
+        poly::circle::CanonicCoset,
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
+        verifier::verify,
+    },
+    prover::{
+        self,
+        backend::simd::SimdBackend,
+        poly::circle::PolyOps,
+        CommitmentSchemeProver,
     },
 };
 use tracing::{span, Level};
@@ -57,6 +62,9 @@ pub fn prove_vex(
     let channel = &mut Blake2sChannel::default();
     let mut commitment_scheme =
         CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
+
+    // Store polynomial coefficients - required for constraint evaluation
+    commitment_scheme.set_store_polynomials_coefficients();
 
     let span = span!(Level::INFO, "Preprocessed Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();

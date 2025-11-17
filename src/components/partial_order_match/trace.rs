@@ -32,9 +32,11 @@ use rayon::{
 };
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use crate::components::IsFirst;
+use stwo_constraint_framework::LogupTraceGenerator;
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst},
-    core::{
+    core::{fields::m31::BaseField, poly::circle::CanonicCoset, ColumnVec},
+    prover::{
         backend::{
             simd::{
                 column::BaseColumn,
@@ -44,9 +46,7 @@ use stwo_prover::{
             },
             Column,
         },
-        fields::m31::BaseField,
         poly::{circle::CircleEvaluation, BitReversedOrder},
-        ColumnVec,
     },
 };
 use tracing::{debug, span, Level};

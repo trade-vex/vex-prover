@@ -10,7 +10,7 @@ use std::{array, marker::PhantomData};
 
 use itertools::{chain, Itertools};
 use num_traits::{One, Zero};
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
+use stwo_constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use crate::{
     components::{

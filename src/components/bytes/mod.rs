@@ -1,7 +1,8 @@
+use stwo_constraint_framework::preprocessed_columns::PreProcessedColumnId;
+use stwo_constraint_framework::relation;
 use stwo_prover::{
-    constraint_framework::preprocessed_columns::PreProcessedColumnId,
-    core::{backend::simd::column::BaseColumn, fields::secure_column::SECURE_EXTENSION_DEGREE},
-    relation,
+    core::fields::qm31::SECURE_EXTENSION_DEGREE,
+    prover::backend::simd::column::BaseColumn,
 };
 
 use super::TraceSize;
@@ -68,11 +69,11 @@ relation!(LessThanU8Elements, 3);
 relation!(RangeCheckU8Elements, 2);
 
 #[cfg(test)]
+use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
 mod tests {
     use constraints::BytesEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};

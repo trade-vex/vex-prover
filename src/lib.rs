@@ -1,6 +1,9 @@
 #![feature(btree_cursors, portable_simd, iter_array_chunks)]
 #![feature(trait_upcasting)]
 
+// The relation! macro from stwo-constraint-framework references `stwo` crate
+extern crate stwo_prover as stwo;
+
 #[cfg(feature = "jemalloc")]
 use tikv_jemallocator::Jemalloc;
 #[cfg(feature = "jemalloc")]
@@ -16,15 +19,13 @@ use components::{
 use executor::state::StateElements;
 use imt::side::{Aggressive, Passive};
 use num_traits::Zero;
-use stwo_prover::{
-    constraint_framework::Relation,
-    core::{
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
-        pcs::TreeVec,
-        prover::StarkProof,
-        vcs::ops::MerkleHasher,
-    },
+use stwo_constraint_framework::Relation;
+use stwo_prover::core::{
+    channel::Channel,
+    fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
+    pcs::TreeVec,
+    proof::StarkProof,
+    vcs::MerkleHasher,
 };
 
 pub mod components;

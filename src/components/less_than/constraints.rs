@@ -1,6 +1,6 @@
 use itertools::{chain, izip};
 use num_traits::{One, Zero};
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
+use stwo_constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use crate::components::{bytes::LessThanU8Elements, Claim};
 
