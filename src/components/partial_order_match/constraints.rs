@@ -258,10 +258,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         // eval low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.low_merkle_proof.clone(),
-            op.low_merkle_path.clone(),
-            low_leaf.clone(),
-            op.low_index.clone(),
+            &op.low_merkle_proof,
+            &op.low_merkle_path,
+            &low_leaf,
+            &op.low_index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -276,10 +276,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         // eval matched leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.merkle_path.clone(),
-            op.leaf.clone(),
-            op.index.clone(),
+            &op.merkle_proof,
+            &op.merkle_path,
+            &op.leaf,
+            &op.index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -291,10 +291,10 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
         // eval updated leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.updated_merkle_path.clone(),
-            updated_leaf,
-            op.index.clone(),
+            &op.merkle_proof,
+            &op.updated_merkle_path,
+            &updated_leaf,
+            &op.index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -311,8 +311,19 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                     );
                 }
 
-                // Note: Opposite-side state immutability (sell price and root unchanged for buy operations)
-                // is enforced by ProcessorEval's instruction lookup.
+                // Enforce opposite-side state immutability: sell state must not change for buy operations
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.sell_root[i].clone()
+                            - op.initial_state.sell_root[i].clone(),
+                    );
+                }
+                for i in 0..N_U64_FELTS {
+                    eval.add_constraint(
+                        op.final_state.best_sell_price[i].clone()
+                            - op.initial_state.best_sell_price[i].clone(),
+                    );
+                }
 
                 // the final priority of the buy side remains the same.
                 for i in 0..N_U64_FELTS {
@@ -331,8 +342,19 @@ impl<S: OrderSide, T: OrderMatchType> FrameworkEval for PartialMatchEval<S, T> {
                     );
                 }
 
-                // Note: Opposite-side state immutability (buy price and root unchanged for sell operations)
-                // is enforced by ProcessorEval's instruction lookup.
+                // Enforce opposite-side state immutability: buy state must not change for sell operations
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.buy_root[i].clone()
+                            - op.initial_state.buy_root[i].clone(),
+                    );
+                }
+                for i in 0..N_U64_FELTS {
+                    eval.add_constraint(
+                        op.final_state.best_buy_price[i].clone()
+                            - op.initial_state.best_buy_price[i].clone(),
+                    );
+                }
 
                 // the final priority of the sell side remains the same.
                 for i in 0..N_U64_FELTS {

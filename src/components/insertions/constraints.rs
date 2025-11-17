@@ -219,10 +219,10 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.low_merkle_proof.clone(),
-            op.low_merkle_path.clone(),
-            op.low_leaf.clone(),
-            op.low_index.clone(),
+            &op.low_merkle_proof,
+            &op.low_merkle_path,
+            &op.low_leaf,
+            &op.low_index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -231,10 +231,10 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval updated low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.low_merkle_proof.clone(),
-            op.updated_low_merkle_path.clone(),
-            updated_low_leaf,
-            op.low_index.clone(),
+            &op.low_merkle_proof,
+            &op.updated_low_merkle_path,
+            &updated_low_leaf,
+            &op.low_index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -253,20 +253,20 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval empty leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.merkle_path.clone(),
-            inactive_leaf,
-            op.index.clone(),
+            &op.merkle_proof,
+            &op.merkle_path,
+            &inactive_leaf,
+            &op.index,
             &self.poseidon_elements,
             mult.clone(),
         );
         // eval updated leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.updated_merkle_path.clone(),
-            op.leaf.clone(),
-            op.index.clone(),
+            &op.merkle_proof,
+            &op.updated_merkle_path,
+            &op.leaf,
+            &op.index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -283,9 +283,19 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     );
                 }
 
-                // Note: Opposite-side state immutability (sell price unchanged for buy operations)
-                // is enforced by ProcessorEval's instruction lookup, which validates the entire
-                // instruction row including both buy and sell state.
+                // Enforce opposite-side state immutability: sell state must not change for buy operations
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.sell_root[i].clone()
+                            - op.initial_state.sell_root[i].clone(),
+                    );
+                }
+                for i in 0..N_U64_FELTS {
+                    eval.add_constraint(
+                        op.final_state.best_sell_price[i].clone()
+                            - op.initial_state.best_sell_price[i].clone(),
+                    );
+                }
 
                 // the initial priority for buy IMT must change only if the low leaf is the first leaf in the buy imt
                 // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time
@@ -315,9 +325,19 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     );
                 }
 
-                // Note: Opposite-side state immutability (buy price unchanged for sell operations)
-                // is enforced by ProcessorEval's instruction lookup, which validates the entire
-                // instruction row including both buy and sell state.
+                // Enforce opposite-side state immutability: buy state must not change for sell operations
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.buy_root[i].clone()
+                            - op.initial_state.buy_root[i].clone(),
+                    );
+                }
+                for i in 0..N_U64_FELTS {
+                    eval.add_constraint(
+                        op.final_state.best_buy_price[i].clone()
+                            - op.initial_state.best_buy_price[i].clone(),
+                    );
+                }
 
                 // the initial priority for sell IMT must change only if the low leaf is the first leaf in the sell IMT
                 // if the priority of the leaf changes, it must be equal to the inserted leaf's price_time

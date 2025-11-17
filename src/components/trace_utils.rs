@@ -162,55 +162,75 @@ pub fn add_merkle_interaction_col_batched<X: Relation<PackedBaseField, PackedSec
     log_size: u32,
     poseidon_elements: &X,
 ) {
+    use crate::hash::{N_HASH, N_ELEMENTS};
+
     for batch in batches {
         let mut col_gen = logup_gen.new_col();
+        // Pre-allocate reusable buffers to avoid allocations in inner loops
+        let mut poseidon_values = Vec::with_capacity(N_ELEMENTS);
+        let mut reordered = Vec::with_capacity(N_ELEMENTS);
+
         for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
             let mut numerator = PackedSecureField::zero();
             let mut denominator = PackedSecureField::one();
 
             for step in batch {
-                // Extract values for this Merkle step
-                let curr: Vec<PackedBaseField> = step.curr.iter().map(|col| col[vec_row]).collect();
-                let sibling: Vec<PackedBaseField> = step.sibling.iter().map(|col| col[vec_row]).collect();
-                let hash: Vec<PackedBaseField> = step.hash.iter().map(|col| col[vec_row]).collect();
+                poseidon_values.clear();
+                reordered.clear();
+
                 let index_bit = step.index_bit[vec_row];
+                let index_arr = index_bit.to_array();
 
-                // Compute left/right based on index bit
-                let (mut left, right): (Vec<PackedBaseField>, Vec<PackedBaseField>) = curr
-                    .into_iter()
-                    .zip(sibling.into_iter())
-                    .map(|(a, b)| {
-                        let a_arr = a.to_array();
-                        let b_arr = b.to_array();
-                        let index_arr = index_bit.to_array();
-                        let mut left = [BaseField::zero(); N_LANES];
-                        let mut right = [BaseField::zero(); N_LANES];
-                        for i in 0..N_LANES {
-                            if index_arr[i] == BaseField::zero() {
-                                left[i] = a_arr[i];
-                                right[i] = b_arr[i];
-                            } else {
-                                left[i] = b_arr[i];
-                                right[i] = a_arr[i];
-                            }
+                // Compute left/right and collect directly into poseidon_values
+                // Avoiding intermediate Vec allocations
+                for i in 0..N_HASH {
+                    let curr_val = step.curr[i][vec_row];
+                    let sibling_val = step.sibling[i][vec_row];
+
+                    let curr_arr = curr_val.to_array();
+                    let sibling_arr = sibling_val.to_array();
+
+                    let mut left = [BaseField::zero(); N_LANES];
+                    let mut right = [BaseField::zero(); N_LANES];
+
+                    for lane in 0..N_LANES {
+                        if index_arr[lane] == BaseField::zero() {
+                            left[lane] = curr_arr[lane];
+                            right[lane] = sibling_arr[lane];
+                        } else {
+                            left[lane] = sibling_arr[lane];
+                            right[lane] = curr_arr[lane];
                         }
-                        (
-                            PackedBaseField::from_array(left),
-                            PackedBaseField::from_array(right),
-                        )
-                    })
-                    .unzip();
+                    }
 
-                left.extend(right);
-                left.extend(hash);
+                    poseidon_values.push(PackedBaseField::from_array(left));
+                    // Store right values temporarily - we'll add them after the loop
+                    poseidon_values.push(PackedBaseField::from_array(right));
+                }
+
+                // Now rearrange: we want all left values, then all right values, then hash
+                // Currently we have: [left0, right0, left1, right1, ...]
+                // We need: [left0, left1, ..., right0, right1, ..., hash0, hash1, ...]
+
+                // Add left values (even indices)
+                for i in (0..2*N_HASH).step_by(2) {
+                    reordered.push(poseidon_values[i]);
+                }
+
+                // Add right values (odd indices)
+                for i in (1..2*N_HASH).step_by(2) {
+                    reordered.push(poseidon_values[i]);
+                }
+
+                // Add hash values
+                for i in 0..N_HASH {
+                    reordered.push(step.hash[i][vec_row]);
+                }
 
                 // Combine into Poseidon lookup
-                let frac_denom = poseidon_elements.combine(&left);
+                let frac_denom = poseidon_elements.combine(&reordered);
 
                 // Accumulate using common denominator: (a/b + c/d) = (a*d + c*b)/(b*d)
-                // old_sum = numerator / denominator
-                // new_fraction = mult / frac_denom
-                // new_sum = (numerator * frac_denom + mult * denominator) / (denominator * frac_denom)
                 numerator = numerator * frac_denom.clone() + step.mult * denominator.clone();
                 denominator *= frac_denom;
             }
@@ -230,14 +250,23 @@ pub fn add_leaf_interaction_col_batched<X: Relation<PackedBaseField, PackedSecur
     log_size: u32,
     poseidon_elements: &X,
 ) {
+    use crate::hash::N_ELEMENTS;
+
     for batch in batches {
         let mut col_gen = logup_gen.new_col();
+        // Pre-allocate reusable buffer to avoid allocations in inner loop
+        let mut values = Vec::with_capacity(N_ELEMENTS);
+
         for vec_row in 0..(1 << (log_size - LOG_N_LANES)) {
             let mut numerator = PackedSecureField::zero();
             let mut denominator = PackedSecureField::one();
 
             for (cols, mult) in batch {
-                let values: Vec<PackedBaseField> = cols.iter().map(|col| col[vec_row]).collect();
+                values.clear();
+                // Reuse the buffer instead of creating a new Vec each iteration
+                for col in cols {
+                    values.push(col[vec_row]);
+                }
                 let frac_denom = poseidon_elements.combine(&values);
 
                 // Accumulate using common denominator: (a/b + c/d) = (a*d + c*b)/(b*d)

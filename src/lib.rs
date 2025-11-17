@@ -92,6 +92,7 @@ impl VexClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.bytes_claim.mix_into(channel);
         self.poseidon_claim.mix_into(channel);
+        // strict_less_than is unified into less_than, but keep in mix for now
         self.strict_less_than_claim.mix_into(channel);
         self.less_than_claim.mix_into(channel);
         self.add_claim.mix_into(channel);
@@ -114,6 +115,7 @@ impl VexClaim {
             [
                 self.bytes_claim.log_sizes(),
                 self.poseidon_claim.log_sizes(),
+                // strict_less_than is unified into less_than, but keep in log_sizes for now
                 self.strict_less_than_claim.log_sizes(),
                 self.less_than_claim.log_sizes(),
                 self.add_claim.log_sizes(),
@@ -230,6 +232,7 @@ impl VexInteractionClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.bytes_interaction_claim.mix_into(channel);
         self.poseidon_interaction_claim.mix_into(channel);
+        // Both claims use unified logic but are kept separate
         self.strict_less_than_interaction_claim.mix_into(channel);
         self.less_than_interaction_claim.mix_into(channel);
         self.add_interaction_claim.mix_into(channel);
