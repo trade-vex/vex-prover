@@ -13,19 +13,19 @@ use super::poseidon::PoseidonElements;
 
 pub fn eval_merkle_proof<E: EvalAtRow>(
     eval: &mut E,
-    proof: MerkleProof<E::F>,
-    path: MerklePath<E::F>,
-    leaf: LeafFelts<E::F>,
-    index_bits: IndexBits<E::F>,
+    proof: &MerkleProof<E::F>,
+    path: &MerklePath<E::F>,
+    leaf: &LeafFelts<E::F>,
+    index_bits: &IndexBits<E::F>,
     poseidon_elements: &PoseidonElements,
     mult: E::EF,
 ) {
     // evaluate leaf hash
-    let leaf: Vec<E::F> = leaf[0..N_STATE].into();
+    let leaf_vec: Vec<E::F> = leaf[0..N_STATE].into();
     eval.add_to_relation(RelationEntry::new(
         poseidon_elements,
         mult.clone(),
-        &chain!(leaf.iter().cloned(), path[0].clone().into_iter()).collect::<Vec<_>>(),
+        &chain!(leaf_vec.iter().cloned(), path[0].clone().into_iter()).collect::<Vec<_>>(),
     ));
 
     let mut curr = path[0].clone();

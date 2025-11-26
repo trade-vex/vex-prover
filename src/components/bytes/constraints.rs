@@ -50,7 +50,7 @@ impl FrameworkEval for BytesEval {
         LOG_SIZE
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        LOG_SIZE + 1
+        LOG_SIZE + 2  // Raised to +2 to match Poseidon and enable better batching
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         // Retrieve preprocessed columns

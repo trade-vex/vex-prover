@@ -5,6 +5,11 @@ edition = "2021"
 
 [profile.release]
 debug = 1
+lto = "fat"
+codegen-units = 1
+overflow-checks = false
+panic = "abort"
+strip = "debuginfo"
 
 [dependencies]
 stwo-prover = { git = "https://github.com/starkware-libs/stwo", rev = "a194fad", features = ["parallel"] }
@@ -13,6 +18,7 @@ tracing = "0.1"
 itertools = "0.12.0"
 num-traits = "0.2.19"
 rayon = "1.10.0"
+tikv-jemallocator = { version = "0.6.1", optional = true }
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
@@ -21,8 +27,18 @@ criterion = { version = "0.5", features = ["html_reports"] }
 test-log = { version = "0.2.15", features = ["trace"] }
 
 [features]
+default = ["jemalloc"]
 relation-tracker = []
+jemalloc = ["tikv-jemallocator"]
 
 [[bench]]
 name = "raw_insertions"
+harness = false
+
+[[bench]]
+name = "vex_baseline"
+harness = false
+
+[[bench]]
+name = "quick_baseline"
 harness = false

@@ -27,7 +27,7 @@ impl FrameworkEval for AddEval {
     /// Computes the maximum constraint degree bound
     /// This helps in polynomial commitment scheme and constraint verification
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 1
+        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
     }
 
     /// Evaluates constraints for an addition operation on a row.

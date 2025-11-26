@@ -92,7 +92,7 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 1
+        self.claim.log_size + 3  // Raised to +3 for full batching of merkle operations
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
@@ -219,10 +219,10 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.low_merkle_proof.clone(),
-            op.low_merkle_path.clone(),
-            op.low_leaf.clone(),
-            op.low_index.clone(),
+            &op.low_merkle_proof,
+            &op.low_merkle_path,
+            &op.low_leaf,
+            &op.low_index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -231,10 +231,10 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval updated low leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.low_merkle_proof.clone(),
-            op.updated_low_merkle_path.clone(),
-            updated_low_leaf,
-            op.low_index.clone(),
+            &op.low_merkle_proof,
+            &op.updated_low_merkle_path,
+            &updated_low_leaf,
+            &op.low_index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -253,20 +253,20 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
         // eval empty leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.merkle_path.clone(),
-            inactive_leaf,
-            op.index.clone(),
+            &op.merkle_proof,
+            &op.merkle_path,
+            &inactive_leaf,
+            &op.index,
             &self.poseidon_elements,
             mult.clone(),
         );
         // eval updated leaf's merkle proof
         eval_merkle_proof(
             &mut eval,
-            op.merkle_proof.clone(),
-            op.updated_merkle_path.clone(),
-            op.leaf.clone(),
-            op.index.clone(),
+            &op.merkle_proof,
+            &op.updated_merkle_path,
+            &op.leaf,
+            &op.index,
             &self.poseidon_elements,
             mult.clone(),
         );
@@ -283,11 +283,17 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     );
                 }
 
-                // the initial priority for sell IMT must be equal to the final priority
+                // Enforce opposite-side state immutability: sell state must not change for buy operations
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.sell_root[i].clone()
+                            - op.initial_state.sell_root[i].clone(),
+                    );
+                }
                 for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.best_sell_price[i].clone()
-                            - op.final_state.best_sell_price[i].clone(),
+                        op.final_state.best_sell_price[i].clone()
+                            - op.initial_state.best_sell_price[i].clone(),
                     );
                 }
 
@@ -319,11 +325,17 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
                     );
                 }
 
-                // the initial priority for buy IMT must be equal to the final priority
+                // Enforce opposite-side state immutability: buy state must not change for sell operations
+                for i in 0..N_HASH {
+                    eval.add_constraint(
+                        op.final_state.buy_root[i].clone()
+                            - op.initial_state.buy_root[i].clone(),
+                    );
+                }
                 for i in 0..N_U64_FELTS {
                     eval.add_constraint(
-                        op.initial_state.best_buy_price[i].clone()
-                            - op.final_state.best_buy_price[i].clone(),
+                        op.final_state.best_buy_price[i].clone()
+                            - op.initial_state.best_buy_price[i].clone(),
                     );
                 }
 
@@ -380,7 +392,21 @@ impl<S: OrderSide> FrameworkEval for InsertionsEval<S> {
             -mult,
             &values,
         ));
-        eval.finalize_logup();
+
+        // Finalize with full batching mapping 89 relations to 26 columns
+        let mut batch_sizes = vec![0, 1, 2, 3]; // relations 0-3 -> columns 0-3
+
+        // 4 merkle proofs, each with 1 leaf + 20 merkle steps
+        for _ in 0..4 {
+            batch_sizes.push(4); // leaf hash -> column 4 (batched)
+            for col in 5..=24 {
+                batch_sizes.push(col); // merkle steps -> columns 5-24 (batched)
+            }
+        }
+
+        batch_sizes.push(25); // instruction -> column 25
+
+        eval.finalize_logup_batched(&batch_sizes);
         eval
     }
 }
