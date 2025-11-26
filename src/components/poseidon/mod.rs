@@ -8,22 +8,20 @@ use rayon::slice::ParallelSlice;
 // };
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use stwo_constraint_framework::{
+    relation, EvalAtRow, FrameworkComponent, FrameworkEval, LogupTraceGenerator, Relation,
+    RelationEntry,
+};
 use stwo_prover::{
-    constraint_framework::{
-        logup::LogupTraceGenerator, EvalAtRow, FrameworkComponent, FrameworkEval, Relation,
-        RelationEntry,
-    },
-    core::{
+    core::{fields::{m31::BaseField, qm31::SECURE_EXTENSION_DEGREE}, poly::circle::CanonicCoset, ColumnVec},
+    prover::{
         backend::simd::{
             m31::{PackedBaseField, LOG_N_LANES, N_LANES},
             qm31::{PackedQM31, PackedSecureField},
             SimdBackend,
         },
-        fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
         poly::{circle::CircleEvaluation, BitReversedOrder},
-        ColumnVec,
     },
-    relation,
 };
 use tracing::{span, Level};
 
@@ -274,6 +272,8 @@ impl TraceSize for PoseidonColumn {
 #[cfg(test)]
 mod tests {
     use std::{cell::RefCell, rc::Rc};
+    use stwo_constraint_framework::assert_constraints_on_polys as assert_constraints;
+    use crate::components::IsFirst;
 
     use super::*;
     use crate::{
@@ -282,7 +282,6 @@ mod tests {
     };
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, preprocessed_columns::IsFirst},
         core::{pcs::TreeVec, poly::circle::CanonicCoset},
     };
 

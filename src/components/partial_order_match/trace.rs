@@ -5,7 +5,8 @@ use crate::{
         order_match::MatchElements,
         poseidon::PoseidonElements,
         trace_utils::{
-            add_interaction_col, add_less_than_interaction_col, add_merkle_interaction_col,
+            add_interaction_col, add_leaf_interaction_col_batched, add_less_than_interaction_col,
+            add_merkle_interaction_col_batched, MerkleStep,
         },
         Claim, InteractionClaim,
     },
@@ -31,9 +32,11 @@ use rayon::{
 };
 use std::array;
 use stwo_air_utils::trace::component_trace::ComponentTrace;
+use crate::components::IsFirst;
+use stwo_constraint_framework::LogupTraceGenerator;
 use stwo_prover::{
-    constraint_framework::{logup::LogupTraceGenerator, preprocessed_columns::IsFirst},
-    core::{
+    core::{fields::m31::BaseField, poly::circle::CanonicCoset, ColumnVec},
+    prover::{
         backend::{
             simd::{
                 column::BaseColumn,
@@ -43,9 +46,7 @@ use stwo_prover::{
             },
             Column,
         },
-        fields::m31::BaseField,
         poly::{circle::CircleEvaluation, BitReversedOrder},
-        ColumnVec,
     },
 };
 use tracing::{debug, span, Level};
@@ -248,42 +249,99 @@ pub fn interaction_trace<S: OrderSide, T: OrderMatchType>(
         PackedSecureField::one(),
     );
 
-    for (leaf, proof, path, index) in [
-        (low_leaf, low_merkle_proof, low_merkle_path, low_index),
-        (leaf, merkle_proof, merkle_path, index),
-        (updated_leaf, merkle_proof, updated_merkle_path, index),
-    ]
-    .iter()
-    {
-        let leaf_state: [&Vec<PackedBaseField>; N_STATE] = leaf[0..N_STATE].try_into().unwrap();
-        let leaf_hash = path[0];
-        let elements: [&Vec<PackedBaseField>; N_ELEMENTS] = flatten!(leaf_state, leaf_hash);
-        // add the leaf hash interaction
-        add_interaction_col(
-            &mut logup_gen,
-            &elements,
-            is_real,
-            log_size,
-            poseidon_elements,
-            PackedSecureField::one(),
-        );
-        let mut curr = leaf_hash;
-        // add the merkle path interaction
-        for (i, (sibling, hash)) in proof.iter().zip(path.iter().skip(1)).enumerate() {
-            add_merkle_interaction_col(
-                &mut logup_gen,
-                &curr,
-                sibling,
-                hash,
-                index[i],
-                is_real,
-                log_size,
-                poseidon_elements,
-                PackedSecureField::one(),
-            );
-            curr = *hash;
-        }
+    // A Total of 3 merkle proofs (partial match doesn't update low leaf):
+    //   1. Low leaf - original path
+    //   2. Matched leaf - original path
+    //   3. Matched leaf - updated path (marked inactive)
+    //
+    // Batching strategy:
+    //   - Batch all 3 leaf hashes into 1 column
+    //   - Batch all 3 merkle steps at each level into 1 column per level (20 columns total)
+
+    // Batch all 3 leaf hash operations together
+    let leaf_batch = vec![
+        // Proof 1: Low leaf - original
+        {
+            let leaf_state: [&Vec<PackedBaseField>; N_STATE] =
+                low_leaf[0..N_STATE].try_into().unwrap();
+            let leaf_hash = low_merkle_path[0];
+            let elements_array: [&Vec<PackedBaseField>; N_ELEMENTS] =
+                flatten!(leaf_state, leaf_hash);
+            let elements = elements_array.to_vec();
+            (elements, PackedSecureField::one())
+        },
+        // Proof 2: Matched leaf - original
+        {
+            let leaf_state: [&Vec<PackedBaseField>; N_STATE] = leaf[0..N_STATE].try_into().unwrap();
+            let leaf_hash = merkle_path[0];
+            let elements_array: [&Vec<PackedBaseField>; N_ELEMENTS] =
+                flatten!(leaf_state, leaf_hash);
+            let elements = elements_array.to_vec();
+            (elements, PackedSecureField::one())
+        },
+        // Proof 3: Matched leaf - updated (inactive)
+        {
+            let leaf_state: [&Vec<PackedBaseField>; N_STATE] =
+                updated_leaf[0..N_STATE].try_into().unwrap();
+            let leaf_hash = updated_merkle_path[0];
+            let elements_array: [&Vec<PackedBaseField>; N_ELEMENTS] =
+                flatten!(leaf_state, leaf_hash);
+            let elements = elements_array.to_vec();
+            (elements, PackedSecureField::one())
+        },
+    ];
+
+    add_leaf_interaction_col_batched(
+        &mut logup_gen,
+        &[leaf_batch],
+        is_real,
+        log_size,
+        poseidon_elements,
+    );
+
+    // Batch Merkle steps by level: for each level, batch all 3 proofs' steps together
+    let mut merkle_batches: Vec<Vec<MerkleStep>> = Vec::with_capacity(MERKLE_HEIGHT);
+
+    for level in 0..MERKLE_HEIGHT {
+        let mut level_batch = Vec::with_capacity(3);
+
+        // Proof 1: Low leaf - original path
+        level_batch.push(MerkleStep {
+            curr: low_merkle_path[level].to_vec(),
+            sibling: low_merkle_proof[level].to_vec(),
+            hash: low_merkle_path[level + 1].to_vec(),
+            index_bit: low_index[level],
+            mult: PackedSecureField::one(),
+        });
+
+        // Proof 2: Matched leaf - original path
+        level_batch.push(MerkleStep {
+            curr: merkle_path[level].to_vec(),
+            sibling: merkle_proof[level].to_vec(),
+            hash: merkle_path[level + 1].to_vec(),
+            index_bit: index[level],
+            mult: PackedSecureField::one(),
+        });
+
+        // Proof 3: Matched leaf - updated path
+        level_batch.push(MerkleStep {
+            curr: updated_merkle_path[level].to_vec(),
+            sibling: merkle_proof[level].to_vec(),
+            hash: updated_merkle_path[level + 1].to_vec(),
+            index_bit: index[level],
+            mult: PackedSecureField::one(),
+        });
+
+        merkle_batches.push(level_batch);
     }
+
+    add_merkle_interaction_col_batched(
+        &mut logup_gen,
+        &merkle_batches,
+        is_real,
+        log_size,
+        poseidon_elements,
+    );
 
     let values = trace.iter().map(|c| &c.data).collect_vec();
     // add the instruction interaction, that yields the final state

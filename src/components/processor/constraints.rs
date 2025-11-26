@@ -1,6 +1,6 @@
 use crate::executor::{flatten_single, state::StateElements};
 use num_traits::One;
-use stwo_prover::constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
+use stwo_constraint_framework::{EvalAtRow, FrameworkEval, RelationEntry};
 
 use crate::{
     components::Claim,
@@ -42,7 +42,7 @@ impl FrameworkEval for ProcessorEval {
         self.claim.log_size
     }
     fn max_constraint_log_degree_bound(&self) -> u32 {
-        self.claim.log_size + 1
+        self.claim.log_size + 2  // Raised to +2 to match Poseidon and enable better batching
     }
     fn evaluate<E: EvalAtRow>(&self, mut eval: E) -> E {
         let op = Instruction::<E::F>::from_eval(&mut eval);
@@ -50,7 +50,8 @@ impl FrameworkEval for ProcessorEval {
         // is_real must be a boolean
         eval.add_constraint(op.is_real.clone() * (op.is_real.clone() - E::F::one()));
 
-        let mult = E::EF::from(op.is_real.clone());
+        let is_real = op.is_real.clone();
+        let mult = E::EF::from(is_real.clone());
 
         let initial_state: Vec<E::F> = flatten!(
             op.initial_state.n.clone(),
@@ -102,6 +103,9 @@ impl FrameworkEval for ProcessorEval {
         ));
 
         // ensure that the state count is updated correctly
+        // TODO: This should respect is_real (n should only increment for non-padded rows)
+        // However, changing to `- is_real` requires updating trace generation to ensure
+        // all padded rows have final_state == initial_state, not just for n
         eval.add_constraint(op.final_state.n.clone() - op.initial_state.n.clone() - E::F::one());
 
         // the instructions opcode must be the same as the final state opcode

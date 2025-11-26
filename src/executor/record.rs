@@ -2,9 +2,9 @@ use crate::components::TraceSize;
 use itertools::izip;
 use num_traits::{One, Zero};
 use std::array;
-use stwo_prover::core::{
-    backend::{simd::column::BaseColumn, Column},
-    fields::m31::BaseField,
+use stwo_prover::{
+    core::fields::m31::BaseField,
+    prover::backend::{simd::column::BaseColumn, Column},
 };
 
 use super::{
@@ -85,9 +85,8 @@ pub struct ExecutionTrace<F> {
     /// Add Operation for Field Representations of Price, Time
     pub add_operations: Vec<[F; 32]>,
     /// Less Than Operation. Compares Price pairs, comprising 8 Field Elements each
+    /// Unified operations (handles both strict and non-strict via is_strict field)
     pub less_than_operations: LessThanOperations,
-    /// strict less than operations
-    pub strict_less_than_operations: LessThanOperations,
     /// Comparison Operations. Compares two Price, Time pairs
     pub comparison_operations: Vec<[F; 53]>,
     /// Hash Operations For Merklelization.
@@ -127,7 +126,6 @@ impl ExecutionTrace<BaseField> {
             instructions: Vec::new(),
             add_operations: Vec::new(),
             less_than_operations: Vec::new(),
-            strict_less_than_operations: Vec::new(),
             comparison_operations: Vec::new(),
             poseidon_operations: Vec::new(),
             byte_operations: array::from_fn(|_| BaseColumn::zeros(1 << 16)),
@@ -310,7 +308,6 @@ impl ExecutionTrace<BaseField> {
             self.instructions.len(),
             self.add_operations.len(),
             self.less_than_operations.len(),
-            self.strict_less_than_operations.len(),
             self.comparison_operations.len(),
             self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
             1 << (2 * N_U64_FELTS), // 2^8 * 2^8 combinations
@@ -339,8 +336,16 @@ impl ExecutionTrace<BaseField> {
             VexComponent::PartialMatchPassiveSell => self.sell_passive_partial_match.len(),
             VexComponent::Processor => self.instructions.len(),
             VexComponent::Addition => self.add_operations.len(),
-            VexComponent::LessThan => self.less_than_operations.len(),
-            VexComponent::StrictLessThan => self.strict_less_than_operations.len(),
+            VexComponent::LessThan => self
+                .less_than_operations
+                .iter()
+                .filter(|op| op[LessThanColumn::IS_STRICT] == BaseField::from(0))
+                .count(),
+            VexComponent::StrictLessThan => self
+                .less_than_operations
+                .iter()
+                .filter(|op| op[LessThanColumn::IS_STRICT] == BaseField::from(1))
+                .count(),
             VexComponent::Poseidon => self.poseidon_operations.len() / N_INSTANCES_PER_ROW,
             VexComponent::Bytes => 1 << N_U64_FELTS, // 2^8 * 2^8 combinations
         };
@@ -394,16 +399,23 @@ impl ExecutionTrace<BaseField> {
         self.add_less_than_u8_event(a_cmp.0, b_cmp.0)?;
         row[LessThanColumn::A_COMPARISON_BYTE] = a_cmp;
         row[LessThanColumn::B_COMPARISON_BYTE] = b_cmp;
+        row[LessThanColumn::IS_STRICT] = if is_strict {
+            BaseField::one()
+        } else {
+            BaseField::zero()
+        };
         row[LessThanColumn::IS_REAL] = BaseField::one();
 
+        // Set C based on is_strict flag
         if is_strict {
             row[LessThanColumn::C] = c;
-            self.strict_less_than_operations.push(row);
         } else {
             // returns 1 as result if a = b, else returns c
             row[LessThanColumn::C] = if a == b { BaseField::one() } else { c };
-            self.less_than_operations.push(row);
         }
+
+        // Push to unified operations vector
+        self.less_than_operations.push(row);
 
         Ok(())
     }
@@ -440,7 +452,6 @@ pub struct ExecutionTraceShape<T: Copy> {
     pub instructions: T,
     pub add_operations: T,
     pub less_than_operations: T,
-    pub strict_less_than_operations: T,
     pub comparison_operations: T,
     pub poseidon_operations: T,
 }
@@ -465,7 +476,6 @@ impl<F> ExecutionTrace<F> {
             instructions: self.instructions.len(),
             add_operations: self.add_operations.len(),
             less_than_operations: self.less_than_operations.len(),
-            strict_less_than_operations: self.strict_less_than_operations.len(),
             comparison_operations: self.comparison_operations.len(),
             poseidon_operations: self.poseidon_operations.len(),
         }
@@ -491,7 +501,6 @@ impl<F> ExecutionTrace<F> {
             instructions: (self.instructions.len() - 1).ilog2() + 1,
             add_operations: (self.add_operations.len() - 1).ilog2() + 1,
             less_than_operations: (self.less_than_operations.len() - 1).ilog2() + 1,
-            strict_less_than_operations: (self.strict_less_than_operations.len() - 1).ilog2() + 1,
             comparison_operations: (self.comparison_operations.len() - 1).ilog2() + 1,
             poseidon_operations: (self.poseidon_operations.len() - 1).ilog2() + 1,
         }

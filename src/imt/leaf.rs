@@ -14,10 +14,10 @@ use crate::{
     types::{Price, Time, Volume},
 };
 use num_traits::{One, Zero};
-use stwo_prover::constraint_framework::EvalAtRow;
-use stwo_prover::core::backend::simd::column::BaseColumn;
-use stwo_prover::core::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
-use stwo_prover::core::backend::Column;
+use stwo_constraint_framework::EvalAtRow;
+use stwo_prover::prover::backend::simd::column::BaseColumn;
+use stwo_prover::prover::backend::simd::m31::{PackedBaseField, LOG_N_LANES};
+use stwo_prover::prover::backend::Column;
 use stwo_prover::core::fields::m31::{BaseField, M31};
 
 #[derive(Clone)]

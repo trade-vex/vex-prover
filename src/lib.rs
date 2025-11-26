@@ -1,6 +1,15 @@
 #![feature(btree_cursors, portable_simd, iter_array_chunks)]
 #![feature(trait_upcasting)]
 
+// The relation! macro from stwo-constraint-framework references `stwo` crate
+extern crate stwo_prover as stwo;
+
+#[cfg(feature = "jemalloc")]
+use tikv_jemallocator::Jemalloc;
+#[cfg(feature = "jemalloc")]
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 use crate::executor::state::StateFelts;
 use components::{
     addition::AddColumn, bytes::BytesPreProcessedColumn, insertions::InsertionsColumn,
@@ -10,15 +19,13 @@ use components::{
 use executor::state::StateElements;
 use imt::side::{Aggressive, Passive};
 use num_traits::Zero;
-use stwo_prover::{
-    constraint_framework::Relation,
-    core::{
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
-        pcs::TreeVec,
-        prover::StarkProof,
-        vcs::ops::MerkleHasher,
-    },
+use stwo_constraint_framework::Relation;
+use stwo_prover::core::{
+    channel::Channel,
+    fields::{m31::BaseField, qm31::SecureField, FieldExpOps},
+    pcs::TreeVec,
+    proof::StarkProof,
+    vcs::MerkleHasher,
 };
 
 pub mod components;
@@ -86,6 +93,7 @@ impl VexClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.bytes_claim.mix_into(channel);
         self.poseidon_claim.mix_into(channel);
+        // strict_less_than is unified into less_than, but keep in mix for now
         self.strict_less_than_claim.mix_into(channel);
         self.less_than_claim.mix_into(channel);
         self.add_claim.mix_into(channel);
@@ -108,6 +116,7 @@ impl VexClaim {
             [
                 self.bytes_claim.log_sizes(),
                 self.poseidon_claim.log_sizes(),
+                // strict_less_than is unified into less_than, but keep in log_sizes for now
                 self.strict_less_than_claim.log_sizes(),
                 self.less_than_claim.log_sizes(),
                 self.add_claim.log_sizes(),
@@ -224,6 +233,7 @@ impl VexInteractionClaim {
     pub fn mix_into(&self, channel: &mut impl Channel) {
         self.bytes_interaction_claim.mix_into(channel);
         self.poseidon_interaction_claim.mix_into(channel);
+        // Both claims use unified logic but are kept separate
         self.strict_less_than_interaction_claim.mix_into(channel);
         self.less_than_interaction_claim.mix_into(channel);
         self.add_interaction_claim.mix_into(channel);

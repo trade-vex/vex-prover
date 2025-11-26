@@ -1,22 +1,31 @@
 use num_traits::Zero;
+use std::collections::HashMap;
+use std::sync::Mutex;
+use stwo_constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX};
 use stwo_prover::{
-    constraint_framework::{INTERACTION_TRACE_IDX, ORIGINAL_TRACE_IDX, PREPROCESSED_TRACE_IDX},
     core::{
-        backend::simd::SimdBackend,
         channel::Blake2sChannel,
-        fields::m31::BaseField,
-        pcs::{CommitmentSchemeProver, CommitmentSchemeVerifier, PcsConfig},
-        poly::circle::{CanonicCoset, PolyOps},
-        prover::{self, verify},
+        fields::{m31::BaseField, qm31::SecureField},
+        pcs::{CommitmentSchemeVerifier, PcsConfig},
+        poly::circle::CanonicCoset,
         vcs::blake2_merkle::{Blake2sMerkleChannel, Blake2sMerkleHasher},
+        verifier::verify,
+    },
+    prover::{
+        self,
+        backend::simd::SimdBackend,
+        poly::circle::PolyOps,
+        CommitmentSchemeProver,
     },
 };
 use tracing::{span, Level};
 
 use crate::{
     components::{
-        addition, bytes, insertions, is_first, less_than, order_match, partial_order_match,
-        poseidon, processor, VexComponent, VexComponents, VexInteractionElements,
+        addition, bytes, insertions, is_first,
+        less_than::{self, LessThanColumn},
+        order_match, partial_order_match, poseidon, processor, InteractionClaim, VexComponent,
+        VexComponents, VexInteractionElements,
     },
     error::{VexProvingError, VexVerificationError},
     executor::record::ExecutionTrace,
@@ -26,6 +35,11 @@ use crate::{
 
 #[cfg(feature = "relation-tracker")]
 use crate::relation_tracker::track_vex_relations;
+
+/// Maximum constraint degree blowup across all components.
+/// This must be >= the maximum value of (max_constraint_log_degree_bound - log_size)
+/// across all components. Currently set to 3 to match batched components (insertions, matches).
+const MAX_CONSTRAINT_BLOWUP: u32 = 3;
 
 /// Prove the Vex Execution Trace
 pub fn prove_vex(
@@ -37,8 +51,9 @@ pub fn prove_vex(
     let config = PcsConfig::default();
 
     // precompute twiddles for low degree polynomial extension
+    // Must use MAX_CONSTRAINT_BLOWUP to ensure twiddles cover all constraint evaluations
     let twiddles = SimdBackend::precompute_twiddles(
-        CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + 2)
+        CanonicCoset::new(trace.max_log_size() + config.fri_config.log_blowup_factor + MAX_CONSTRAINT_BLOWUP)
             .circle_domain()
             .half_coset,
     );
@@ -48,32 +63,45 @@ pub fn prove_vex(
     let mut commitment_scheme =
         CommitmentSchemeProver::<_, Blake2sMerkleChannel>::new(config, &twiddles);
 
+    // Store polynomial coefficients - required for constraint evaluation
+    commitment_scheme.set_store_polynomials_coefficients();
+
     let span = span!(Level::INFO, "Preprocessed Trace").entered();
     let mut tree_builder = commitment_scheme.tree_builder();
 
+    // Memoize is_first() calls to avoid recomputing for same log_size
+    let is_first_cache = Mutex::new(HashMap::new());
+    let get_is_first = |log_size: u32| {
+        let mut cache = is_first_cache.lock().unwrap();
+        cache
+            .entry(log_size)
+            .or_insert_with(|| is_first(log_size))
+            .clone()
+    };
+
     // Extend the preprocessed trace with the components
     tree_builder.extend_evals(bytes::preprocessed_trace());
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Poseidon)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::StrictLessThan)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::LessThan)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Addition)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::Processor)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertBuyOrder)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::InsertSellOrder)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveBuy)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchAggressiveSell)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveBuy)));
-    tree_builder.extend_evals(is_first(trace.log_size(VexComponent::MatchPassiveSell)));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::Poseidon)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::StrictLessThan)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::LessThan)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::Addition)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::Processor)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::InsertBuyOrder)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::InsertSellOrder)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchAggressiveBuy)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchAggressiveSell)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchPassiveBuy)));
+    tree_builder.extend_evals(get_is_first(trace.log_size(VexComponent::MatchPassiveSell)));
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchAggressiveBuy),
     ));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchAggressiveSell),
     ));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchPassiveBuy),
     ));
-    tree_builder.extend_evals(is_first(
+    tree_builder.extend_evals(get_is_first(
         trace.log_size(VexComponent::PartialMatchPassiveSell),
     ));
 
@@ -84,9 +112,15 @@ pub fn prove_vex(
     let mut tree_builder = commitment_scheme.tree_builder();
     let (bytes_trace, bytes_claim) = bytes::trace(trace.byte_operations.clone());
     let (poseidon_trace, poseidon_claim) = poseidon::trace(trace.poseidon_operations);
-    let (strict_less_than_trace, strict_less_than_claim) =
-        less_than::trace::<true>(trace.strict_less_than_operations);
-    let (less_than_trace, less_than_claim) = less_than::trace::<false>(trace.less_than_operations);
+    // Split unified operations by is_strict flag for separate tree sections
+    let (strict_ops, non_strict_ops): (Vec<_>, Vec<_>) = trace
+        .less_than_operations
+        .into_iter()
+        .partition(|op| op[LessThanColumn::IS_STRICT] == BaseField::from(1));
+
+    // Generate traces using unified logic, but keep them separate for tree structure
+    let (strict_less_than_trace, strict_less_than_claim) = less_than::trace(strict_ops);
+    let (less_than_trace, less_than_claim) = less_than::trace(non_strict_ops);
     let (add_trace, add_claim) = addition::trace(trace.add_operations);
     let (processor_trace, processor_claim) = processor::trace(trace.instructions);
     let (buy_insert_trace, buy_insert_claim) = insertions::trace::<Buy>(trace.buy_insert_order);
@@ -111,6 +145,7 @@ pub fn prove_vex(
     // Extend the main trace with the components
     tree_builder.extend_evals(bytes_trace.clone());
     tree_builder.extend_evals(poseidon_trace.clone());
+    // Both traces use unified logic but are kept separate for tree structure
     tree_builder.extend_evals(strict_less_than_trace.clone());
     tree_builder.extend_evals(less_than_trace.clone());
     tree_builder.extend_evals(add_trace.clone());
@@ -175,17 +210,20 @@ pub fn prove_vex(
         &interaction_elements.state_elements,
         &interaction_elements.instruction_elements,
     );
+    // Generate interaction traces using unified logic, but keep them separate
     let (strict_less_than_interaction_trace, strict_less_than_interaction_claim) =
-        less_than::interaction_trace::<true, _>(
+        less_than::interaction_trace(
             &strict_less_than_trace,
             &interaction_elements.less_than_u8_elements,
+            &interaction_elements.less_than_elements,
             &interaction_elements.strict_less_than_elements,
         );
     let (less_than_interaction_trace, less_than_interaction_claim) =
-        less_than::interaction_trace::<false, _>(
+        less_than::interaction_trace(
             &less_than_trace,
             &interaction_elements.less_than_u8_elements,
             &interaction_elements.less_than_elements,
+            &interaction_elements.strict_less_than_elements,
         );
     let (add_interaction_trace, add_interaction_claim) = addition::interaction_trace(
         &add_trace,
@@ -285,6 +323,7 @@ pub fn prove_vex(
 
     tree_builder.extend_evals(bytes_interaction_trace);
     tree_builder.extend_evals(poseidon_interaction_trace);
+    // Both interaction traces use unified logic but are kept separate for tree structure
     tree_builder.extend_evals(strict_less_than_interaction_trace);
     tree_builder.extend_evals(less_than_interaction_trace);
     tree_builder.extend_evals(add_interaction_trace);
@@ -300,6 +339,8 @@ pub fn prove_vex(
     tree_builder.extend_evals(buy_passive_partial_match_interaction_trace);
     tree_builder.extend_evals(sell_passive_partial_match_interaction_trace);
 
+    // For the unified less_than component: both claims point to the same data
+    // but are kept separate for backward compatibility with tree structure
     let interaction_claim = VexInteractionClaim {
         processor_interaction_claim,
         buy_insert_interaction_claim,

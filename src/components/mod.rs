@@ -10,10 +10,15 @@ use partial_order_match::{
     BuyAgessivePartialMatchComponent, BuyPassivePartialMatchComponent, PartialMatchEval,
     SellAggressivePartialMatchComponent, SellPassivePartialMatchComponent,
 };
+use stwo_constraint_framework::TraceLocationAllocator;
 use stwo_prover::{
-    constraint_framework::TraceLocationAllocator,
     core::{
-        air::{Component, ComponentProver},
+        air::Component,
+        channel::Channel,
+        fields::{m31::BaseField, qm31::SecureField},
+        pcs::TreeVec,
+    },
+    prover::{
         backend::{
             simd::{
                 column::BaseColumn,
@@ -22,9 +27,7 @@ use stwo_prover::{
             },
             Column,
         },
-        channel::Channel,
-        fields::{m31::BaseField, qm31::SecureField},
-        pcs::TreeVec,
+        ComponentProver,
     },
 };
 
@@ -36,9 +39,7 @@ use crate::{
 
 use bytes::{BytesComponent, LessThanU8Elements, RangeCheckU8Elements};
 use insertions::{BuyInsertionComponent, InsertionsEval, SellInsertionComponent};
-use less_than::{
-    LessThanComponent, LessThanElements, StrictLessThanComponent, StrictLessThanElements,
-};
+use less_than::{LessThanComponent, LessThanElements, StrictLessThanElements};
 use poseidon::{PoseidonComponent, PoseidonElements};
 use processor::{ProcessorComponent, ProcessorEval};
 pub mod addition;
@@ -51,7 +52,7 @@ pub mod partial_order_match;
 pub mod poseidon;
 pub mod processor;
 pub(crate) mod trace_utils;
-pub use trace_utils::is_first;
+pub use trace_utils::{is_first, IsFirst};
 
 /// Const trait that defines the number of columns in the trace table
 pub trait TraceSize {
@@ -195,8 +196,8 @@ pub struct VexComponents {
     buy_insert: BuyInsertionComponent,
     sell_insert: SellInsertionComponent,
     poseidon: PoseidonComponent,
-    strict_less_than: StrictLessThanComponent,
-    less_than: LessThanComponent,
+    strict_less_than: LessThanComponent,  // Uses unified logic
+    less_than: LessThanComponent,  // Uses unified logic
     add_component: AddComponent,
     bytes: BytesComponent,
     buy_aggressive_match: BuyAgessiveMatchComponent,
@@ -237,7 +238,8 @@ impl VexComponents {
             interaction_claim.poseidon_interaction_claim.claimed_sum,
         );
 
-        let strict_less_than = less_than::StrictLessThanComponent::new(
+        // Both components use the same unified logic
+        let strict_less_than = LessThanComponent::new(
             tree_span_provider,
             less_than::LessThanEval {
                 claim: claim.strict_less_than_claim.clone(),
@@ -245,9 +247,7 @@ impl VexComponents {
                 strict_less_than_elements: interaction_elements.strict_less_than_elements.clone(),
                 less_than_u8_elements: interaction_elements.less_than_u8_elements.clone(),
             },
-            interaction_claim
-                .strict_less_than_interaction_claim
-                .claimed_sum,
+            interaction_claim.strict_less_than_interaction_claim.claimed_sum,
         );
 
         let less_than = LessThanComponent::new(
@@ -464,6 +464,7 @@ impl VexComponents {
         vec![
             &self.bytes,
             &self.poseidon,
+            // Both components use the same unified logic
             &self.strict_less_than,
             &self.less_than,
             &self.add_component,

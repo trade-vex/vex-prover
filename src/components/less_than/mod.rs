@@ -1,10 +1,8 @@
 use crate::types::N_U64_LIMBS;
 use std::array;
-use stwo_prover::{
-    constraint_framework::{EvalAtRow, FrameworkComponent},
-    core::fields::{m31::BaseField, secure_column::SECURE_EXTENSION_DEGREE},
-    relation,
-};
+use stwo_constraint_framework::{EvalAtRow, FrameworkComponent};
+use stwo_constraint_framework::relation;
+use stwo_prover::core::fields::{m31::BaseField, qm31::SECURE_EXTENSION_DEGREE};
 
 use super::TraceSize;
 mod constraints;
@@ -13,9 +11,8 @@ mod trace;
 pub use constraints::LessThanEval;
 pub use trace::{interaction_trace, preprocessed_trace, trace};
 
-/// LessThanComponent represents the LessThan component
-pub type StrictLessThanComponent = FrameworkComponent<LessThanEval<true>>;
-pub type LessThanComponent = FrameworkComponent<LessThanEval<false>>;
+/// LessThanComponent represents the unified LessThan component (handles both strict and non-strict)
+pub type LessThanComponent = FrameworkComponent<LessThanEval>;
 
 /// Less Than Operations
 pub type LessThanOperations = Vec<[BaseField; LessThanColumn::MAIN_COLS]>;
@@ -37,6 +34,8 @@ pub struct LessThanOp<F> {
     a_comparison_byte: F,
     // First byte of the second operand where a[i] < b[i] from the most significant byte
     b_comparison_byte: F,
+    // is_strict flag: 1 for strict less than (<), 0 for less than or equal (<=)
+    is_strict: F,
     // is real flag to check if the operation is not among the dummy padded operations
     is_real: F,
 }
@@ -50,6 +49,7 @@ impl<F> LessThanOp<F> {
         let flags = array::from_fn(|_| eval.next_trace_mask());
         let a_comparison_byte = eval.next_trace_mask();
         let b_comparison_byte = eval.next_trace_mask();
+        let is_strict = eval.next_trace_mask();
         let is_real = eval.next_trace_mask();
         LessThanOp {
             a,
@@ -58,6 +58,7 @@ impl<F> LessThanOp<F> {
             flags,
             a_comparison_byte,
             b_comparison_byte,
+            is_strict,
             is_real,
         }
     }
@@ -74,7 +75,8 @@ impl LessThanColumn {
     pub const FLAGS: usize = Self::C + 1;
     pub const A_COMPARISON_BYTE: usize = Self::FLAGS + N_U64_LIMBS;
     pub const B_COMPARISON_BYTE: usize = Self::A_COMPARISON_BYTE + 1;
-    pub const IS_REAL: usize = Self::B_COMPARISON_BYTE + 1;
+    pub const IS_STRICT: usize = Self::B_COMPARISON_BYTE + 1;
+    pub const IS_REAL: usize = Self::IS_STRICT + 1;
 }
 
 impl TraceSize for LessThanColumn {
@@ -82,9 +84,8 @@ impl TraceSize for LessThanColumn {
     const PREPROCESSED_COLS: usize = 1;
     // last field's index + offset
     const MAIN_COLS: usize = Self::IS_REAL + 1;
-    // 1 Interaction Column for LessThanU8 check
-    // 1 Interaction Column for yielding the result
-    const INTERACTION_COLS: usize = SECURE_EXTENSION_DEGREE;
+    // 2 Interaction Columns: one for LessThanU8 check, one for LessThan/StrictLessThan yield
+    const INTERACTION_COLS: usize = 2 * SECURE_EXTENSION_DEGREE;
 }
 
 // A Total of 17 elements are "used" or "yielded" for the less than operation
@@ -95,12 +96,12 @@ relation!(LessThanElements, 17);
 relation!(StrictLessThanElements, 17);
 
 #[cfg(test)]
+use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
 mod tests {
     use constraints::LessThanEval;
     use rand::Rng;
     use std::{cell::RefCell, rc::Rc};
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
         core::{channel::Blake2sChannel, pcs::TreeVec, poly::circle::CanonicCoset},
     };
     use trace::{interaction_trace, preprocessed_trace, trace};
@@ -115,7 +116,7 @@ mod tests {
 
     use super::*;
 
-    fn evaluate_trace<const STRICT: bool>(
+    fn evaluate_trace(
         less_than_operations: LessThanOperations,
         less_than_u8_elements: &LessThanU8Elements,
         less_than_elements: &LessThanElements,
@@ -123,17 +124,18 @@ mod tests {
     ) {
         let log_size = (less_than_operations.len() - 1).ilog2() + 1;
         let constant_trace = preprocessed_trace(log_size);
-        let (trace, claim) = trace::<STRICT>(less_than_operations);
-        let (interaction_trace, interaction_claim) = if STRICT {
-            interaction_trace::<STRICT, _>(&trace, less_than_u8_elements, strict_less_than_elements)
-        } else {
-            interaction_trace::<STRICT, _>(&trace, less_than_u8_elements, less_than_elements)
-        };
+        let (trace, claim) = trace(less_than_operations);
+        let (interaction_trace, interaction_claim) = interaction_trace(
+            &trace,
+            less_than_u8_elements,
+            less_than_elements,
+            strict_less_than_elements,
+        );
 
         let trace = TreeVec::new(vec![constant_trace, trace, interaction_trace]);
         let trace_polys = TreeVec::<Vec<_>>::map_cols(trace, |c| c.interpolate());
 
-        let component: LessThanEval<STRICT> = LessThanEval {
+        let component = LessThanEval {
             less_than_u8_elements: less_than_u8_elements.clone(),
             less_than_elements: less_than_elements.clone(),
             strict_less_than_elements: strict_less_than_elements.clone(),
@@ -180,14 +182,9 @@ mod tests {
         let less_than_elements = LessThanElements::draw(&mut channel);
         let strict_less_than_elements = StrictLessThanElements::draw(&mut channel);
 
-        evaluate_trace::<false>(
+        // Test unified component with both strict and non-strict operations
+        evaluate_trace(
             execution_trace.less_than_operations,
-            &less_than_u8_elements,
-            &less_than_elements,
-            &strict_less_than_elements,
-        );
-        evaluate_trace::<true>(
-            execution_trace.strict_less_than_operations,
             &less_than_u8_elements,
             &less_than_elements,
             &strict_less_than_elements,
@@ -223,14 +220,10 @@ mod tests {
         let less_than_u8_elements = LessThanU8Elements::draw(&mut channel);
         let less_than_elements = LessThanElements::draw(&mut channel);
         let strict_less_than_elements = StrictLessThanElements::draw(&mut channel);
-        evaluate_trace::<false>(
+
+        // Test unified component with both strict and non-strict operations
+        evaluate_trace(
             execution_trace.less_than_operations,
-            &less_than_u8_elements,
-            &less_than_elements,
-            &strict_less_than_elements,
-        );
-        evaluate_trace::<true>(
-            execution_trace.strict_less_than_operations,
             &less_than_u8_elements,
             &less_than_elements,
             &strict_less_than_elements,

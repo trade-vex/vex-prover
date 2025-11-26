@@ -1,8 +1,7 @@
 use std::marker::PhantomData;
 
-use stwo_prover::{
-    constraint_framework::FrameworkComponent, core::fields::secure_column::SECURE_EXTENSION_DEGREE,
-};
+use stwo_constraint_framework::FrameworkComponent;
+use stwo_prover::core::fields::qm31::SECURE_EXTENSION_DEGREE;
 
 use crate::{
     executor::instruction::N_INSTRUCTION_FELTS,
@@ -40,32 +39,35 @@ impl<T: OrderMatchType> TraceSize for PartialMatchColumn<T> {
     /// is_first column
     const PREPROCESSED_COLS: usize = 1;
     const MAIN_COLS: usize = N_INSTRUCTION_FELTS;
-    /// number of poseidon hashes: 3 times for leaf hashes
-    ///     - 1 for 0th leaf
-    ///     - 1 for merkle_proof for matched leaf
-    ///     - 1 for updated matched leaf (leaf.active = zero)
-    /// 3*MERKLE_HEIGHT for merkle paths verification
-    /// Total Poseidon Interactions: 3 + 3*MERKLE_HEIGHT
-    /// Match Invariant: MAX(buy_imt) >= MIN(sell_imt) only in Aggressive Side
-    /// Total Non Strict Less Than Interactions: 1
-    /// When an Aggressive Match is made (price, volume) is yielded
-    /// When an Passive Match is made (price, volume) is used
-    /// 1 column for Add Elements (filled_volume + remaining_volume, volume)
-    /// 1 column for Match Elements (price, volume)
-    /// 1 column for yielding the final result
-    /// Total Columns: 3 + 3*MERKLE_HEIGHT + 1 + 1 + 1 = 4*MERKLE_HEIGHT + 9
+    /// Interaction columns (batched for efficiency):
+    ///   - T::LESSTHANCOL less_than columns (1 for Aggressive, 0 for Passive)
+    ///   - 1 add elements column (filled_volume + remaining_volume, volume)
+    ///   - 1 match elements column (price, volume)
+    ///   - 1 leaf_batch column (batches 3 leaf hash operations via common denominator)
+    ///   - MERKLE_HEIGHT merkle_batch columns (each batches 3 tree operations per level)
+    ///   - 1 instruction column (final state)
+    ///
+    /// Batching details:
+    ///   - 3 leaf hashes (low original, matched original, matched updated)
+    ///     batched into 1 column using common denominator technique
+    ///   - 3 merkle verifications per level * MERKLE_HEIGHT levels
+    ///     batched into MERKLE_HEIGHT columns (one batch per level)
+    ///
+    /// Total Columns:
+    ///   - Aggressive: 1 + 1 + 1 + 1 + MERKLE_HEIGHT + 1 = 1 + 1 + 1 + 1 + 20 + 1 = 25
+    ///   - Passive: 0 + 1 + 1 + 1 + MERKLE_HEIGHT + 1 = 0 + 1 + 1 + 1 + 20 + 1 = 24
     const INTERACTION_COLS: usize =
-        ((3 * MERKLE_HEIGHT + 6) + T::LESSTHANCOL) * SECURE_EXTENSION_DEGREE;
+        (T::LESSTHANCOL + MERKLE_HEIGHT + 4) * SECURE_EXTENSION_DEGREE;
 }
 
 #[cfg(test)]
+use stwo_constraint_framework::{assert_constraints_on_polys as assert_constraints, FrameworkEval};
 mod tests {
     use std::{cell::RefCell, marker::PhantomData, rc::Rc};
 
     use constraints::PartialMatchEval;
     use rand::Rng;
     use stwo_prover::{
-        constraint_framework::{assert_constraints, FrameworkEval},
         core::{
             channel::Blake2sChannel, fields::m31::BaseField, pcs::TreeVec,
             poly::circle::CanonicCoset,

@@ -1,6 +1,7 @@
 use std::{array, fmt::Debug};
 
-use stwo_prover::{constraint_framework::EvalAtRow, relation};
+use stwo_constraint_framework::EvalAtRow;
+use stwo_constraint_framework::relation;
 
 use crate::{
     executor::flatten_single,
